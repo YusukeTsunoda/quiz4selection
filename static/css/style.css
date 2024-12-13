@@ -128,7 +128,7 @@ body {
 
 .fade {
     opacity: 0;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.15s ease;
 }
 
 .fade.show {

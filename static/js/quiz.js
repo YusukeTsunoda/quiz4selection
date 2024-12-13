@@ -56,11 +56,8 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => {
             const container = document.querySelector('.quiz-container');
             container.classList.add('fade');
-            
-            setTimeout(() => {
-                window.location.href = '/next_question';
-            }, 300);
-        }, 1000);
+            window.location.href = '/next_question';
+        }, 500);
     }
 
     optionsContainer.addEventListener('click', handleOptionClick);
