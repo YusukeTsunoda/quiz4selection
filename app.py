@@ -10,21 +10,47 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev_key_for_quiz_app")
 
-from quiz_data import questions
+from quiz_data import questions_by_category
 
 @app.route('/')
 def index():
     try:
-        # Reset session data at the start
+        # Show category selection page
+        categories = list(questions_by_category.keys())
+        return render_template('category_select.html', categories=categories)
+    except Exception as e:
+        logger.error(f"Error in index route: {e}")
+        return "An error occurred", 500
+
+@app.route('/select_difficulty/<category>')
+def select_difficulty(category):
+    try:
+        difficulties = ["easy", "medium", "hard"]
+        return render_template('difficulty_select.html', 
+                             category=category,
+                             difficulties=difficulties)
+    except Exception as e:
+        logger.error(f"Error in select_difficulty route: {e}")
+        return "An error occurred", 500
+
+@app.route('/start_quiz/<category>/<difficulty>')
+def start_quiz(category, difficulty):
+    try:
+        # Reset session data and store category/difficulty
         session['score'] = 0
         session['current_question'] = 0
-        logger.debug("Starting new quiz session")
-        return render_template('index.html', 
+        session['category'] = category
+        session['difficulty'] = difficulty
+        
+        questions = questions_by_category[category][difficulty]
+        logger.debug(f"Starting new quiz session: {category} - {difficulty}")
+        
+        return render_template('quiz.html', 
                             question=questions[0],
                             question_number=1,
                             total_questions=len(questions))
     except Exception as e:
-        logger.error(f"Error in index route: {e}")
+        logger.error(f"Error in start_quiz route: {e}")
         return "An error occurred", 500
 
 @app.route('/next_question', methods=['GET'])
@@ -32,6 +58,9 @@ def next_question():
     try:
         current_question = session.get('current_question', 0)
         score = session.get('score', 0)
+        category = session.get('category')
+        difficulty = session.get('difficulty')
+        questions = questions_by_category[category][difficulty]
         
         # Update current question
         current_question += 1
@@ -45,7 +74,7 @@ def next_question():
                                 score=score,
                                 total_questions=len(questions))
         
-        return render_template('index.html',
+        return render_template('quiz.html',
                             question=questions[current_question],
                             question_number=current_question + 1,
                             total_questions=len(questions))
@@ -58,6 +87,9 @@ def submit_answer():
     try:
         data = request.get_json()
         current_question = session.get('current_question', 0)
+        category = session.get('category')
+        difficulty = session.get('difficulty')
+        questions = questions_by_category[category][difficulty]
         
         if data and 'selected' in data:
             selected = int(data['selected'])

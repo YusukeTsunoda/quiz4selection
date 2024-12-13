@@ -89,3 +89,40 @@ body {
 .fade.show {
     opacity: 1;
 }
+
+.category-grid,
+.difficulty-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
+}
+
+.category-card,
+.difficulty-card {
+    text-decoration: none;
+    color: var(--text-color);
+    transition: transform 0.3s ease;
+}
+
+.category-card:hover,
+.difficulty-card:hover {
+    transform: translateY(-5px);
+}
+
+.card {
+    border-radius: 10px;
+    border: 2px solid #e0e0e0;
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.card-title {
+    margin: 0;
+    padding: 1.5rem;
+    font-weight: 500;
+}

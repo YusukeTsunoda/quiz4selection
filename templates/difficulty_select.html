@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="quiz-container fade show">
+        <h2 class="text-center mb-4">Select Difficulty Level</h2>
+        <h5 class="text-center mb-4">Category: {{ category }}</h5>
+        
+        <div class="difficulty-grid">
+            {% for difficulty in difficulties %}
+            <a href="{{ url_for('start_quiz', category=category, difficulty=difficulty) }}" class="difficulty-card">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">{{ difficulty|title }}</h5>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        
+        <div class="text-center mt-4">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Categories</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
