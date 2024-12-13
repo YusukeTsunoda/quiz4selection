@@ -97,9 +97,7 @@ def submit_answer():
             if 'incorrect_questions' not in session:
                 session['incorrect_questions'] = []
             
-            # Initialize incorrect_questions list if not exists
-            if 'incorrect_questions' not in session:
-                session['incorrect_questions'] = []
+            logger.debug(f"Current incorrect questions: {session.get('incorrect_questions', [])}")
             
             if selected == correct:
                 session['score'] = session.get('score', 0) + 1

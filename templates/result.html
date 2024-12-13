@@ -13,7 +13,7 @@
         <div class="review-section">
             <h3 class="text-center mb-4">復習しましょう！</h3>
             <p class="text-center mb-4">間違えた問題を復習して、次は満点を目指そう！</p>
-            {% for question in session.get('incorrect_questions') %}
+            {% for question in session.get('incorrect_questions', []) %}
             <div class="review-question mb-4">
                 <div class="question-text mb-3">
                     <span class="question-number">問題 {{ loop.index }}:</span>
