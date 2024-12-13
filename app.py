@@ -42,10 +42,11 @@ def start_quiz(category, difficulty):
         session['category'] = category
         session['difficulty'] = difficulty
         
-        # Get all questions and select first 10
+        import random
+        # Get all questions and randomly select 5
         all_questions = questions_by_category[category][difficulty]
-        session['questions'] = all_questions[:10]  # Take first 10 questions
-        logger.debug(f"Starting new quiz session: {category} - {difficulty} with 10 questions")
+        session['questions'] = random.sample(all_questions, 5)  # Randomly select 5 questions
+        logger.debug(f"Starting new quiz session: {category} - {difficulty} with 5 questions")
         
         return render_template('quiz.html', 
                             question=session['questions'][0],
@@ -68,16 +69,16 @@ def next_question():
         
         logger.debug(f"Moving to question {current_question + 1}, current score: {score}")
         
-        if current_question >= 10:  # Fixed number of questions
+        if current_question >= 5:  # Fixed number of questions
             logger.debug("Quiz completed")
             return render_template('result.html', 
                                 score=score,
-                                total_questions=10)
+                                total_questions=5)
         
         return render_template('quiz.html',
                             question=questions[current_question],
                             question_number=current_question + 1,
-                            total_questions=10)
+                            total_questions=5)
     except Exception as e:
         logger.error(f"Error in next_question route: {e}")
         return "An error occurred", 500
