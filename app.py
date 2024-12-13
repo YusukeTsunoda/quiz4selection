@@ -124,15 +124,18 @@ def submit_answer():
                 session['score'] = session.get('score', 0) + 1
                 logger.debug(f"Correct answer! New score: {session['score']}")
             else:
-                # Save incorrect question with correct answer for review
-                incorrect_question = {
+                # Save question with answer for review
+                question_record = {
                     'question': questions[current_question]['question'],
                     'selected': questions[current_question]['options'][selected],
                     'correct': questions[current_question]['options'][correct],
-                    'options': questions[current_question]['options']
+                    'options': questions[current_question]['options'],
+                    'correct_answer': selected == correct
                 }
-                session['incorrect_questions'].append(incorrect_question)
-                logger.debug(f"Question added to review list")
+                if 'quiz_history' not in session:
+                    session['quiz_history'] = []
+                session['quiz_history'].append(question_record)
+                logger.debug(f"Question added to history")
             
         # クイズが完了したら結果を保存
             if current_question == len(questions) - 1:
@@ -140,7 +143,7 @@ def submit_answer():
                     category=session.get('category'),
                     difficulty=session.get('difficulty'),
                     score=session.get('score', 0),
-                    questions_history=session.get('incorrect_questions', [])
+                    questions_history=session.get('quiz_history', [])
                 )
                 db.session.add(quiz_attempt)
                 db.session.commit()
