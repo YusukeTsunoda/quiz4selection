@@ -75,9 +75,22 @@ body {
     transition: width 0.3s ease;
 }
 
-.score-display {
-    font-size: 1.2rem;
+.question-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 1rem;
+    padding: 0.5rem 0;
+    border-bottom: 2px solid #eee;
+}
+
+.question-progress {
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.score-display {
+    font-weight: 500;
     color: var(--primary-color);
 }
 
