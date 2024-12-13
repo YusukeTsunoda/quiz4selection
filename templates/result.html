@@ -9,10 +9,8 @@
             最終スコア: {{ score }} / {{ total_questions }}
         </div>
         
-        {% if session.get('incorrect_questions') %}
         <div class="review-section">
-            <h3 class="text-center mb-4">復習しましょう！</h3>
-            <p class="text-center mb-4">間違えた問題を復習して、次は満点を目指そう！</p>
+            <h3 class="text-center mb-4">クイズの結果</h3>
             {% for question in session.get('quiz_history', []) %}
             <div class="review-question mb-4 {% if question.correct_answer %}correct{% else %}incorrect{% endif %}">
                 <div class="question-text mb-3">
@@ -22,22 +20,27 @@
                 
                 <div class="answer-review">
                     <div class="selected-answer">
-                        <span class="review-label">あなたの答え:</span>
+                        <span class="review-label">あなたの選択:</span>
                         <span class="review-answer {% if question.correct_answer %}right{% else %}wrong{% endif %}">
                             {{ question.selected }}
                         </span>
                     </div>
                     {% if not question.correct_answer %}
-                    <div class="correct-answer">
-                        <span class="review-label">正しい答え:</span>
+                    <div class="correct-answer mt-2">
+                        <span class="review-label">正解:</span>
                         <span class="review-answer right">{{ question.correct }}</span>
                     </div>
                     {% endif %}
+                    <div class="answer-status mt-2">
+                        <span class="review-label">結果:</span>
+                        <span class="review-answer {% if question.correct_answer %}right{% else %}wrong{% endif %}">
+                            {% if question.correct_answer %}正解{% else %}不正解{% endif %}
+                        </span>
+                    </div>
                 </div>
             </div>
             {% endfor %}
         </div>
-        {% endif %}
         
         <div class="text-center mt-4">
             <a href="/" class="btn btn-primary btn-lg me-3">もう一度チャレンジ！</a>

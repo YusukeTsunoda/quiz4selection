@@ -185,6 +185,21 @@ body {
     padding: 1.5rem;
     box-shadow: var(--shadow);
     transition: transform 0.2s ease;
+    border-left: 4px solid #e2e8f0;
+}
+
+.review-question.correct {
+    border-left-color: var(--success-color);
+}
+
+.review-question.incorrect {
+    border-left-color: var(--error-color);
+}
+
+.answer-status {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #e2e8f0;
 }
 
 .review-question:hover {
