@@ -41,28 +41,35 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectedIndex = Array.from(options).indexOf(selectedOption);
         const correctIndex = parseInt(optionsContainer.dataset.correct);
         
-        // Submit answer to server
-        await submitAnswer(selectedIndex);
-        
-        if (selectedIndex === correctIndex) {
-            selectedOption.classList.add('correct');
-            const currentScore = parseInt(scoreDisplay.textContent.split(': ')[1]);
-            scoreDisplay.textContent = `Score: ${currentScore + 1}`;
-        } else {
-            selectedOption.classList.add('incorrect');
-            options[correctIndex].classList.add('correct');
-        }
-        
-        const container = document.querySelector('.quiz-container');
-        container.classList.add('fade');
-
-        // 最後の問題の場合は直接結果画面に遷移
-        if (data.isLastQuestion) {
-            window.location.href = '/next_question';
-        } else {
+        try {
+            // Submit answer to server and get response
+            const response = await submitAnswer(selectedIndex);
+            
+            if (selectedIndex === correctIndex) {
+                selectedOption.classList.add('correct');
+                const currentScore = parseInt(scoreDisplay.textContent.split(': ')[1]);
+                scoreDisplay.textContent = `Score: ${currentScore + 1}`;
+            } else {
+                selectedOption.classList.add('incorrect');
+                options[correctIndex].classList.add('correct');
+            }
+            
+            // Wait for animation
             setTimeout(() => {
-                window.location.href = '/next_question';
-            }, 200);
+                const container = document.querySelector('.quiz-container');
+                container.classList.add('fade');
+                
+                // Check if this is the last question
+                if (response.isLastQuestion) {
+                    window.location.href = '/next_question';
+                } else {
+                    setTimeout(() => {
+                        window.location.href = '/next_question';
+                    }, 200);
+                }
+            }, 500);
+        } catch (error) {
+            console.error('Error handling answer:', error);
         }
     }
 
