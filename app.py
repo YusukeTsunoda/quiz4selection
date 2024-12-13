@@ -137,19 +137,26 @@ def submit_answer():
                 session['quiz_history'].append(question_record)
                 logger.debug(f"Question added to history")
             
-        # クイズが完了したら結果を保存
+        # クイズが完了したら結果を保存（非同期的に）
             if current_question == len(questions) - 1:
-                quiz_attempt = QuizAttempt(
-                    category=session.get('category'),
-                    difficulty=session.get('difficulty'),
-                    score=session.get('score', 0),
-                    questions_history=session.get('quiz_history', [])
-                )
-                db.session.add(quiz_attempt)
-                db.session.commit()
-                logger.debug("Quiz attempt saved to database")
+                try:
+                    quiz_attempt = QuizAttempt(
+                        category=session.get('category'),
+                        difficulty=session.get('difficulty'),
+                        score=session.get('score', 0),
+                        questions_history=session.get('quiz_history', [])
+                    )
+                    db.session.add(quiz_attempt)
+                    db.session.commit()
+                    logger.debug("Quiz attempt saved to database")
+                except Exception as e:
+                    logger.error(f"Error saving quiz attempt: {e}")
+                    db.session.rollback()
             
-            return jsonify({'success': True})
+            return jsonify({
+                'success': True,
+                'isLastQuestion': current_question == len(questions) - 1
+            })
     except Exception as e:
         logger.error(f"Error in submit_answer route: {e}")
         return jsonify({'success': False, 'error': str(e)})

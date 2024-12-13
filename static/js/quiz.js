@@ -53,11 +53,17 @@ document.addEventListener('DOMContentLoaded', function() {
             options[correctIndex].classList.add('correct');
         }
         
-        setTimeout(() => {
-            const container = document.querySelector('.quiz-container');
-            container.classList.add('fade');
+        const container = document.querySelector('.quiz-container');
+        container.classList.add('fade');
+
+        // 最後の問題の場合は直接結果画面に遷移
+        if (data.isLastQuestion) {
             window.location.href = '/next_question';
-        }, 500);
+        } else {
+            setTimeout(() => {
+                window.location.href = '/next_question';
+            }, 200);
+        }
     }
 
     optionsContainer.addEventListener('click', handleOptionClick);
