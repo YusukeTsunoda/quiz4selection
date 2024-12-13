@@ -44,16 +44,28 @@ def select_difficulty(category):
 @app.route('/start_quiz/<category>/<difficulty>')
 def start_quiz(category, difficulty):
     try:
-        # Reset session data and store category/difficulty
-        session['score'] = 0
+        # Get questions for the selected category and difficulty
+        questions = questions_by_category[category][difficulty]
+        # Select 5 random questions
+        selected_questions = random.sample(questions, min(5, len(questions)))
+        
+        # Randomize options for each question
+        for question in selected_questions:
+            options = question['options'].copy()
+            correct_option = options[question['correct']]
+            random.shuffle(options)
+            question['correct'] = options.index(correct_option)
+            question['options'] = options
+        
+        # Initialize session variables
+        session['questions'] = selected_questions
         session['current_question'] = 0
+        session['score'] = 0
         session['category'] = category
         session['difficulty'] = difficulty
+        session['incorrect_questions'] = []
         
         import random
-        # Get all questions and randomly select 5
-        all_questions = questions_by_category[category][difficulty]
-        session['questions'] = random.sample(all_questions, 5)  # Randomly select 5 questions
         logger.debug(f"Starting new quiz session: {category} - {difficulty} with 5 questions")
         
         return render_template('quiz.html', 
