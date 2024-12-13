@@ -177,6 +177,24 @@ body {
     border-radius: var(--border-radius);
     padding: 2rem;
     margin: 2rem 0;
+    max-height: 70vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-color) #f1f1f1;
+}
+
+.review-section::-webkit-scrollbar {
+    width: 8px;
+}
+
+.review-section::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.review-section::-webkit-scrollbar-thumb {
+    background-color: var(--primary-color);
+    border-radius: 4px;
 }
 
 .review-question {

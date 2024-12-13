@@ -12,7 +12,8 @@
         <div class="review-section">
             <h3 class="text-center mb-4">解答結果</h3>
             {% for question in session.get('quiz_history', []) %}
-            <div class="review-question mb-4 {% if question.correct_answer %}correct{% else %}incorrect{% endif %}">
+            {% if not question.correct_answer %}
+            <div class="review-question mb-4 incorrect">
                 <div class="question-text mb-3">
                     <span class="question-number">問題 {{ loop.index }}:</span>
                     {{ question.question }}
@@ -21,7 +22,7 @@
                 <div class="answer-review">
                     <div class="selected-answer">
                         <span class="review-label">選択した回答:</span>
-                        <span class="review-answer {% if question.correct_answer %}right{% else %}wrong{% endif %}">
+                        <span class="review-answer wrong">
                             {{ question.selected }}
                         </span>
                     </div>
@@ -31,16 +32,13 @@
                     </div>
                     <div class="answer-status mt-2">
                         <span class="review-label">判定:</span>
-                        <span class="review-answer {% if question.correct_answer %}right{% else %}wrong{% endif %}">
-                            {% if question.correct_answer %}
-                                <i class="fas fa-check"></i> 正解
-                            {% else %}
-                                <i class="fas fa-times"></i> 不正解
-                            {% endif %}
+                        <span class="review-answer wrong">
+                            <i class="fas fa-times"></i> 不正解
                         </span>
                     </div>
                 </div>
             </div>
+            {% endif %}
             {% endfor %}
         </div>
         
