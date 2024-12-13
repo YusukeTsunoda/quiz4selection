@@ -11,7 +11,7 @@
         
         <div class="review-section">
             <h3 class="text-center mb-4">解答結果</h3>
-            {% for question in session.get('quiz_history', []) %}
+            {% for question in quiz_history %}
             {% if not question.correct_answer %}
             <div class="review-question mb-4 incorrect">
                 <div class="question-text mb-3">
@@ -29,12 +29,6 @@
                     <div class="correct-answer mt-2">
                         <span class="review-label">正解:</span>
                         <span class="review-answer right">{{ question.correct }}</span>
-                    </div>
-                    <div class="answer-status mt-2">
-                        <span class="review-label">判定:</span>
-                        <span class="review-answer wrong">
-                            <i class="fas fa-times"></i> 不正解
-                        </span>
                     </div>
                 </div>
             </div>

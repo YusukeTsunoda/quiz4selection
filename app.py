@@ -92,15 +92,18 @@ def submit_answer():
                 'question': questions[current_question]['question'],
                 'selected': questions[current_question]['options'][selected],
                 'correct': questions[current_question]['options'][correct],
-                'correct_answer': selected == correct,
-                'selected_index': selected,
-                'correct_index': correct
+                'correct_answer': selected == correct
             }
             
             # Initialize quiz_history if not exists
             if 'quiz_history' not in session:
                 session['quiz_history'] = []
-            session['quiz_history'].append(question_record)
+            
+            # Update quiz history
+            quiz_history = session['quiz_history']
+            quiz_history.append(question_record)
+            session['quiz_history'] = quiz_history
+            session.modified = True  # Ensure session is saved
             logger.debug(f"Question {current_question + 1} added to history: {'correct' if selected == correct else 'incorrect'}")
 
             # Update score if answer is correct
@@ -120,6 +123,7 @@ def submit_answer():
                     db.session.add(quiz_attempt)
                     db.session.commit()
                     logger.debug("Quiz attempt saved to database")
+                    logger.debug(f"Final quiz history: {session.get('quiz_history', [])}")
                 except Exception as e:
                     logger.error(f"Error saving quiz attempt: {e}")
                     db.session.rollback()
@@ -142,12 +146,15 @@ def next_question():
         quiz_history = session.get('quiz_history', [])
         
         logger.debug(f"Moving to question {current_question + 1}, current score: {score}")
+        logger.debug(f"Current quiz history: {quiz_history}")
         
         if current_question >= len(questions) - 1:
             logger.debug("Quiz completed")
+            logger.debug(f"Final quiz history: {session.get('quiz_history', [])}")
             return render_template('result.html', 
-                                score=score,
-                                total_questions=len(questions))
+                                score=session.get('score', 0),
+                                total_questions=len(questions),
+                                quiz_history=session.get('quiz_history', []))
         
         # Update current question
         current_question += 1
