@@ -64,7 +64,7 @@ def start_quiz(category, difficulty):
         session['score'] = 0
         session['category'] = category
         session['difficulty'] = difficulty
-        session['incorrect_questions'] = []
+        session['quiz_history'] = []
         
         logger.debug(f"Starting new quiz session: {category} - {difficulty} with 5 questions")
         
@@ -74,33 +74,6 @@ def start_quiz(category, difficulty):
                             total_questions=len(session['questions']))
     except Exception as e:
         logger.error(f"Error in start_quiz route: {e}")
-        return "An error occurred", 500
-
-@app.route('/next_question', methods=['GET'])
-def next_question():
-    try:
-        current_question = session.get('current_question', 0)
-        score = session.get('score', 0)
-        questions = session.get('questions', [])
-        
-        # Update current question
-        current_question += 1
-        session['current_question'] = current_question
-        
-        logger.debug(f"Moving to question {current_question + 1}, current score: {score}")
-        
-        if current_question >= 5:  # Fixed number of questions
-            logger.debug("Quiz completed")
-            return render_template('result.html', 
-                                score=score,
-                                total_questions=5)
-        
-        return render_template('quiz.html',
-                            question=questions[current_question],
-                            question_number=current_question + 1,
-                            total_questions=5)
-    except Exception as e:
-        logger.error(f"Error in next_question route: {e}")
         return "An error occurred", 500
 
 @app.route('/submit_answer', methods=['POST'])
@@ -114,30 +87,28 @@ def submit_answer():
             selected = int(data['selected'])
             correct = questions[current_question]['correct']
             
-            # Initialize incorrect_questions list if not exists
-            if 'incorrect_questions' not in session:
-                session['incorrect_questions'] = []
-            
-            logger.debug(f"Current incorrect questions: {session.get('incorrect_questions', [])}")
-            
-            # Record question attempt regardless of correctness
+            # Record question attempt with detailed information
             question_record = {
                 'question': questions[current_question]['question'],
                 'selected': questions[current_question]['options'][selected],
                 'correct': questions[current_question]['options'][correct],
-                'options': questions[current_question]['options'],
-                'correct_answer': selected == correct
+                'correct_answer': selected == correct,
+                'selected_index': selected,
+                'correct_index': correct
             }
+            
+            # Initialize quiz_history if not exists
             if 'quiz_history' not in session:
                 session['quiz_history'] = []
             session['quiz_history'].append(question_record)
-            logger.debug(f"Question added to history")
+            logger.debug(f"Question {current_question + 1} added to history: {'correct' if selected == correct else 'incorrect'}")
 
+            # Update score if answer is correct
             if selected == correct:
                 session['score'] = session.get('score', 0) + 1
                 logger.debug(f"Correct answer! New score: {session['score']}")
-            
-        # クイズが完了したら結果を保存（非同期的に）
+
+            # Save quiz attempt if this is the last question
             if current_question == len(questions) - 1:
                 try:
                     quiz_attempt = QuizAttempt(
@@ -157,9 +128,39 @@ def submit_answer():
                 'success': True,
                 'isLastQuestion': current_question == len(questions) - 1
             })
+            
     except Exception as e:
         logger.error(f"Error in submit_answer route: {e}")
         return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/next_question', methods=['GET'])
+def next_question():
+    try:
+        current_question = session.get('current_question', 0)
+        score = session.get('score', 0)
+        questions = session.get('questions', [])
+        quiz_history = session.get('quiz_history', [])
+        
+        logger.debug(f"Moving to question {current_question + 1}, current score: {score}")
+        
+        if current_question >= len(questions) - 1:
+            logger.debug("Quiz completed")
+            return render_template('result.html', 
+                                score=score,
+                                total_questions=len(questions))
+        
+        # Update current question
+        current_question += 1
+        session['current_question'] = current_question
+        
+        return render_template('quiz.html',
+                            question=questions[current_question],
+                            question_number=current_question + 1,
+                            total_questions=len(questions))
+    except Exception as e:
+        logger.error(f"Error in next_question route: {e}")
+        return "An error occurred", 500
+
 @app.route('/dashboard')
 def dashboard():
     try:

@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     const optionsContainer = document.querySelector('.options-container');
+    if (!optionsContainer) return; // クイズページ以外では実行しない
     const progressFill = document.querySelector('.progress-fill');
     const scoreDisplay = document.querySelector('.score-display');
     let isAnswered = false;
@@ -54,20 +55,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 options[correctIndex].classList.add('correct');
             }
             
-            // Wait for animation
+            // Shorter animation time for smoother transitions
             setTimeout(() => {
                 const container = document.querySelector('.quiz-container');
                 container.classList.add('fade');
                 
-                // Check if this is the last question
-                if (response.isLastQuestion) {
+                // Immediate transition for both cases
+                setTimeout(() => {
                     window.location.href = '/next_question';
-                } else {
-                    setTimeout(() => {
-                        window.location.href = '/next_question';
-                    }, 200);
-                }
-            }, 500);
+                }, 100);
+            }, 200);
         } catch (error) {
             console.error('Error handling answer:', error);
         }

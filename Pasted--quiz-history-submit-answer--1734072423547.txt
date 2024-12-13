@@ -1,0 +1,51 @@
+結果を表示するために使用しているテンプレートで、quiz_history セッションに質問が正しく保存されていないためだと思われます。submit_answer 関数で結果を保存するコードがあるのですが、最後の質問が終わったタイミングでの処理がうまく行われていない可能性があります。
+
+以下のコードを修正して、すべての回答を履歴に保存できるよう確認してみましょう。
+
+app.pyのsubmit_answer関数内で、quiz_historyに保存される内容を確実にしていますが、最終的な処理部分での質問の履歴が正しく追加されるかどうかの確認が必要です。以下のように適切に処理を追加します：
+
+@app.route('/submit_answer', methods=['POST'])
+def submit_answer():
+    try:
+        data = request.get_json()
+        current_question = session.get('current_question', 0)
+        questions = session.get('questions', [])
+        
+        if data and 'selected' in data:
+            selected = int(data['selected'])
+            correct = questions[current_question]['correct']
+            
+            if 'incorrect_questions' not in session:
+                session['incorrect_questions'] = []
+            
+            # Record question attempt
+            question_record = {
+                'question': questions[current_question]['question'],
+                'selected': questions[current_question]['options'][selected],
+                'correct': questions[current_question]['options'][correct],
+                'correct_answer': selected == correct
+            }
+            if 'quiz_history' not in session:
+                session['quiz_history'] = []
+            session['quiz_history'].append(question_record)
+            
+            if selected == correct:
+                session['score'] = session.get('score', 0) + 1
+            
+            # Check if quiz is complete
+            if current_question == len(questions) - 1:
+                try:
+                    quiz_attempt = QuizAttempt(
+                        category=session.get('category'),
+                        difficulty=session.get('difficulty'),
+                        score=session.get('score', 0),
+                        questions_history=session.get('quiz_history', [])
+                    )
+                    db.session.add(quiz_attempt)
+                    db.session.commit()
+                except Exception as e:
+                    db.session.rollback()
+            
+            # Advance to the next question
+            session['current_question'] += 1
+            return jsonify({
