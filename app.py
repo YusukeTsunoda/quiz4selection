@@ -93,9 +93,23 @@ def submit_answer():
             selected = int(data['selected'])
             correct = questions[current_question]['correct']
             
+            # Initialize incorrect_questions list if not exists
+            if 'incorrect_questions' not in session:
+                session['incorrect_questions'] = []
+            
             if selected == correct:
                 session['score'] = session.get('score', 0) + 1
                 logger.debug(f"Correct answer! New score: {session['score']}")
+            else:
+                # Save incorrect question with correct answer for review
+                incorrect_question = {
+                    'question': questions[current_question]['question'],
+                    'selected': questions[current_question]['options'][selected],
+                    'correct': questions[current_question]['options'][correct],
+                    'options': questions[current_question]['options']
+                }
+                session['incorrect_questions'].append(incorrect_question)
+                logger.debug(f"Question added to review list")
             
         return jsonify({'success': True})
     except Exception as e:

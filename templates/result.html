@@ -3,14 +3,39 @@
 {% block content %}
 <div class="container">
     <div class="quiz-container fade show">
-        <h2 class="text-center mb-4">Quiz Completed!</h2>
+        <h2 class="text-center mb-4">クイズ完了！</h2>
         
         <div class="score-display text-center mb-4">
-            Final Score: {{ score }} out of {{ total_questions }}
+            最終スコア: {{ score }} / {{ total_questions }}
         </div>
         
-        <div class="text-center">
-            <a href="/" class="btn btn-primary">Try Again</a>
+        {% if session.get('incorrect_questions') %}
+        <div class="review-section">
+            <h3 class="text-center mb-4">復習しましょう！</h3>
+            {% for question in session.get('incorrect_questions') %}
+            <div class="review-question mb-4">
+                <div class="question-text mb-3">
+                    <span class="question-number">問題 {{ loop.index }}:</span>
+                    {{ question.question }}
+                </div>
+                
+                <div class="answer-review">
+                    <div class="incorrect-answer">
+                        <span class="review-label">あなたの答え:</span>
+                        <span class="review-answer wrong">{{ question.selected }}</span>
+                    </div>
+                    <div class="correct-answer">
+                        <span class="review-label">正しい答え:</span>
+                        <span class="review-answer right">{{ question.correct }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <div class="text-center mt-4">
+            <a href="/" class="btn btn-primary btn-lg">もう一度チャレンジ！</a>
         </div>
     </div>
 </div>
