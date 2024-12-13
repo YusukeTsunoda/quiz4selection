@@ -120,22 +120,22 @@ def submit_answer():
             
             logger.debug(f"Current incorrect questions: {session.get('incorrect_questions', [])}")
             
+            # Record question attempt regardless of correctness
+            question_record = {
+                'question': questions[current_question]['question'],
+                'selected': questions[current_question]['options'][selected],
+                'correct': questions[current_question]['options'][correct],
+                'options': questions[current_question]['options'],
+                'correct_answer': selected == correct
+            }
+            if 'quiz_history' not in session:
+                session['quiz_history'] = []
+            session['quiz_history'].append(question_record)
+            logger.debug(f"Question added to history")
+
             if selected == correct:
                 session['score'] = session.get('score', 0) + 1
                 logger.debug(f"Correct answer! New score: {session['score']}")
-            else:
-                # Save question with answer for review
-                question_record = {
-                    'question': questions[current_question]['question'],
-                    'selected': questions[current_question]['options'][selected],
-                    'correct': questions[current_question]['options'][correct],
-                    'options': questions[current_question]['options'],
-                    'correct_answer': selected == correct
-                }
-                if 'quiz_history' not in session:
-                    session['quiz_history'] = []
-                session['quiz_history'].append(question_record)
-                logger.debug(f"Question added to history")
             
         # クイズが完了したら結果を保存（非同期的に）
             if current_question == len(questions) - 1:
