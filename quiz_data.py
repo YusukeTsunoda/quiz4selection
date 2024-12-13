@@ -30,6 +30,60 @@ questions_by_category = {
                 "options": ["日", "月", "星", "空"],
                 "correct": 1,
                 "difficulty": "easy"
+            },
+            {
+                "question": "「うみ」を漢字で書くとどれ？",
+                "options": ["海", "川", "池", "湖"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "「やま」を漢字で書くとどれ？",
+                "options": ["山", "川", "森", "林"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "「はな」を漢字で書くとどれ？",
+                "options": ["花", "草", "木", "葉"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "「そら」を漢字で書くとどれ？",
+                "options": ["空", "雲", "風", "雨"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "「かぜ」を漢字で書くとどれ？",
+                "options": ["風", "雨", "雪", "霧"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "「くも」を漢字で書くとどれ？",
+                "options": ["雲", "霧", "雨", "雪"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "「あめ」を漢字で書くとどれ？",
+                "options": ["雨", "雲", "風", "雪"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "「ゆき」を漢字で書くとどれ？",
+                "options": ["雪", "雨", "雲", "霧"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "「みず」を漢字で書くとどれ？",
+                "options": ["水", "火", "土", "木"],
+                "correct": 0,
+                "difficulty": "easy"
             }
         ],
         "medium": [
@@ -62,6 +116,60 @@ questions_by_category = {
                 "options": ["きょうしつ", "こうしつ", "きょうした", "こうした"],
                 "correct": 0,
                 "difficulty": "medium"
+            },
+            {
+                "question": "「美術館」の読み方は？",
+                "options": ["びじゅつかん", "びじつかん", "みじゅつかん", "みじつかん"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "「動物園」の読み方は？",
+                "options": ["どうぶつえん", "どうぶつかん", "どうぶつそう", "どうぶつじょう"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "「体育館」の読み方は？",
+                "options": ["たいいくかん", "たいくかん", "たいいくえん", "たいくえん"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "「自転車」の読み方は？",
+                "options": ["じてんしゃ", "じでんしゃ", "してんしゃ", "しでんしゃ"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "「天気予報」の読み方は？",
+                "options": ["てんきよほう", "てんきよぼう", "でんきよほう", "でんきよぼう"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "「新幹線」の読み方は？",
+                "options": ["しんかんせん", "しんがんせん", "しんかんせい", "しんがんせい"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "「携帯電話」の読み方は？",
+                "options": ["けいたいでんわ", "けいだいでんわ", "けいたいでんは", "けいだいでんは"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "「図書館前」の読み方は？",
+                "options": ["としょかんまえ", "としょうかんまえ", "とかんまえ", "としょまえ"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "「世界地図」の読み方は？",
+                "options": ["せかいちず", "せかいずず", "せかいじず", "せかいちじ"],
+                "correct": 0,
+                "difficulty": "medium"
             }
         ],
         "hard": [
@@ -92,6 +200,60 @@ questions_by_category = {
             {
                 "question": "「宿題」の読み方は？",
                 "options": ["しゅくだい", "しゅくたい", "じゅくだい", "じゅくたい"],
+                "correct": 0,
+                "difficulty": "hard"
+            },
+            {
+                "question": "「図書館司書」の読み方は？",
+                "options": ["としょかんししょ", "としょかんしじょ", "とかんししょ", "とかんしじょ"],
+                "correct": 0,
+                "difficulty": "hard"
+            },
+            {
+                "question": "「自動販売機」の読み方は？",
+                "options": ["じどうはんばいき", "じどうばいばいき", "しどうはんばいき", "しどうばいばいき"],
+                "correct": 0,
+                "difficulty": "hard"
+            },
+            {
+                "question": "「理科実験室」の読み方は？",
+                "options": ["りかじっけんしつ", "りかじけんしつ", "りかじっけんした", "りかじけんした"],
+                "correct": 0,
+                "difficulty": "hard"
+            },
+            {
+                "question": "「校長先生室」の読み方は？",
+                "options": ["こうちょうせんせいしつ", "こうちょせんせいしつ", "こうちょうせんせした", "こうちょせんせした"],
+                "correct": 0,
+                "difficulty": "hard"
+            },
+            {
+                "question": "「国語辞典」の読み方は？",
+                "options": ["こくごじてん", "こくごじでん", "こくごしてん", "こくごしでん"],
+                "correct": 0,
+                "difficulty": "hard"
+            },
+            {
+                "question": "「算数教科書」の読み方は？",
+                "options": ["さんすうきょうかしょ", "さんすうきょかしょ", "さんすうきょうかほん", "さんすうきょかほん"],
+                "correct": 0,
+                "difficulty": "hard"
+            },
+            {
+                "question": "「体育用具室」の読み方は？",
+                "options": ["たいいくようぐしつ", "たいいくようぐした", "たいくようぐしつ", "たいくようぐした"],
+                "correct": 0,
+                "difficulty": "hard"
+            },
+            {
+                "question": "「音楽室倉庫」の読み方は？",
+                "options": ["おんがくしつそうこ", "おんがくしつぞうこ", "おんがくしたそうこ", "おんがくしたぞうこ"],
+                "correct": 0,
+                "difficulty": "hard"
+            },
+            {
+                "question": "「生徒会室」の読み方は？",
+                "options": ["せいとかいしつ", "せいとかいした", "せいとかいしょ", "せいとかいじょ"],
                 "correct": 0,
                 "difficulty": "hard"
             }

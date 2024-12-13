@@ -42,13 +42,15 @@ def start_quiz(category, difficulty):
         session['category'] = category
         session['difficulty'] = difficulty
         
-        questions = questions_by_category[category][difficulty]
-        logger.debug(f"Starting new quiz session: {category} - {difficulty}")
+        # Get all questions and select first 10
+        all_questions = questions_by_category[category][difficulty]
+        session['questions'] = all_questions[:10]  # Take first 10 questions
+        logger.debug(f"Starting new quiz session: {category} - {difficulty} with 10 questions")
         
         return render_template('quiz.html', 
-                            question=questions[0],
+                            question=session['questions'][0],
                             question_number=1,
-                            total_questions=len(questions))
+                            total_questions=len(session['questions']))
     except Exception as e:
         logger.error(f"Error in start_quiz route: {e}")
         return "An error occurred", 500
@@ -58,9 +60,7 @@ def next_question():
     try:
         current_question = session.get('current_question', 0)
         score = session.get('score', 0)
-        category = session.get('category')
-        difficulty = session.get('difficulty')
-        questions = questions_by_category[category][difficulty]
+        questions = session.get('questions', [])
         
         # Update current question
         current_question += 1
@@ -68,16 +68,16 @@ def next_question():
         
         logger.debug(f"Moving to question {current_question + 1}, current score: {score}")
         
-        if current_question >= len(questions):
+        if current_question >= 10:  # Fixed number of questions
             logger.debug("Quiz completed")
             return render_template('result.html', 
                                 score=score,
-                                total_questions=len(questions))
+                                total_questions=10)
         
         return render_template('quiz.html',
                             question=questions[current_question],
                             question_number=current_question + 1,
-                            total_questions=len(questions))
+                            total_questions=10)
     except Exception as e:
         logger.error(f"Error in next_question route: {e}")
         return "An error occurred", 500
@@ -87,9 +87,7 @@ def submit_answer():
     try:
         data = request.get_json()
         current_question = session.get('current_question', 0)
-        category = session.get('category')
-        difficulty = session.get('difficulty')
-        questions = questions_by_category[category][difficulty]
+        questions = session.get('questions', [])
         
         if data and 'selected' in data:
             selected = int(data['selected'])
