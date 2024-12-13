@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="quiz-history-container fade show">
+        <h2 class="text-center mb-4">クイズ履歴</h2>
+        <h3 class="text-center mb-4">{{ category }} - {{ difficulty|title }}</h3>
+        
+        {% for attempt in attempts %}
+        <div class="attempt-card mb-4">
+            <div class="attempt-header">
+                <span class="attempt-date">{{ attempt.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
+                <span class="attempt-score">スコア: {{ attempt.score }}/{{ attempt.questions_history|length }}</span>
+            </div>
+            
+            <div class="questions-list">
+                {% for question in attempt.questions_history %}
+                <div class="history-question {% if question.correct %}correct{% else %}incorrect{% endif %}">
+                    <p class="question-text">{{ question.question }}</p>
+                    <div class="answer-details">
+                        <p class="selected-answer">
+                            選択した回答: <span class="{% if question.correct %}text-success{% else %}text-danger{% endif %}">
+                                {{ question.selected }}
+                            </span>
+                        </p>
+                        {% if not question.correct %}
+                        <p class="correct-answer">
+                            正解: <span class="text-success">{{ question.correct_answer }}</span>
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+        
+        <div class="text-center mt-4">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">ダッシュボードに戻る</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

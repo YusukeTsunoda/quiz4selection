@@ -1,6 +1,10 @@
 import os
 import logging
 from flask import Flask, render_template, session, request, jsonify
+from extensions import db
+from models import QuizAttempt
+from sqlalchemy import func
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -9,6 +13,10 @@ logger = logging.getLogger(__name__)
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev_key_for_quiz_app")
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db.init_app(app)
 
 from quiz_data import questions_by_category
 
@@ -114,7 +122,59 @@ def submit_answer():
                 session['incorrect_questions'].append(incorrect_question)
                 logger.debug(f"Question added to review list")
             
-        return jsonify({'success': True})
+        # クイズが完了したら結果を保存
+            if current_question == len(questions) - 1:
+                quiz_attempt = QuizAttempt(
+                    category=session.get('category'),
+                    difficulty=session.get('difficulty'),
+                    score=session.get('score', 0),
+                    questions_history=session.get('incorrect_questions', [])
+                )
+                db.session.add(quiz_attempt)
+                db.session.commit()
+                logger.debug("Quiz attempt saved to database")
+            
+            return jsonify({'success': True})
     except Exception as e:
         logger.error(f"Error in submit_answer route: {e}")
         return jsonify({'success': False, 'error': str(e)})
+@app.route('/dashboard')
+def dashboard():
+    try:
+        # 全カテゴリーの進捗を取得
+        progress = {}
+        for category in questions_by_category.keys():
+            progress[category] = {}
+            for difficulty in ['easy', 'medium', 'hard']:
+                attempts = QuizAttempt.query.filter_by(
+                    category=category,
+                    difficulty=difficulty
+                ).all()
+                
+                stats = {
+                    'attempts': len(attempts),
+                    'avg_score': sum(attempt.get_percentage() for attempt in attempts) / len(attempts) if attempts else 0,
+                    'highest_score': max((attempt.get_percentage() for attempt in attempts), default=0)
+                }
+                progress[category][difficulty] = stats
+        
+        return render_template('dashboard.html', progress=progress)
+    except Exception as e:
+        logger.error(f"Error in dashboard route: {e}")
+        return "An error occurred", 500
+
+@app.route('/quiz_history/<category>/<difficulty>')
+def quiz_history(category, difficulty):
+    try:
+        attempts = QuizAttempt.query.filter_by(
+            category=category,
+            difficulty=difficulty
+        ).order_by(QuizAttempt.timestamp.desc()).all()
+        
+        return render_template('quiz_history.html',
+                             category=category,
+                             difficulty=difficulty,
+                             attempts=attempts)
+    except Exception as e:
+        logger.error(f"Error in quiz_history route: {e}")
+        return "An error occurred", 500
