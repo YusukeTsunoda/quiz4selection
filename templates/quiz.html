@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="quiz-container fade">
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ (question_number / total_questions) * 100 }}%"></div>
+        </div>
+        
+        <div class="score-display">Score: {{ session.get('score', 0) }}</div>
+        
+        <div class="question mb-4">
+            {{ question.question }}
+        </div>
+        
+        <div class="options-container" data-correct="{{ question.correct }}">
+            {% for option in question.options %}
+            <div class="option">
+                {{ option }}
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="mt-4">
+            <small class="text-muted">Question {{ question_number }} of {{ total_questions }}</small>
+        </div>
+    </div>
+</div>
+{% endblock %}
