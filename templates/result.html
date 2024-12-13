@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="quiz-container fade show">
+        <h2 class="text-center mb-4">Quiz Completed!</h2>
+        
+        <div class="score-display text-center mb-4">
+            Final Score: {{ score }} out of {{ total_questions }}
+        </div>
+        
+        <div class="text-center">
+            <a href="/" class="btn btn-primary">Try Again</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
