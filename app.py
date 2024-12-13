@@ -1,4 +1,5 @@
 import os
+import random
 import logging
 from flask import Flask, render_template, session, request, jsonify
 from extensions import db
@@ -65,7 +66,6 @@ def start_quiz(category, difficulty):
         session['difficulty'] = difficulty
         session['incorrect_questions'] = []
         
-        import random
         logger.debug(f"Starting new quiz session: {category} - {difficulty} with 5 questions")
         
         return render_template('quiz.html', 
