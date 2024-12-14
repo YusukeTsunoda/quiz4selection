@@ -7,7 +7,7 @@
             <div class="progress-fill" style="width: {{ (question_number / total_questions) * 100 }}%"></div>
         </div>
         
-        <div class="score-display">Score: {{ session.get('score', 0) }}</div>
+        <div class="score-display">スコア: {{ session.get('score', 0) }}</div>
         
         <div class="question mb-4">
             {{ question.question }}
@@ -22,7 +22,7 @@
         </div>
         
         <div class="mt-4">
-            <small class="text-muted">Question {{ question_number }} of {{ total_questions }}</small>
+            <small class="text-muted">問題 {{ question_number }} / {{ total_questions }}</small>
         </div>
     </div>
 </div>
