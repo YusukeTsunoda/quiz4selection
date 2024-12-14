@@ -3,31 +3,47 @@
 {% block content %}
 <div class="container">
     <div class="quiz-history-container fade show">
+        <!-- ページタイトル -->
         <h2 class="text-center mb-4">クイズ履歴</h2>
+        <!-- カテゴリと難易度 -->
         <h3 class="text-center mb-4">{{ category }} - {{ difficulty|title }}</h3>
         
         {% for attempt in attempts %}
+        <!-- 各試行のカード -->
         <div class="attempt-card mb-4">
             <div class="attempt-header">
+                <!-- 試行日時 -->
                 <span class="attempt-date">{{ attempt.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
+                <!-- スコア -->
                 <span class="attempt-score">スコア: {{ attempt.score }}/{{ attempt.questions_history|length }}</span>
             </div>
             
             <div class="questions-list">
                 {% for question in attempt.questions_history %}
-                <div class="history-question {% if question.correct %}correct{% else %}incorrect{% endif %}">
-                    <p class="question-text">{{ question.question }}</p>
-                    <div class="answer-details">
-                        <p class="selected-answer">
-                            選択した回答: <span class="{% if question.correct %}text-success{% else %}text-danger{% endif %}">
-                                {{ question.selected }}
-                            </span>
-                        </p>
-                        {% if not question.correct %}
-                        <p class="correct-answer">
-                            正解: <span class="text-success">{{ question.correct_answer }}</span>
-                        </p>
-                        {% endif %}
+                <!-- 各問題の履歴 -->
+                <div class="history-question {% if not question.correct_answer %}incorrect{% else %}correct{% endif %}">
+                    <div class="review-question mb-4 {% if not question.correct_answer %}incorrect{% endif %}">
+                        <div class="question-text mb-3">
+                            <!-- 問題番号 -->
+                            <span class="question-number">問題 {{ loop.index }}:</span>
+                            <!-- 問題文 -->
+                            {{ question.question }}
+                        </div>
+                        
+                        <div class="answer-review">
+                            <div class="selected-answer">
+                                <!-- 選択した回答 -->
+                                <span class="review-label">選択した回答:</span>
+                                <span class="review-answer {% if not question.correct_answer %}wrong{% else %}right{% endif %}">
+                                    {{ question.selected }}
+                                </span>
+                            </div>
+                            <div class="correct-answer mt-2">
+                                <!-- 正解 -->
+                                <span class="review-label">正解:</span>
+                                <span class="review-answer right">{{ question.correct }}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 {% endfor %}
@@ -36,6 +52,7 @@
         {% endfor %}
         
         <div class="text-center mt-4">
+            <!-- ダッシュボードに戻るボタン -->
             <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">ダッシュボードに戻る</a>
         </div>
     </div>

@@ -3,23 +3,31 @@
 {% block content %}
 <div class="container">
     <div class="dashboard-container fade show">
+        <!-- ページタイトル -->
         <h2 class="text-center mb-4">学習進捗ダッシュボード</h2>
         
         <div class="categories-overview">
             {% for category, levels in progress.items() %}
+            <!-- カテゴリごとのセクション -->
             <div class="category-section mb-5">
                 <h3 class="category-title mb-3">{{ category }}</h3>
                 <div class="difficulty-grid">
                     {% for level, stats in levels.items() %}
+                    <!-- 難易度ごとのカード -->
                     <div class="difficulty-card">
                         <div class="card">
                             <div class="card-body">
+                                <!-- 難易度名 -->
                                 <h5 class="card-title">{{ level|title }}</h5>
                                 <div class="stats">
+                                    <!-- 受験回数 -->
                                     <p>受験回数: {{ stats.attempts }}</p>
+                                    <!-- 平均スコア -->
                                     <p>平均スコア: {{ "%.1f"|format(stats.avg_score) }}%</p>
+                                    <!-- 最高スコア -->
                                     <p>最高スコア: {{ "%.1f"|format(stats.highest_score) }}%</p>
                                 </div>
+                                <!-- 詳細履歴ページへのリンク -->
                                 <a href="{{ url_for('quiz_history', category=category, difficulty=level) }}" 
                                    class="btn btn-outline-primary btn-sm mt-2">
                                     詳細履歴を見る

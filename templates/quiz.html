@@ -3,22 +3,28 @@
 {% block content %}
 <div class="container">
     <div class="quiz-container fade">
+        <!-- プログレスバー -->
         <div class="progress-bar">
             <div class="progress-fill" style="width: {{ (question_number / total_questions) * 100 }}%"></div>
         </div>
         
         <div class="question-header mb-3">
+            <!-- 現在の問題番号と総問題数 -->
             <div class="question-progress">問題 {{ question_number }} / {{ total_questions }}</div>
+            <!-- 現在のスコア -->
             <div class="score-display">スコア: {{ session.get('score', 0) }}</div>
         </div>
         
+        <!-- 問題文 -->
         <div class="question mb-4">
             {{ question.question }}
         </div>
         
+        <!-- 選択肢コンテナ -->
         <div class="options-container" data-correct="{{ question.correct }}">
             {% for option in question.options %}
-            <div class="option">
+            <!-- 選択肢 -->
+            <div class="option" role="button">
                 {{ option }}
             </div>
             {% endfor %}

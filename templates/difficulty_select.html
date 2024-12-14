@@ -3,15 +3,18 @@
 {% block content %}
 <div class="container">
     <div class="quiz-container fade show">
+        <!-- ページタイトル -->
         <h2 class="text-center mb-4">難易度を選択</h2>
+        <!-- 選択中のカテゴリ -->
         <h5 class="text-center mb-4">カテゴリ: {{ category }}</h5>
         
         <div class="difficulty-grid">
             {% for difficulty in difficulties %}
-            <!-- 各クイズ難易度のカード -->
+            <!-- 各難易度のカード -->
             <a href="{{ url_for('start_quiz', category=category, difficulty=difficulty) }}" class="difficulty-card">
                 <div class="card">
                     <div class="card-body text-center">
+                        <!-- 難易度名 -->
                         <h5 class="card-title">{{ difficulty|title }}</h5>
                     </div>
                 </div>
@@ -20,6 +23,7 @@
         </div>
         
         <div class="text-center mt-4">
+            <!-- カテゴリ選択ページへのリンク -->
             <a href="{{ url_for('index') }}" class="btn btn-secondary">カテゴリに戻る</a>
         </div>
     </div>

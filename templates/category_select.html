@@ -3,6 +3,7 @@
 {% block content %}
 <div class="container">
     <div class="quiz-container fade show">
+        <!-- ページタイトル -->
         <h2 class="text-center mb-4">クイズカテゴリを選択</h2>
         
         <div class="category-grid">
@@ -11,6 +12,7 @@
             <a href="{{ url_for('select_difficulty', category=category) }}" class="category-card">
                 <div class="card">
                     <div class="card-body text-center">
+                        <!-- カテゴリ名を表示 -->
                         <h5 class="card-title">{{ category }}</h5>
                     </div>
                 </div>
@@ -18,6 +20,7 @@
             {% endfor %}
         </div>
         <div class="text-center mt-4">
+            <!-- 学習進捗ページへのリンク -->
             <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">学習進捗を確認</a>
         </div>
     </div>

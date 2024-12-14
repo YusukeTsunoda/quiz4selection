@@ -3,30 +3,37 @@
 {% block content %}
 <div class="container">
     <div class="quiz-container fade show">
+        <!-- ページタイトル -->
         <h2 class="text-center mb-4">クイズ完了！</h2>
         
+        <!-- 最終スコア表示 -->
         <div class="score-display text-center mb-4">
             最終スコア: {{ score }} / {{ total_questions }}
         </div>
         
         <div class="review-section">
+            <!-- 解答結果の見出し -->
             <h3 class="text-center mb-4">解答結果</h3>
             {% for question in quiz_history %}
             {% if not question.correct_answer %}
+            <!-- 不正解の問題のみ表示 -->
             <div class="review-question mb-4 incorrect">
                 <div class="question-text mb-3">
+                    <!-- 問題番号と問題文 -->
                     <span class="question-number">問題 {{ loop.index }}:</span>
                     {{ question.question }}
                 </div>
                 
                 <div class="answer-review">
                     <div class="selected-answer">
+                        <!-- 選択した回答の表示 -->
                         <span class="review-label">選択した回答:</span>
                         <span class="review-answer wrong">
                             {{ question.selected }}
                         </span>
                     </div>
                     <div class="correct-answer mt-2">
+                        <!-- 正解の表示 -->
                         <span class="review-label">正解:</span>
                         <span class="review-answer right">{{ question.correct }}</span>
                     </div>
@@ -37,7 +44,9 @@
         </div>
         
         <div class="text-center mt-4">
+            <!-- 再チャレンジボタン -->
             <a href="/" class="btn btn-primary btn-lg me-3">もう一度チャレンジ！</a>
+            <!-- 学習進捗ページへのリンク -->
             <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-lg">学習進捗を確認</a>
         </div>
     </div>
