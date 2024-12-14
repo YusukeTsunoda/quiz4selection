@@ -11,8 +11,8 @@
         <div class="question-header mb-3">
             <!-- 現在の問題番号と総問題数 -->
             <div class="question-progress">問題 {{ question_number }} / {{ total_questions }}</div>
-            <!-- 現在のスコア -->
-            <div class="score-display">スコア: {{ session.get('score', 0) }}</div>
+            <!-- 現在の正答数 -->
+            <div class="score-display">正答数: {{ session.get('score', 0) }}問</div>
         </div>
         
         <!-- 問題文 -->
