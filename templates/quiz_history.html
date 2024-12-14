@@ -3,56 +3,96 @@
 {% block content %}
 <div class="container">
     <div class="quiz-history-container fade show">
-        <!-- ページタイトル -->
         <h2 class="text-center mb-4">クイズ履歴</h2>
-        <!-- カテゴリと難易度 -->
         <h3 class="text-center mb-4">{{ category }} - {{ difficulty|title }}</h3>
-        
-        {% for attempt in attempts %}
-        <!-- 各試行のカード -->
-        <div class="attempt-card mb-4">
-            <div class="attempt-header">
-                <!-- 試行日時 -->
-                <span class="attempt-date">{{ attempt.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
-                <!-- スコア -->
-                <span class="attempt-score">スコア: {{ attempt.score }}/{{ attempt.questions_history|length }}</span>
-            </div>
-            
-            <div class="questions-list">
-                {% for question in attempt.questions_history %}
-                <!-- 各問題の履歴 -->
-                <div class="history-question {% if not question.correct_answer %}incorrect{% else %}correct{% endif %}">
-                    <div class="review-question mb-4 {% if not question.correct_answer %}incorrect{% endif %}">
-                        <div class="question-text mb-3">
-                            <!-- 問題番号 -->
-                            <span class="question-number">問題 {{ loop.index }}:</span>
-                            <!-- 問題文 -->
-                            {{ question.question }}
+
+        <!-- タブナビゲーション -->
+        <ul class="nav nav-tabs mb-4" id="historyTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="attempts-tab" data-bs-toggle="tab" data-bs-target="#attempts" type="button" role="tab" aria-controls="attempts" aria-selected="true">
+                    試行履歴
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="questions-tab" data-bs-toggle="tab" data-bs-target="#questions" type="button" role="tab">
+                    問題別履歴
+                </button>
+            </li>
+        </ul>
+
+        <!-- タブコンテンツ -->
+        <div class="tab-content" id="historyTabContent">
+            <!-- 試行履歴タブ -->
+            <div class="tab-pane fade show active" id="attempts" role="tabpanel">
+                {% for attempt in attempts %}
+                <div class="attempt-card mb-4">
+                    <div class="attempt-header">
+                        <span class="attempt-date">{{ attempt.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
+                        <span class="attempt-score">スコア: {{ attempt.score }}/{{ attempt.questions_history|length }}</span>
+                    </div>
+                    
+                    <div class="questions-list">
+                        {% for question in attempt.questions_history %}
+                        <div class="history-question {% if not question.correct_answer %}incorrect{% else %}correct{% endif %}">
+                            <div class="review-question mb-4">
+                                <div class="question-text mb-3">
+                                    <span class="question-number">問題 {{ loop.index }}:</span>
+                                    {{ question.question }}
+                                </div>
+                                
+                                <div class="answer-review">
+                                    <div class="selected-answer">
+                                        <span class="review-label">選択した回答:</span>
+                                        <span class="review-answer {% if not question.correct_answer %}wrong{% else %}right{% endif %}">
+                                            {{ question.selected }}
+                                        </span>
+                                    </div>
+                                    <div class="correct-answer mt-2">
+                                        <span class="review-label">正解:</span>
+                                        <span class="review-answer right">{{ question.correct }}</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        
-                        <div class="answer-review">
-                            <div class="selected-answer">
-                                <!-- 選択した回答 -->
-                                <span class="review-label">選択した回答:</span>
-                                <span class="review-answer {% if not question.correct_answer %}wrong{% else %}right{% endif %}">
-                                    {{ question.selected }}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- 問題別履歴タブ -->
+            <div class="tab-pane fade" id="questions" role="tabpanel">
+                {% for question, stats in question_stats.items() %}
+                <div class="question-stats-card mb-4">
+                    <div class="question-stats-header">
+                        <h4 class="question-text">{{ question }}</h4>
+                        <div class="stats-summary">
+                            <span class="accuracy">正答率: {{ "%.1f"|format(stats.accuracy) }}%</span>
+                            <span class="attempts-count">回答回数: {{ stats.total_attempts }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="answer-history">
+                        {% for entry in stats.history %}
+                        <div class="history-entry {% if entry.is_correct %}correct{% else %}incorrect{% endif %}">
+                            <span class="timestamp">{{ entry.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
+                            <div class="answer-details">
+                                <span class="selected-answer">
+                                    選択: <span class="{% if entry.is_correct %}right{% else %}wrong{% endif %}">{{ entry.selected }}</span>
+                                </span>
+                                <span class="correct-answer">
+                                    正解: <span class="right">{{ entry.correct }}</span>
                                 </span>
                             </div>
-                            <div class="correct-answer mt-2">
-                                <!-- 正解 -->
-                                <span class="review-label">正解:</span>
-                                <span class="review-answer right">{{ question.correct }}</span>
-                            </div>
                         </div>
+                        {% endfor %}
                     </div>
                 </div>
                 {% endfor %}
             </div>
         </div>
-        {% endfor %}
-        
+
         <div class="text-center mt-4">
-            <!-- ダッシュボードに戻るボタン -->
             <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">ダッシュボードに戻る</a>
         </div>
     </div>

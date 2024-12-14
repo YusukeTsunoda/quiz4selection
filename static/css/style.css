@@ -383,3 +383,134 @@ body {
     background-color: #dcfce7; /* 緑色の背景 */
     color: var(--success-color); /* 緑文字 */
 }
+
+/* 問題別履歴のスタイル */
+.question-stats-card {
+    background: white;
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    margin-bottom: 1.5rem;
+}
+
+.question-stats-header {
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+}
+
+.question-stats-header h4 {
+    color: var(--text-color);
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.stats-summary {
+    display: flex;
+    gap: 1.5rem;
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.accuracy {
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.answer-history {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+}
+
+.history-entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem;
+    margin: 0.5rem 0;
+    background-color: #f8fafc;
+    border-radius: 0.5rem;
+    border-left: 4px solid #e2e8f0;
+}
+
+.history-entry.correct {
+    border-left-color: var(--success-color);
+}
+
+.history-entry.incorrect {
+    border-left-color: var(--error-color);
+}
+
+.timestamp {
+    color: #64748b;
+    font-size: 0.85rem;
+    min-width: 150px;
+}
+
+.answer-details {
+    display: flex;
+    gap: 1.5rem;
+    flex-grow: 1;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+/* タブのスタイル */
+.nav-tabs {
+    border-bottom: 2px solid #e2e8f0;
+    gap: 0.5rem;
+}
+
+.nav-tabs .nav-link {
+    color: #64748b;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.nav-tabs .nav-link:hover {
+    color: var(--primary-color);
+    border: none;
+    background: none;
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--primary-color);
+    border: none;
+    border-bottom: 2px solid var(--primary-color);
+    margin-bottom: -2px;
+}
+
+.tab-content {
+    padding-top: 1.5rem;
+}
+
+/* スクロールバーのスタイル */
+.answer-history::-webkit-scrollbar {
+    width: 6px;
+}
+
+.answer-history::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.answer-history::-webkit-scrollbar-thumb {
+    background-color: var(--primary-color);
+    border-radius: 3px;
+}
+
+/* アニメーション */
+.tab-pane {
+    transition: opacity 0.3s ease;
+}
+
+.tab-pane.fade {
+    opacity: 0;
+}
+
+.tab-pane.fade.show {
+    opacity: 1;
+}

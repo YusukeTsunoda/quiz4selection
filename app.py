@@ -207,15 +207,29 @@ def dashboard():
 @app.route('/quiz_history/<category>/<difficulty>')
 def quiz_history(category, difficulty):
     try:
+        # 通常の試行履歴を取得
         attempts = QuizAttempt.query.filter_by(
             category=category,
             difficulty=difficulty
         ).order_by(QuizAttempt.timestamp.desc()).all()
         
+        # 問題単位の統計情報を取得
+        question_stats = QuizAttempt.get_question_stats(category, difficulty)
+        
         return render_template('quiz_history.html',
                              category=category,
                              difficulty=difficulty,
-                             attempts=attempts)
+                             attempts=attempts,
+                             question_stats=question_stats)
     except Exception as e:
         logger.error(f"Error in quiz_history route: {e}")
         return "An error occurred", 500
+
+@app.route('/question_history/<category>/<difficulty>/<path:question_text>')
+def question_history(category, difficulty, question_text):
+    try:
+        history = QuizAttempt.get_question_history(category, difficulty, question_text)
+        return jsonify(history)
+    except Exception as e:
+        logger.error(f"Error in question_history route: {e}")
+        return jsonify({'error': str(e)}), 500
