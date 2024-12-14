@@ -1,0 +1,139 @@
+main:
+  root:
+    app.py:
+      content: |-
+        Flaskアプリケーションのメインファイル
+        外部依存:
+        - Flask
+        - SQLAlchemy
+        機能:
+        - ルーティング設定
+        - アプリケーション初期化
+        - ビュー関数の定義
+      dependency:
+        - /models.py
+        - /extensions.py
+        - /quiz_data.py
+
+    models.py:
+      content: |-
+        データベースモデルの定義
+        外部依存:
+        - SQLAlchemy
+        機能:
+        - クイズ履歴モデル
+        - ユーザーモデル
+      dependency:
+        - /extensions.py
+
+    extensions.py:
+      content: |-
+        Flaskの拡張機能の初期化
+        外部依存:
+        - Flask-SQLAlchemy
+        機能:
+        - データベース設定
+        - 共有拡張機能の初期化
+
+    quiz_data.py:
+      content: |-
+        クイズデータの管理
+        機能:
+        - クイズ問題の定義
+        - 問題カテゴリーの管理
+        - 難易度設定
+
+    static:
+      css:
+        style.css:
+          content: |-
+            アプ��ケーションのスタイル定義
+            機能:
+            - レイアウト
+            - カラースキーム
+            - レスポンシブデザイン
+      
+      js:
+        quiz.js:
+          content: |-
+            クライアントサイドの機能
+            機能:
+            - クイズタイマー
+            - 解答チェック
+            - 動的UI更新
+
+    templates:
+      base.html:
+        content: |-
+          ベーステンプレート
+          機能:
+          - 共通レイアウト
+          - ナビゲーション
+          - メタ情報
+
+      index.html:
+        content: |-
+          トップページ
+          機能:
+          - ウェルカムメッセージ
+          - クイズ開始オプション
+        dependency:
+          - /templates/base.html
+
+      quiz.html:
+        content: |-
+          クイズページ
+          機能:
+          - 問題表示
+          - 解答フォーム
+          - タイマー表示
+        dependency:
+          - /templates/base.html
+          - /static/js/quiz.js
+
+      result.html:
+        content: |-
+          結果表示ページ
+          機能:
+          - スコア表示
+          - 正解・不正解の確認
+          - 解説表示
+        dependency:
+          - /templates/base.html
+
+      quiz_history.html:
+        content: |-
+          クイズ履歴ページ
+          機能:
+          - 過去の成績表示
+          - 統計情報
+        dependency:
+          - /templates/base.html
+
+      category_select.html:
+        content: |-
+          カテゴリー選択ページ
+          機能:
+          - カテゴリー一覧表示
+          - カテゴリー選択機能
+        dependency:
+          - /templates/base.html
+
+      difficulty_select.html:
+        content: |-
+          難易度選択ページ
+          機能:
+          - 難易度レベル選択
+          - 難易度説明
+        dependency:
+          - /templates/base.html
+
+      dashboard.html:
+        content: |-
+          ダッシュボードページ
+          機能:
+          - ユーザー統計
+          - 進捗状況
+          - クイズ概要
+        dependency:
+          - /templates/base.html
