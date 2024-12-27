@@ -32,6 +32,31 @@ migrate = Migrate(app, db)
 
 from quiz_data import questions_by_category
 
+def get_shuffled_question(question):
+    """
+    問題の選択肢をランダムにシャッフルし、correct indexも更新する
+    """
+    # 元の選択肢と正解のインデックスを保持
+    original_options = question['options'].copy()
+    original_correct = question['correct']
+    
+    # 選択肢と正解のインデックスをペアにする
+    pairs = list(enumerate(original_options))
+    
+    # ペアをシャッフル
+    random.shuffle(pairs)
+    
+    # シャッフルされた選択肢と新しい正解のインデックスを取得
+    shuffled_indices, shuffled_options = zip(*pairs)
+    new_correct = shuffled_indices.index(original_correct)
+    
+    # 問題のコピーを作成し、シャッフルされた情報で更新
+    shuffled_question = question.copy()
+    shuffled_question['options'] = list(shuffled_options)
+    shuffled_question['correct'] = new_correct
+    
+    return shuffled_question
+
 @app.route('/')
 def index():
     try:
@@ -58,8 +83,8 @@ def start_quiz(category, difficulty):
     try:
         # Get questions for the selected category and difficulty
         questions = questions_by_category[category][difficulty]
-        # Select 5 random questions
-        selected_questions = random.sample(questions, min(5, len(questions)))
+        # Select 10 random questions
+        selected_questions = random.sample(questions, min(10, len(questions)))
         
         # Randomize options for each question
         for question in selected_questions:
@@ -77,7 +102,7 @@ def start_quiz(category, difficulty):
         session['difficulty'] = difficulty
         session['quiz_history'] = []
         
-        logger.debug(f"Starting new quiz session: {category} - {difficulty} with 5 questions")
+        logger.debug(f"Starting new quiz session: {category} - {difficulty} with 10 questions")
         
         return render_template('quiz.html', 
                             question=session['questions'][0],

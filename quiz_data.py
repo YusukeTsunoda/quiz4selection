@@ -2,172 +2,124 @@ questions_by_category = {
     "Japanese": {
         "easy": [
             {
-                "question": "ひらがなで「りんご」はどれですか？",
-                "options": ["リンゴ", "りんご", "リんご", "りンゴ"],
-                "correct": 1,
-                "difficulty": "easy"
-            },
-            {
-                "question": "「いぬ」を漢字で書くとどれ？",
-                "options": ["犬", "大", "太", "夫"],
+                "question": "人はいさ心も知らず古里は",
+                "options": ["花ぞ昔の香ににほひける", "龍田の川の錦なりけり", "声聞く時ぞ秋は悲しき", "富士の高嶺に雪は降りつつ"],
                 "correct": 0,
                 "difficulty": "easy"
             },
             {
-                "question": "「あか」を漢字で書くとどれ？",
-                "options": ["青", "赤", "白", "黒"],
-                "correct": 1,
-                "difficulty": "easy"
-            },
-            {
-                "question": "「ねこ」を漢字で書くとどれ？",
-                "options": ["猫", "狗", "馬", "牛"],
+                "question": "恋すてふ我が名はまだき立ちにけり",
+                "options": ["人知れずこそ思ひそめし", "花ぞ昔の香ににほひける", "龍田の川の錦なりけり", "声聞く時ぞ秋は悲しき"],
                 "correct": 0,
                 "difficulty": "easy"
             },
             {
-                "question": "「つき」を漢字で書くとどれ？",
-                "options": ["日", "月", "星", "空"],
-                "correct": 1,
-                "difficulty": "easy"
-            },
-            {
-                "question": "「うみ」を漢字で書くとどれ？",
-                "options": ["海", "川", "池", "湖"],
+                "question": "秋風にたなびく雲の絶え間より",
+                "options": ["もれ出づる月の影のさやけさ", "人知れずこそ思ひそめし", "花ぞ昔の香ににほひける", "龍田の川の錦なりけり"],
                 "correct": 0,
                 "difficulty": "easy"
             },
             {
-                "question": "「やま」を漢字で書くとどれ？",
-                "options": ["山", "川", "森", "林"],
+                "question": "花の色は移りにけりないたこらに",
+                "options": ["わが身世にふるながめせし間に", "もれ出づる月の影のさやけさ", "人知れずこそ思ひそめし", "花ぞ昔の香ににほひける"],
                 "correct": 0,
                 "difficulty": "easy"
             },
             {
-                "question": "「はな」を漢字で書くとどれ？",
-                "options": ["花", "草", "木", "葉"],
+                "question": "君がため春の野に出でて若菜つむ",
+                "options": ["わが衣手に雪は降りつつ", "もれ出づる月の影のさやけさ", "人知れずこそ思ひそめし", "わが身世にふるながめせし間に"],
                 "correct": 0,
                 "difficulty": "easy"
             },
             {
-                "question": "「そら」を漢字で書くとどれ？",
-                "options": ["空", "雲", "風", "雨"],
+                "question": "久方の光のどけき春の日に",
+                "options": ["しづ心なく花の散るらむ", "わが身世にふるながめせし間に", "もれ出づる月の影のさやけさ", "わが衣手に雪は降りつつ"],
                 "correct": 0,
                 "difficulty": "easy"
             },
             {
-                "question": "「かぜ」を漢字で書くとどれ？",
-                "options": ["風", "雨", "雪", "霧"],
+                "question": "春過ぎて夏来にけらし白妙の",
+                "options": ["衣ほすてふ天の香具山", "しづ心なく花の散るらむ", "わが身���にふるながめせし間に", "秋風にたなびく雲の絶え間より"],
                 "correct": 0,
                 "difficulty": "easy"
             },
             {
-                "question": "「くも」を漢字で書くとどれ？",
-                "options": ["雲", "霧", "雨", "雪"],
+                "question": "田子の浦にうち出でて見れば白妙の",
+                "options": ["富士の高嶺に雪は降りつつ", "衣ほすてふ天の香具山", "しづ心なく花の散るらむ", "わが衣手に雪は降りつつ"],
                 "correct": 0,
                 "difficulty": "easy"
             },
             {
-                "question": "「あめ」を漢字で書くとどれ？",
-                "options": ["雨", "雲", "風", "雪"],
+                "question": "奥山に紅葉踏み分け鳴く鹿の",
+                "options": ["声聞く時ぞ秋は悲しき", "富士の高嶺に雪は降りつつ", "衣ほすてふ天の香具山", "しづ心なく花の散るらむ"],
                 "correct": 0,
                 "difficulty": "easy"
             },
             {
-                "question": "「ゆき」を漢字で書くとどれ？",
-                "options": ["雪", "雨", "雲", "霧"],
-                "correct": 0,
-                "difficulty": "easy"
-            },
-            {
-                "question": "「みず」を漢字で書くとどれ？",
-                "options": ["水", "火", "土", "木"],
+                "question": "嵐吹く三室の山のもみぢ葉は",
+                "options": ["龍田の川の錦なりけり", "声聞く時ぞ秋は悲しき", "富士の高嶺に雪は降りつつ", "衣ほすてふ天の香具山"],
                 "correct": 0,
                 "difficulty": "easy"
             }
         ],
         "medium": [
             {
-                "question": "「学校」の読み方は？",
-                "options": ["がっこう", "がくこう", "がこう", "がっこ"],
+                "question": "人はいさ… ",
+                "options": ["花ぞ昔の香ににほひける", "龍田の川の錦なりけり", "声聞く時ぞ秋は悲しき", "富士の高嶺に雪は降りつつ"],
                 "correct": 0,
                 "difficulty": "medium"
             },
             {
-                "question": "「図書館」の読み方は？",
-                "options": ["としょかん", "ずしょかん", "としょうかん", "ずしょうかん"],
+                "question": "恋すてふ… ",
+                "options": ["人知れずこそ思ひそめし", "花ぞ昔の香ににほひける", "龍田の川の錦なりけり", "声聞く時ぞ秋は悲しき"],
                 "correct": 0,
                 "difficulty": "medium"
             },
             {
-                "question": "「電車」の読み方は？",
-                "options": ["でんしゃ", "てんしゃ", "でんじゃ", "てんじゃ"],
+                "question": "秋風に… ",
+                "options": ["もれ出づる月の影のさやけさ", "人知れずこそ思ひそめし", "花ぞ昔の香ににほひける", "龍田の川の錦なりけり"],
                 "correct": 0,
                 "difficulty": "medium"
             },
             {
-                "question": "「公園」の読み方は？",
-                "options": ["こうえん", "こうばん", "こうそう", "こうどう"],
+                "question": "花の色は… ",
+                "options": ["わが身世にふるながめせし間に", "もれ出づる月の影のさやけさ", "人知れずこそ思ひそめし", "花ぞ昔の香ににほひける"],
                 "correct": 0,
                 "difficulty": "medium"
             },
             {
-                "question": "「教室」の読み方は？",
-                "options": ["きょうしつ", "こうしつ", "きょうした", "こうした"],
+                "question": "君がため… ",
+                "options": ["わが衣手に雪は降りつつ", "もれ出づる月の影のさやけさ", "人知れずこそ思ひそめし", "わが身世にふるながめせし間に"],
                 "correct": 0,
                 "difficulty": "medium"
             },
             {
-                "question": "「美術館」の読み方は？",
-                "options": ["びじゅつかん", "びじつかん", "みじゅつかん", "みじつかん"],
+                "question": "久方の… ",
+                "options": ["しづ心なく花の散るらむ", "わが身世にふるながめせし間に", "もれ出づる月の影のさやけさ", "わが衣手に雪は降りつつ"],
                 "correct": 0,
                 "difficulty": "medium"
             },
             {
-                "question": "「動物園」の読み方は？",
-                "options": ["どうぶつえん", "どうぶつかん", "どうぶつそう", "どうぶつじょう"],
+                "question": "春過ぎて… ",
+                "options": ["衣ほすてふ天の香具山", "しづ心なく花の散るらむ", "わが身世にふるながめせし間に", "秋風にたなびく雲の絶え間より"],
                 "correct": 0,
                 "difficulty": "medium"
             },
             {
-                "question": "「体育館」の読み方は？",
-                "options": ["たいいくかん", "たいくかん", "たいいくえん", "たいくえん"],
+                "question": "田子の浦に… ",
+                "options": ["富士の高嶺に雪は降りつつ", "衣ほすてふ天の香具山", "しづ心なく花の散るらむ", "わが衣手に雪は降りつつ"],
                 "correct": 0,
                 "difficulty": "medium"
             },
             {
-                "question": "「自転車」の読み方は？",
-                "options": ["じてんしゃ", "じでんしゃ", "してんしゃ", "しでんしゃ"],
+                "question": "奥山に… ",
+                "options": ["声聞く時ぞ秋は悲しき", "富士の高嶺に雪は降りつつ", "衣ほすてふ天の香具山", "しづ心なく花の散るらむ"],
                 "correct": 0,
                 "difficulty": "medium"
             },
             {
-                "question": "「天気予報」の読み方は？",
-                "options": ["てんきよほう", "てんきよぼう", "でんきよほう", "でんきよぼう"],
-                "correct": 0,
-                "difficulty": "medium"
-            },
-            {
-                "question": "「新幹線」の読み方は？",
-                "options": ["しんかんせん", "しんがんせん", "しんかんせい", "しんがんせい"],
-                "correct": 0,
-                "difficulty": "medium"
-            },
-            {
-                "question": "「携帯電話」の読み方は？",
-                "options": ["けいたいでんわ", "けいだいでんわ", "けいたいでんは", "けいだいでんは"],
-                "correct": 0,
-                "difficulty": "medium"
-            },
-            {
-                "question": "「図書館前」の読み方は？",
-                "options": ["としょかんまえ", "としょうかんまえ", "とかんまえ", "としょまえ"],
-                "correct": 0,
-                "difficulty": "medium"
-            },
-            {
-                "question": "「世界地図」の読み方は？",
-                "options": ["せかいちず", "せかいずず", "せかいじず", "せかいちじ"],
+                "question": "嵐吹く… ",
+                "options": ["龍田の川の錦なりけり", "声聞く時ぞ秋は悲しき", "富士の高嶺に雪は降りつつ", "衣ほすてふ天の香具山"],
                 "correct": 0,
                 "difficulty": "medium"
             }
@@ -262,33 +214,315 @@ questions_by_category = {
     "Math": {
         "easy": [
             {
-                "question": "5 + 3 = ?",
-                "options": ["7", "8", "9", "6"],
-                "correct": 1,
+                "question": "12 - 5 = ?",
+                "options": ["7", "6", "8", "5"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "9 + 3 = ?",
+                "options": ["12", "11", "13", "10"],
+                "correct": 0,
                 "difficulty": "easy"
             },
             {
                 "question": "10 - 4 = ?",
-                "options": ["4", "5", "6", "7"],
-                "correct": 2,
+                "options": ["6", "5", "7", "4"],
+                "correct": 0,
                 "difficulty": "easy"
             },
             {
-                "question": "2 + 6 = ?",
-                "options": ["7", "8", "9", "10"],
-                "correct": 1,
+                "question": "7 + 7 = ?",
+                "options": ["14", "13", "15", "12"],
+                "correct": 0,
                 "difficulty": "easy"
             },
             {
-                "question": "9 - 3 = ?",
-                "options": ["4", "5", "6", "7"],
-                "correct": 2,
+                "question": "13 - 6 = ?",
+                "options": ["7", "8", "6", "9"],
+                "correct": 0,
                 "difficulty": "easy"
             },
             {
-                "question": "4 + 5 = ?",
-                "options": ["8", "9", "10", "7"],
-                "correct": 1,
+                "question": "8 + 4 = ?",
+                "options": ["12", "11", "13", "10"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "11 - 5 = ?",
+                "options": ["6", "7", "5", "8"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "5 + 8 = ?",
+                "options": ["13", "12", "14", "11"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "15 - 7 = ?",
+                "options": ["8", "9", "7", "6"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "6 + 6 = ?",
+                "options": ["12", "11", "13", "10"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "2 + 2 + 2 = ?",
+                "options": ["6", "5", "7", "4"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "10 - 3 - 2 = ?",
+                "options": ["5", "4", "6", "3"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "4 + 5 + 1 = ?",
+                "options": ["10", "9", "11", "8"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "9 - 4 = ?",
+                "options": ["5", "6", "4", "7"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "3 + 3 + 3 = ?",
+                "options": ["9", "8", "10", "7"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "7 - 2 = ?",
+                "options": ["5", "4", "6", "3"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "4 + 4 = ?",
+                "options": ["8", "7", "9", "6"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "6 - 3 = ?",
+                "options": ["3", "4", "2", "5"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "5 + 3 + 2 = ?",
+                "options": ["10", "9", "11", "8"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "8 - 5 = ?",
+                "options": ["3", "4", "2", "5"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "2 + 7 = ?",
+                "options": ["9", "8", "10", "7"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "10 - 6 = ?",
+                "options": ["4", "5", "3", "6"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "5 + 4 = ?",
+                "options": ["9", "8", "10", "7"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "7 - 3 = ?",
+                "options": ["4", "5", "3", "6"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "3 + 8 = ?",
+                "options": ["11", "10", "12", "9"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "12 - 7 = ?",
+                "options": ["5", "6", "4", "7"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "6 + 5 = ?",
+                "options": ["11", "10", "12", "9"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "9 - 5 = ?",
+                "options": ["4", "5", "3", "6"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "7 + 4 = ?",
+                "options": ["11", "10", "12", "9"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "13 - 8 = ?",
+                "options": ["5", "6", "4", "7"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "4 + 7 = ?",
+                "options": ["11", "10", "12", "9"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "8 - 3 = ?",
+                "options": ["5", "4", "6", "3"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "6 + 3 + 1 = ?",
+                "options": ["10", "9", "11", "8"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "11 - 6 = ?",
+                "options": ["5", "6", "4", "7"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "3 + 5 = ?",
+                "options": ["8", "7", "9", "6"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "7 - 4 = ?",
+                "options": ["3", "4", "2", "5"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "5 + 6 = ?",
+                "options": ["11", "10", "12", "9"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "10 - 5 = ?",
+                "options": ["5", "6", "4", "7"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "4 + 4 + 2 = ?",
+                "options": ["10", "9", "11", "8"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "9 - 6 = ?",
+                "options": ["3", "4", "2", "5"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "2 + 8 = ?",
+                "options": ["10", "9", "11", "8"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "14 - 9 = ?",
+                "options": ["5", "6", "4", "7"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "6 + 4 = ?",
+                "options": ["10", "9", "11", "8"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "8 - 4 = ?",
+                "options": ["4", "5", "3", "6"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "3 + 6 = ?",
+                "options": ["9", "8", "10", "7"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "12 - 8 = ?",
+                "options": ["4", "5", "3", "6"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "5 + 7 = ?",
+                "options": ["12", "11", "13", "10"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "11 - 7 = ?",
+                "options": ["4", "5", "3", "6"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "3 + 4 + 3 = ?",
+                "options": ["10", "9", "11", "8"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "13 - 5 = ?",
+                "options": ["8", "7", "9", "6"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "2 + 9 = ?",
+                "options": ["11", "10", "12", "9"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "15 - 9 = ?",
+                "options": ["6", "7", "5", "8"],
+                "correct": 0,
                 "difficulty": "easy"
             }
         ],
@@ -339,7 +573,7 @@ questions_by_category = {
             },
             {
                 "question": "3/4 + 1/4 = ?",
-                "options": ["3/8", "4/8", "4/4", "2/4"],
+                "options": ["3/8", "4/8", "1", "2/4"],
                 "correct": 2,
                 "difficulty": "hard"
             },
@@ -360,32 +594,122 @@ questions_by_category = {
     "Science": {
         "easy": [
             {
-                "question": "植物が育つために必要なものは？",
-                "options": ["水と日光", "水と石", "砂と石", "氷と雨"],
+                "question": "太陽は、何でできている星？",
+                "options": ["ガス", "岩", "水", "氷"],
                 "correct": 0,
                 "difficulty": "easy"
             },
             {
-                "question": "動物の赤ちゃんが生まれる時に必要なものは？",
-                "options": ["卵", "葉っぱ", "石", "木"],
+                "question": "地球は、何という惑星？",
+                "options": ["赤い星", "青い星", "黄色い星", "緑の星"],
+                "correct": 1,
+                "difficulty": "easy"
+            },
+            {
+                "question": "夜空に見える明るい星は？",
+                "options": ["月", "太陽", "星", "雲"],
+                "correct": 2,
+                "difficulty": "easy"
+            },
+            {
+                "question": "地球の周りを回るものは？",
+                "options": ["月", "太陽", "星", "雲"],
                 "correct": 0,
                 "difficulty": "easy"
             },
             {
-                "question": "雨が降る時、空にできるものは？",
-                "options": ["雲", "星", "月", "太陽"],
+                "question": "太陽系の中心にある星は？",
+                "options": ["月", "地球", "太陽", "火星"],
+                "correct": 2,
+                "difficulty": "easy"
+            },
+            {
+                "question": "地球が太陽の周りを回ることを何という？",
+                "options": ["自転", "公転", "回転", "反射"],
+                "correct": 1,
+                "difficulty": "easy"
+            },
+            {
+                "question": "毎日、太陽が昇る方角は？",
+                "options": ["東", "西", "南", "北"],
                 "correct": 0,
                 "difficulty": "easy"
             },
             {
-                "question": "春に咲く代表的な花は？",
-                "options": ["桜", "ひまわり", "コスモス", "チューリップ"],
+                "question": "太陽系の中で、一番小さい惑星は？",
+                "options": ["水星", "火星", "地球", "木星"],
                 "correct": 0,
                 "difficulty": "easy"
             },
             {
-                "question": "昼と夜を分けるものは？",
-                "options": ["太陽", "月", "星", "雲"],
+                "question": "宇宙で人間が使う乗り物は？",
+                "options": ["船", "飛行機", "ロケット", "車"],
+                "correct": 2,
+                "difficulty": "easy"
+            },
+            {
+                "question": "宇宙服を着る理由は？",
+                "options": ["寒いから", "かっこいいから", "酸素がないから", "宇宙旅行をするため"],
+                "correct": 2,
+                "difficulty": "easy"
+            },
+            {
+                "question": "地球に一番近い星は？",
+                "options": ["月", "太陽", "火星", "木星"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "昼と夜があるのはなぜ？",
+                "options": ["地球が動いているから", "太陽が動いているから", "月が動いているから", "星が動いているから"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "星は、どんな形をしている？",
+                "options": ["丸い", "四角い", "三角", "星形"],
+                "correct": 0,
+                "difficulty": "easy"
+            },
+            {
+                "question": "空に虹ができるのはどんな時？",
+                "options": ["晴れの時", "雨上がり", "雪の日", "曇りの日"],
+                "correct": 1,
+                "difficulty": "easy"
+            },
+            {
+                "question": "宇宙で重力がないとどうなる？",
+                "options": ["歩ける", "飛べる", "泳げる", "寝れる"],
+                "correct": 1,
+                "difficulty": "easy"
+            },
+            {
+                "question": "宇宙にいく人は何と呼ばれている？",
+                "options": ["パイロット", "宇宙飛行士", "船長", "探検家"],
+                "correct": 1,
+                "difficulty": "easy"
+            },
+            {
+                "question": "星がたくさん集まったものを何という？",
+                "options": ["雲", "星座", "雨", "星雲"],
+                "correct": 1,
+                "difficulty": "easy"
+            },
+            {
+                "question": "太陽は、どんな色をしている？",
+                "options": ["青色", "黄色", "赤色", "緑色"],
+                "correct": 1,
+                "difficulty": "easy"
+            },
+            {
+                "question": "夜空で一番明るく見える月は何？",
+                "options": ["三日月", "満月", "新月", "上弦の月"],
+                "correct": 1,
+                "difficulty": "easy"
+            },
+            {
+                "question": "地球は何という形をしている？",
+                "options": ["丸い", "四角い", "三角", "平ら"],
                 "correct": 0,
                 "difficulty": "easy"
             }
@@ -550,6 +874,70 @@ questions_by_category = {
                 "options": ["琵琶湖", "霞ヶ浦", "サロマ湖", "中海"],
                 "correct": 0,
                 "difficulty": "hard"
+            }
+        ]
+    },
+    "Planets": {
+        "medium": [
+            {
+                "question": "地球の大気の主成分は？",
+                "options": ["窒素", "酸素", "二酸化炭素", "水素"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "太陽系で一番熱い惑星は？",
+                "options": ["金星", "地球", "火星", "水星"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "地球の自転は何時間で一周する？",
+                "options": ["24時間", "12時間", "48時間", "36時間"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "太陽系で環を持つ惑星は？",
+                "options": ["土星", "火星", "地球", "金星"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "地球から見える一番明るい星は？",
+                "options": ["金星", "火星", "木星", "土星"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "太陽系で一番小さな惑星は？",
+                "options": ["水星", "火星", "地球", "金星"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "地球の周りを回っている天体は？",
+                "options": ["月", "太陽", "火星", "金星"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "太陽系で一番大きな惑星は？",
+                "options": ["木星", "地球", "火星", "金星"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "火星の別名は？",
+                "options": ["赤い惑星", "青い惑星", "緑の惑星", "黄色い惑星"],
+                "correct": 0,
+                "difficulty": "medium"
+            },
+            {
+                "question": "太陽系で最も遠い惑星は？",
+                "options": ["海王星", "天王星", "土星", "木星"],
+                "correct": 0,
+                "difficulty": "medium"
             }
         ]
     }
