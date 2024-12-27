@@ -359,3 +359,6 @@ app.py:
     - クイズロジックの実装
     + 問題単位の履歴データ取得処理
     + 問題ごとの正答率計算処理
+
+    supabaseとの連携
+    Password: WV1fxjSD4aznmIYj
