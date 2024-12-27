@@ -7,28 +7,25 @@ from models import QuizAttempt
 from sqlalchemy import func
 from datetime import datetime
 from flask_migrate import Migrate
+from config import Config
 
-# Configure logging
+# ロギング設定
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-from dotenv import load_dotenv
-load_dotenv()
+def create_app():
+    app = Flask(__name__)
+    
+    # 設定の適用
+    app.config.from_object(Config)
+    
+    # データベース初期化
+    db.init_app(app)
+    migrate = Migrate(app, db)
+    
+    return app
 
-# Initialize Flask app
-app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev_key_for_quiz_app")
-
-# Get database URL and ensure it uses postgresql://
-database_url = os.environ.get('DATABASE_URL')
-if database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db.init_app(app)
-migrate = Migrate(app, db)
+app = create_app()
 
 from quiz_data import questions_by_category
 
