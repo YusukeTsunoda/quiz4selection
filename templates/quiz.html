@@ -1,34 +1,181 @@
-{% extends "base.html" %}
+{% extends "base.html" %} {% block content %}
+<div class="container mt-4 quiz-container">
+  <div class="progress mb-4">
+    <div
+      class="progress-fill"
+      style="width: {{ (question_number / total_questions) * 100 }}%"
+    ></div>
+  </div>
 
-{% block content %}
-<div class="container">
-    <div class="quiz-container fade">
-        <!-- プログレスバー -->
-        <div class="progress-bar">
-            <div class="progress-fill" style="width: {{ (question_number / total_questions) * 100 }}%"></div>
-        </div>
-        
-        <div class="question-header mb-3">
-            <!-- 現在の問題番号と総問題数 -->
-            <div class="question-progress">問題 {{ question_number }} / {{ total_questions }}</div>
-            <!-- 現在の正答数 -->
-            <div class="score-display">正答数: {{ session.get('score', 0) }}問</div>
-        </div>
-        
-        <!-- 問題文 -->
-        <div class="question mb-4">
-            {{ question.question }}
-        </div>
-        
-        <!-- 選択肢コンテナ -->
-        <div class="options-container" data-correct="{{ question.correct }}">
-            {% for option in question.options %}
-            <!-- 選択肢 -->
-            <div class="option" role="button">
-                {{ option }}
-            </div>
-            {% endfor %}
-        </div>
+  <div class="progress-info">
+    <span>問題 {{ question_number }}/{{ total_questions }}</span>
+    <span>正答数: {{ correct_answers }}問</span>
+  </div>
+
+  <div class="question-container">
+    <h2 class="question-text mb-4">{{ question.question }}</h2>
+    <div class="options-container" data-correct="{{ question.correct }}">
+      {% for option in question.options %}
+      <div class="option mb-3 p-3 rounded" data-index="{{ loop.index0 }}">
+        {{ option }}
+      </div>
+      {% endfor %}
     </div>
+  </div>
 </div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const optionsContainer = document.querySelector(".options-container");
+    const options = document.querySelectorAll(".option");
+    let isAnswered = false;
+    let isProcessing = false;
+    const startTime = Date.now();
+
+    options.forEach((option) => {
+      option.addEventListener(
+        "click",
+        async function (event) {
+          // イベントの伝播を停止
+          event.preventDefault();
+          event.stopPropagation();
+
+          if (isAnswered || isProcessing) return;
+          isProcessing = true;
+          isAnswered = true;
+
+          try {
+            const selectedIndex = this.dataset.index;
+            const timeTaken = (Date.now() - startTime) / 1000;
+
+            const response = await fetch("/submit_answer", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                selected: selectedIndex,
+                time_taken: timeTaken,
+              }),
+            });
+
+            const result = await response.json();
+            console.log("Server response:", result); // デバッグ用
+
+            if (result.success) {
+              // 正解・不正解の表示
+              const correctIndex = optionsContainer.dataset.correct;
+              const selectedOption = this;
+              const correctOption = options[correctIndex];
+              const isCorrect = selectedIndex === correctIndex;
+
+              // 正解/不正解のスタイル適用
+              if (isCorrect) {
+                selectedOption.classList.add("correct");
+              } else {
+                selectedOption.classList.add("incorrect");
+                correctOption.classList.add("correct");
+              }
+
+              // 正解の場合のみ正答数を更新
+              if (isCorrect) {
+                const correctAnswersDisplay = document.querySelector(
+                  ".progress-info span:last-child"
+                );
+                const currentCorrectAnswers = parseInt(
+                  correctAnswersDisplay.textContent.replace(/[^0-9]/g, "")
+                );
+                correctAnswersDisplay.textContent = `正答数: ${
+                  currentCorrectAnswers + 1
+                }問`;
+              }
+
+              // アニメーション表示のための遅延
+              await new Promise((resolve) => setTimeout(resolve, 800));
+
+              // 遷移処理
+              if (result.isLastQuestion && result.redirectUrl) {
+                window.location.href = result.redirectUrl;
+              } else {
+                window.location.href = "/next_question";
+              }
+            } else {
+              console.error("Error from server:", result.error);
+            }
+          } catch (error) {
+            console.error("Error:", error);
+          } finally {
+            isProcessing = false;
+          }
+        },
+        { once: true }
+      ); // イベントリスナーを1回だけ実行
+    });
+  });
+</script>
+
+<style>
+  .progress {
+    width: 100%;
+    height: 20px;
+    background-color: #f0f0f0;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background-color: #4caf50;
+    transition: width 0.3s ease;
+  }
+
+  .progress-info {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #666;
+    margin-bottom: 10px;
+  }
+
+  .question-container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .question-text {
+    font-size: 1.5em;
+    color: #333;
+    text-align: center;
+  }
+
+  .option {
+    background-color: #fff;
+    border: 2px solid #ddd;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .option:hover {
+    background-color: #f8f9fa;
+    transform: translateY(-2px);
+  }
+
+  .option.correct {
+    background-color: #d4edda;
+    border-color: #28a745;
+  }
+
+  .option.incorrect {
+    background-color: #f8d7da;
+    border-color: #dc3545;
+  }
+
+  .quiz-container {
+    opacity: 1;
+    transition: opacity 0.3s ease;
+  }
+
+  .quiz-container.fade {
+    opacity: 0;
+  }
+</style>
 {% endblock %}

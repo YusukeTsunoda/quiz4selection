@@ -1,7 +1,10 @@
 from flask_login import UserMixin
 from datetime import datetime
 from extensions import db
-from sqlalchemy import func
+from sqlalchemy import func, JSON
+import logging
+
+logger = logging.getLogger(__name__)
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -19,88 +22,97 @@ class QuizAttempt(db.Model):
     category = db.Column(db.String(50), nullable=False)
     subcategory = db.Column(db.String(50), nullable=False)
     difficulty = db.Column(db.String(20), nullable=False)
-    question_text = db.Column(db.String(500), nullable=False)
-    selected_answer = db.Column(db.String(500), nullable=False)
-    correct_answer = db.Column(db.String(500), nullable=False)
-    is_correct = db.Column(db.Boolean, nullable=False)
-    time_taken = db.Column(db.Float, nullable=False)
-    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    score = db.Column(db.Integer, nullable=False, default=0)
+    total_questions = db.Column(db.Integer, nullable=False, default=0)
+    quiz_history = db.Column(JSON, nullable=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def get_percentage(self):
+        """スコアをパーセンテージで返す"""
+        if not self.total_questions or not self.score:
+            return 0.0
+        return (self.score / self.total_questions) * 100
 
     @staticmethod
     def get_stats(grade, category, subcategory, difficulty):
         """特定の条件での統計情報を取得"""
-        attempts = QuizAttempt.query.filter_by(
-            grade=grade,
-            category=category,
-            subcategory=subcategory,
-            difficulty=difficulty
-        ).all()
+        try:
+            attempts = QuizAttempt.query.filter_by(
+                grade=grade,
+                category=category,
+                subcategory=subcategory,
+                difficulty=difficulty
+            ).all()
 
-        if not attempts:
+            if not attempts:
+                return {
+                    'attempts': 0,
+                    'avg_score': 0.0,
+                    'highest_score': 0.0
+                }
+
+            total_percentage = sum(attempt.get_percentage() for attempt in attempts)
+            highest_percentage = max(attempt.get_percentage() for attempt in attempts)
+
+            return {
+                'attempts': len(attempts),
+                'avg_score': total_percentage / len(attempts),
+                'highest_score': highest_percentage
+            }
+        except Exception as e:
+            logger.error(f"Error in get_stats: {e}")
             return {
                 'attempts': 0,
-                'avg_score': 0,
-                'highest_score': 0
+                'avg_score': 0.0,
+                'highest_score': 0.0
             }
-
-        total_attempts = len(attempts)
-        correct_attempts = sum(1 for attempt in attempts if attempt.is_correct)
-        avg_score = (correct_attempts / total_attempts) * 100
-        highest_score = 100 if correct_attempts > 0 else 0
-
-        return {
-            'attempts': total_attempts,
-            'avg_score': avg_score,
-            'highest_score': highest_score
-        }
 
     @staticmethod
     def get_question_stats(grade, category, subcategory, difficulty):
         """問題ごとの統計情報を取得"""
-        attempts = QuizAttempt.query.filter_by(
-            grade=grade,
-            category=category,
-            subcategory=subcategory,
-            difficulty=difficulty
-        ).all()
+        try:
+            attempts = QuizAttempt.query.filter_by(
+                grade=grade,
+                category=category,
+                subcategory=subcategory,
+                difficulty=difficulty
+            ).all()
 
-        stats = {}
-        for attempt in attempts:
-            if attempt.question_text not in stats:
-                stats[attempt.question_text] = {
-                    'attempts': 0,
-                    'correct': 0,
-                    'total_time': 0
-                }
-            
-            stats[attempt.question_text]['attempts'] += 1
-            if attempt.is_correct:
-                stats[attempt.question_text]['correct'] += 1
-            stats[attempt.question_text]['total_time'] += attempt.time_taken
+            if not attempts:
+                return {}
 
-        # 統計情報の計算
-        for question in stats:
-            attempts = stats[question]['attempts']
-            stats[question]['correct_rate'] = stats[question]['correct'] / attempts
-            stats[question]['avg_time'] = stats[question]['total_time'] / attempts
+            # 問題ごとの統計を集計
+            stats = {}
+            for attempt in attempts:
+                if not attempt.quiz_history:
+                    continue
 
-        return stats
+                for question in attempt.quiz_history:
+                    q_text = question.get('question', '')
+                    if not q_text:
+                        continue
 
-    @staticmethod
-    def get_question_history(grade, category, subcategory, difficulty, question_text):
-        """特定の問題の履歴を取得"""
-        attempts = QuizAttempt.query.filter_by(
-            grade=grade,
-            category=category,
-            subcategory=subcategory,
-            difficulty=difficulty,
-            question_text=question_text
-        ).order_by(QuizAttempt.timestamp.desc()).all()
+                    if q_text not in stats:
+                        stats[q_text] = {
+                            'attempts': 0,
+                            'correct': 0,
+                            'total_time': 0,
+                            'correct_rate': 0,
+                            'avg_time': 0
+                        }
 
-        return [{
-            'timestamp': attempt.timestamp,
-            'is_correct': attempt.is_correct,
-            'time_taken': attempt.time_taken,
-            'selected_answer': attempt.selected_answer,
-            'correct_answer': attempt.correct_answer
-        } for attempt in attempts]
+                    stats[q_text]['attempts'] += 1
+                    if question.get('is_correct', False):
+                        stats[q_text]['correct'] += 1
+                    stats[q_text]['total_time'] += question.get('time_taken', 0)
+
+            # 統計を計算
+            for q_stats in stats.values():
+                if q_stats['attempts'] > 0:
+                    q_stats['correct_rate'] = q_stats['correct'] / q_stats['attempts']
+                    q_stats['avg_time'] = q_stats['total_time'] / q_stats['attempts']
+
+            return stats
+        except Exception as e:
+            logger.error(f"Error in get_question_stats: {e}")
+            return {}

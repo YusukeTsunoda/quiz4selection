@@ -1,54 +1,94 @@
-{% extends "base.html" %}
+{% extends "base.html" %} {% block content %}
+<div class="container mt-5">
+  <h1 class="text-center mb-4">クイズ結果</h1>
 
-{% block content %}
-<div class="container">
-    <div class="quiz-container fade show">
-        <!-- ページタイトル -->
-        <h2 class="text-center mb-4">クイズ完了！</h2>
-        
-        <!-- 最終スコア表示 -->
-        <div class="score-display text-center mb-4">
-            最終スコア: {{ score }} / {{ total_questions }}
-        </div>
-        
-        <div class="review-section">
-            <!-- 解答結果の見出し -->
-            <h3 class="text-center mb-4">解答結果</h3>
-            {% for question in quiz_history %}
-            {% if not question.correct_answer %}
-            <!-- 不正解の問題のみ表示 -->
-            <div class="review-question mb-4 incorrect">
-                <div class="question-text mb-3">
-                    <!-- 問題番号と問題文 -->
-                    <span class="question-number">問題 {{ loop.index }}:</span>
-                    {{ question.question }}
-                </div>
-                
-                <div class="answer-review">
-                    <div class="selected-answer">
-                        <!-- 選択した回答の表示 -->
-                        <span class="review-label">選択した回答:</span>
-                        <span class="review-answer wrong">
-                            {{ question.selected }}
-                        </span>
-                    </div>
-                    <div class="correct-answer mt-2">
-                        <!-- 正解の表示 -->
-                        <span class="review-label">正解:</span>
-                        <span class="review-answer right">{{ question.correct }}</span>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-            {% endfor %}
-        </div>
-        
-        <div class="text-center mt-4">
-            <!-- 再チャレンジボタン -->
-            <a href="/" class="btn btn-primary btn-lg me-3">もう一度チャレンジ！</a>
-            <!-- 学習進捗ページへのリンク -->
-            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-lg">学習進捗を確認</a>
-        </div>
+  <div class="score-summary text-center mb-4">
+    <h2>正答数: {{ correct_answers }}/{{ total_questions }}</h2>
+    <div class="percentage">
+      正答率: {{ (correct_answers / total_questions * 100) | round(1) }}%
     </div>
+    {% if correct_answers == total_questions %}
+    <div class="perfect-score mt-2">🎉 満点おめでとうございます！ 🎉</div>
+    {% endif %}
+  </div>
+
+  <div class="question-review mt-4">
+    <h3 class="mb-3">問題の振り返り</h3>
+    {% for history in quiz_history %}
+    <div class="card mb-3">
+      <div class="card-body">
+        <p class="question-text">{{ loop.index }}. {{ history.question }}</p>
+
+        <div class="selected-answer mt-2">
+          あなたの回答: {{ history.selected_option }}
+        </div>
+
+        {% if not history.is_correct %}
+        <div class="correct-answer mt-2">
+          正解: {{ history.correct_option }}
+        </div>
+        {% endif %}
+
+        <div class="answer-status mt-2">
+          {% if history.is_correct %}
+          <span class="text-success">✓ 正解</span>
+          {% else %}
+          <span class="text-danger">✗ 不正解</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="navigation-buttons text-center mt-4">
+    <a href="/dashboard" class="btn btn-primary">ダッシュボードへ戻る</a>
+  </div>
 </div>
+
+<style>
+  .score-summary {
+    background-color: #f8f9fa;
+    padding: 2rem;
+    border-radius: 10px;
+  }
+
+  .percentage {
+    font-size: 1.2em;
+    color: #666;
+  }
+
+  .question-review {
+    background-color: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .question-text {
+    font-size: 1.1em;
+    font-weight: bold;
+  }
+
+  .selected-answer {
+    padding-left: 1rem;
+    border-left: 3px solid #dc3545;
+  }
+
+  .correct-answer {
+    padding-left: 1rem;
+    border-left: 3px solid #28a745;
+  }
+
+  .perfect-score {
+    color: #28a745;
+    font-size: 1.5em;
+  }
+
+  .navigation-buttons {
+    margin-top: 2rem;
+  }
+
+  .btn-primary {
+    padding: 0.5rem 2rem;
+  }
+</style>
 {% endblock %}

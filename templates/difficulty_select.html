@@ -1,21 +1,23 @@
 {% extends "base.html" %} {% block content %}
 <div class="container mt-4">
-  <div class="text-center mb-4">
-    <h1 class="display-4 fw-bold">{{ grade }}年生 {{ category_name }}</h1>
-    <h2 class="h3">{{ subcategory_name }}</h2>
-    <h3 class="h4 mb-4">むずかしさは？</h3>
-  </div>
-
-  <div class="row justify-content-center g-4">
-    <div class="col-md-6">
+  <div class="difficulty-select-container">
+    <h2 class="text-center mb-4">
+      {{ grade }}年生 - {{ category_name }} - {{ subcategory_name }}
+    </h2>
+    <div class="difficulty-buttons">
       <a
         href="{{ url_for('start_quiz', grade=grade, category=category, subcategory=subcategory, difficulty='easy') }}"
         class="text-decoration-none"
       >
-        <div
-          class="difficulty-button easy p-4 rounded-lg shadow text-center mb-4"
-        >
+        <div class="difficulty-button easy p-4 rounded-lg shadow text-center">
           <span class="fs-2">かんたん</span>
+          {% if stats.easy.attempts > 0 %}
+          <div class="stats-info">
+            <p>受験回数: {{ stats.easy.attempts }}回</p>
+            <p>平均スコア: {{ "%.1f"|format(stats.easy.avg_score) }}%</p>
+            <p>最高スコア: {{ "%.1f"|format(stats.easy.highest_score) }}%</p>
+          </div>
+          {% endif %}
         </div>
       </a>
 
@@ -23,10 +25,15 @@
         href="{{ url_for('start_quiz', grade=grade, category=category, subcategory=subcategory, difficulty='medium') }}"
         class="text-decoration-none"
       >
-        <div
-          class="difficulty-button medium p-4 rounded-lg shadow text-center mb-4"
-        >
+        <div class="difficulty-button medium p-4 rounded-lg shadow text-center">
           <span class="fs-2">ふつう</span>
+          {% if stats.medium.attempts > 0 %}
+          <div class="stats-info">
+            <p>受験回数: {{ stats.medium.attempts }}回</p>
+            <p>平均スコア: {{ "%.1f"|format(stats.medium.avg_score) }}%</p>
+            <p>最高スコア: {{ "%.1f"|format(stats.medium.highest_score) }}%</p>
+          </div>
+          {% endif %}
         </div>
       </a>
 
@@ -36,26 +43,47 @@
       >
         <div class="difficulty-button hard p-4 rounded-lg shadow text-center">
           <span class="fs-2">むずかしい</span>
+          {% if stats.hard.attempts > 0 %}
+          <div class="stats-info">
+            <p>受験回数: {{ stats.hard.attempts }}回</p>
+            <p>平均スコア: {{ "%.1f"|format(stats.hard.avg_score) }}%</p>
+            <p>最高スコア: {{ "%.1f"|format(stats.hard.highest_score) }}%</p>
+          </div>
+          {% endif %}
         </div>
       </a>
     </div>
-  </div>
 
-  <div class="text-center mt-5">
-    <a
-      href="{{ url_for('select_subcategory', grade=grade, category=category) }}"
-      class="btn btn-secondary btn-lg"
-    >
-      <i class="fas fa-arrow-left me-2"></i>もどる
-    </a>
+    <div class="text-center mt-4">
+      <a
+        href="{{ url_for('select_subcategory', grade=grade, category=category) }}"
+        class="btn btn-secondary"
+      >
+        <i class="fas fa-arrow-left me-2"></i>戻る
+      </a>
+    </div>
   </div>
 </div>
 
 <style>
+  .difficulty-select-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  .difficulty-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-bottom: 30px;
+  }
+
   .difficulty-button {
     background-color: #fff;
     transition: all 0.3s ease;
     cursor: pointer;
+    border-radius: 10px;
   }
 
   .difficulty-button:hover {
@@ -63,29 +91,34 @@
     transform: translateY(-5px);
   }
 
-  .difficulty-button span {
-    font-weight: bold;
-  }
-
-  .easy {
+  .difficulty-button.easy {
     border: 3px solid #4caf50;
   }
-  .easy:hover {
+  .difficulty-button.easy:hover {
     background-color: #4caf50;
   }
 
-  .medium {
-    border: 3px solid #ffc107;
+  .difficulty-button.medium {
+    border: 3px solid #ff9800;
   }
-  .medium:hover {
-    background-color: #ffc107;
+  .difficulty-button.medium:hover {
+    background-color: #ff9800;
   }
 
-  .hard {
+  .difficulty-button.hard {
     border: 3px solid #f44336;
   }
-  .hard:hover {
+  .difficulty-button.hard:hover {
     background-color: #f44336;
+  }
+
+  .stats-info {
+    margin-top: 10px;
+    font-size: 0.9em;
+  }
+
+  .stats-info p {
+    margin: 5px 0;
   }
 </style>
 {% endblock %}

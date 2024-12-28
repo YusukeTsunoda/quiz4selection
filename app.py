@@ -44,7 +44,7 @@ SUBCATEGORY_NAMES = {
     'kanji': '漢字',
     'reading': '読解',
     'grammar': '文法',
-    'writing': '作文',
+    'writing': '作��',
     # 算数
     'calculation': '計算',
     'figure': '図形',
@@ -88,34 +88,61 @@ def get_shuffled_question(question):
     
     return shuffled_question
 
-def get_prioritized_questions(questions, category, subcategory, difficulty):
+def get_prioritized_questions(questions, grade, category, subcategory, difficulty):
     """
-    優先順位付けされた問題を取得する（10問固定）
+    優先順位付けされた問題を取得する
     1. まだ回答していない問題
     2. 正答率の低い問題
     3. その他の問題
     """
     try:
-        if len(questions) < 10:
-            logger.info(f"Not enough questions in {category} - {subcategory} - {difficulty}. Only {len(questions)} available")
-            return questions  # 10問未満の場合は全問題を返す
-        
+        total_questions = len(questions)
+        if total_questions == 0:
+            logger.error(f"No questions available in {category} - {subcategory} - {difficulty}")
+            return None
+            
         # 問題の統計情報を取得
-        stats = QuizAttempt.get_question_stats(category, subcategory, difficulty)
+        attempts = QuizAttempt.query.filter_by(
+            grade=grade,
+            category=category,
+            subcategory=subcategory,
+            difficulty=difficulty
+        ).all()
         
         # 問題を3つのグループに分類
         unanswered_questions = []
         low_accuracy_questions = []
         other_questions = []
         
+        # 問題ごとの正答率を計算
+        question_stats = {}
+        for attempt in attempts:
+            if not hasattr(attempt, 'quiz_history') or not attempt.quiz_history:
+                continue
+                
+            for history in attempt.quiz_history:
+                q_text = history.get('question', '')
+                if not q_text:
+                    continue
+                    
+                if q_text not in question_stats:
+                    question_stats[q_text] = {'correct': 0, 'total': 0}
+                    
+                question_stats[q_text]['total'] += 1
+                if history.get('is_correct', False):
+                    question_stats[q_text]['correct'] += 1
+        
+        # 問題を分類
         for question in questions:
             q_text = question['question']
-            if q_text not in stats:
+            if q_text not in question_stats:
                 # 未回答の問題
                 unanswered_questions.append(question)
             else:
                 # 正答率に基づいて分類（50%未満を低正答率とする）
-                if stats[q_text]['accuracy'] < 50:
+                stats = question_stats[q_text]
+                accuracy = (stats['correct'] / stats['total'] * 100) if stats['total'] > 0 else 0
+                if accuracy < 50:
                     low_accuracy_questions.append(question)
                 else:
                     other_questions.append(question)
@@ -125,63 +152,60 @@ def get_prioritized_questions(questions, category, subcategory, difficulty):
         random.shuffle(low_accuracy_questions)
         random.shuffle(other_questions)
         
-        # 優先順位に基づいて問題を選択（合計10問）
+        # 優先順位に基づいて問題を選択
+        target_questions = min(10, total_questions)  # 最大10問
         selected_questions = []
         
-        # 未回答問題から選択（4問）
-        num_unanswered = min(len(unanswered_questions), 4)
-        selected_questions.extend(unanswered_questions[:num_unanswered])
-        
-        # 低正答率問題から選択（4問）
-        remaining = 10 - len(selected_questions)
-        num_low_accuracy = min(len(low_accuracy_questions), remaining)
-        selected_questions.extend(low_accuracy_questions[:num_low_accuracy])
-        
-        # 残りをその他の問題から選択
-        remaining = 10 - len(selected_questions)
-        if remaining > 0:
-            additional_questions = other_questions[:remaining]
-            if len(additional_questions) < remaining:
-                # その他の問題が足りない場合、未回答問題や低正答率問題から補完
-                remaining_pool = unanswered_questions[num_unanswered:] + low_accuracy_questions[num_low_accuracy:]
-                if remaining_pool:
-                    random.shuffle(remaining_pool)
-                    additional_questions.extend(remaining_pool[:remaining - len(additional_questions)])
-            selected_questions.extend(additional_questions)
-        
-        # 10問に満たない場合、残りの問題からランダムに追加
-        while len(selected_questions) < 10:
-            remaining_questions = [q for q in questions if q not in selected_questions]
-            if not remaining_questions:
-                break
-            random.shuffle(remaining_questions)
-            selected_questions.append(remaining_questions[0])
-        
-        # 最終的な問題リストをシャッフル
-        random.shuffle(selected_questions)
+        # 1. まず未回答の問題を追加
+        remaining = target_questions
+        if unanswered_questions:
+            num_unanswered = min(len(unanswered_questions), remaining)
+            selected_questions.extend(unanswered_questions[:num_unanswered])
+            remaining -= num_unanswered
+            
+        # 2. 次に低正答率の問題を追加
+        if remaining > 0 and low_accuracy_questions:
+            num_low_accuracy = min(len(low_accuracy_questions), remaining)
+            selected_questions.extend(low_accuracy_questions[:num_low_accuracy])
+            remaining -= num_low_accuracy
+            
+        # 3. 最後にその他の問題を追加
+        if remaining > 0 and other_questions:
+            num_other = min(len(other_questions), remaining)
+            selected_questions.extend(other_questions[:num_other])
+            
         return selected_questions
         
     except Exception as e:
         logger.error(f"Error in get_prioritized_questions: {e}")
         return None
 
+@app.route('/show_question')
 def show_question():
     """現在の問題を表示する"""
     try:
         current_question = session.get('current_question', 0)
         questions = session.get('questions', [])
+        total_questions = len(questions)
         
-        if not questions or current_question >= len(questions):
+        if not questions or current_question >= total_questions:
             logger.error("No questions available or invalid question index")
-            return "An error occurred", 500
+            return redirect(url_for('select_grade'))
+            
+        # 現在の正答数を取得
+        current_score = session.get('score', 0)
+        
+        # 現在の問題をシャッフル
+        current_q = get_shuffled_question(questions[current_question])
             
         return render_template('quiz.html',
-                             question=questions[current_question],
+                             question=current_q,
                              question_number=current_question + 1,
-                             total_questions=len(questions))
+                             total_questions=total_questions,
+                             correct_answers=current_score)
     except Exception as e:
         logger.error(f"Error in show_question: {e}")
-        return "An error occurred", 500
+        return redirect(url_for('select_grade'))
 
 @app.route('/')
 def select_grade():
@@ -204,27 +228,94 @@ def select_subcategory(grade, category):
 
 @app.route('/grade/<int:grade>/category/<category>/subcategory/<subcategory>/difficulty')
 def select_difficulty(grade, category, subcategory):
-    return render_template('difficulty_select.html',
-                         grade=grade,
-                         category=category,
-                         category_name=CATEGORY_NAMES[category],
-                         subcategory=subcategory,
-                         subcategory_name=SUBCATEGORY_NAMES[subcategory])
-
-@app.route('/grade/<int:grade>/category/<category>/subcategory/<subcategory>/difficulty/<difficulty>/start')
-def start_quiz(grade, category, subcategory, difficulty):
+    """難易度選択画面を表示する"""
     try:
-        # ���イズデータを取得
-        quiz_data = get_quiz_data(grade, category, subcategory, difficulty)
-        if not quiz_data:
-            flash('クイズデータが見つかりませんでした。', 'error')
+        logger.info(f"Entering select_difficulty with grade={grade}, category={category}, subcategory={subcategory}")
+        
+        # 問題データの存在確認
+        file_path = f'quiz_data/grade_{grade}/{category}.json'
+        logger.info(f"Checking file: {file_path}")
+        
+        if not os.path.exists(file_path):
+            logger.error(f"File not found: {file_path}")
+            flash('問題データが見つかりません。', 'error')
+            return redirect(url_for('select_grade'))
+
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            logger.info(f"Loaded data keys: {list(data.keys())}")
+            
+            if subcategory not in data:
+                logger.error(f"Subcategory {subcategory} not found in data")
+                flash('選択されたカテゴリーの問題が見つかりません。', 'error')
+                return redirect(url_for('select_grade'))
+            
+            logger.info(f"Found subcategory {subcategory} in data")
+            logger.info(f"Available difficulties in {subcategory}: {list(data[subcategory].keys())}")
+
+        # 各難易度のクイズ統計を取得
+        stats = {}
+        for difficulty in ['easy', 'medium', 'hard']:
+            logger.info(f"Getting stats for difficulty: {difficulty}")
+            stats[difficulty] = QuizAttempt.get_stats(grade, category, subcategory, difficulty)
+            logger.info(f"Stats for {difficulty}: {stats[difficulty]}")
+            
+        logger.info("Preparing to render template with context:")
+        logger.info(f"grade: {grade}")
+        logger.info(f"category: {category}")
+        logger.info(f"subcategory: {subcategory}")
+        logger.info(f"category_name: {CATEGORY_NAMES.get(category)}")
+        logger.info(f"subcategory_name: {SUBCATEGORY_NAMES.get(subcategory)}")
+        logger.info(f"stats: {stats}")
+        
+        return render_template('difficulty_select.html',
+                             grade=grade,
+                             category=category,
+                             subcategory=subcategory,
+                             stats=stats,
+                             category_name=CATEGORY_NAMES[category],
+                             subcategory_name=SUBCATEGORY_NAMES[subcategory])
+    except Exception as e:
+        logger.error(f"Error in select_difficulty: {e}")
+        logger.exception("Full traceback:")
+        flash('難易度選択画面の表示中にエラーが発生しました。', 'error')
+        return redirect(url_for('select_grade'))
+
+def get_questions(grade, category, subcategory, difficulty):
+    """指定された件に基づいて問題を取得する"""
+    try:
+        # 問題データを取得
+        questions, error = get_quiz_data(grade, category, subcategory, difficulty)
+        if error or not questions:
+            logger.error(f"Error getting questions: {error}")
+            return []
+            
+        # 問題をランダムに選択し、10問を選択
+        if len(questions) > 10:
+            selected_questions = random.sample(questions, 10)
+        else:
+            selected_questions = questions
+        
+        return selected_questions
+    except Exception as e:
+        logger.error(f"Error in get_questions: {e}")
+        return []
+
+@app.route('/start_quiz/<int:grade>/<category>/<subcategory>/<difficulty>')
+def start_quiz(grade, category, subcategory, difficulty):
+    """クイズを開始する"""
+    try:
+        # セッションをクリア
+        session.clear()
+        
+        # 問題を取得
+        questions = get_questions(grade, category, subcategory, difficulty)
+        if not questions:
+            flash('問題の取得に失敗しました。', 'error')
             return redirect(url_for('select_difficulty', grade=grade, category=category, subcategory=subcategory))
-        
-        # 問題をシャッフルして保存
-        shuffled_questions = [get_shuffled_question(q) for q in quiz_data]
-        
-        # セッションにクイズ情報を保存
-        session['questions'] = shuffled_questions
+            
+        # セッションに情報を保存
+        session['questions'] = questions
         session['current_question'] = 0
         session['score'] = 0
         session['quiz_history'] = []
@@ -233,14 +324,16 @@ def start_quiz(grade, category, subcategory, difficulty):
         session['subcategory'] = subcategory
         session['difficulty'] = difficulty
         
-        return show_question()
+        # 最初の問題を表示
+        return redirect(url_for('show_question'))
+        
     except Exception as e:
         logger.error(f"Error in start_quiz: {e}")
         flash('クイズの開始中にエラーが発生しました。', 'error')
         return redirect(url_for('select_difficulty', grade=grade, category=category, subcategory=subcategory))
 
 def get_subcategories(grade, category):
-    """指定された学年とカテゴリのサブカテゴリを取得"""
+    """定された学年とカテゴリのサブカテゴリを取得"""
     # カテゴリに応じたサブカテゴリのマッピング
     category_subcategories = {
         'japanese': ['kanji', 'reading', 'grammar', 'writing'],
@@ -254,86 +347,142 @@ def get_quiz_data(grade, category, subcategory, difficulty):
     """クイズデータを取得する関数"""
     try:
         file_path = f'quiz_data/grade_{grade}/{category}.json'
+        logger.info(f"Loading quiz data from: {file_path}")
+        
+        if not os.path.exists(file_path):
+            logger.error(f"Quiz data file not found: {file_path}")
+            return None, "問題データファイルが見つかりません"
+            
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
+            
+            if subcategory not in data:
+                logger.error(f"Subcategory {subcategory} not found in {category}.json")
+                return None, "選択されたサブカテゴリーの問題が見つかりません"
+                
+            if difficulty not in data[subcategory]:
+                logger.error(f"Difficulty {difficulty} not found in {subcategory}")
+                return None, "選択された難易度の問題が見つかりません"
+                
             all_questions = data[subcategory][difficulty]
-            # 優先順位付けされた問題を取得
-            questions = get_prioritized_questions(all_questions, category, subcategory, difficulty)
-            if questions is None:
-                logger.error("Failed to get prioritized questions")
-                return None
-            return questions
+            if not all_questions:
+                logger.error(f"No questions found for {category}/{subcategory}/{difficulty}")
+                return None, "問題が見つかりません"
+            
+            # 利用可能な問題数を確認
+            num_questions = len(all_questions)
+            target_questions = min(10, num_questions)  # 10問または利用可能な全問題数の少ない方
+            
+            # 問題をランダムに選択
+            selected_questions = random.sample(all_questions, target_questions)
+            
+            # 各問題の選択肢をシャッフル
+            shuffled_questions = [get_shuffled_question(q) for q in selected_questions]
+            
+            logger.info(f"Successfully loaded and shuffled {len(shuffled_questions)} questions")
+            return shuffled_questions, None
+            
     except Exception as e:
-        logger.error(f"Error loading quiz data: {e}")
-        return None
+        logger.error(f"Error in get_quiz_data: {e}")
+        return None, "問題データの読み込み中にエラーが発生しました"
 
 @app.route('/submit_answer', methods=['POST'])
 def submit_answer():
     try:
         data = request.get_json()
+        selected_index = data.get('selected')
+        time_taken = data.get('time_taken', 0)
+        
         current_question = session.get('current_question', 0)
         questions = session.get('questions', [])
+        current_score = session.get('score', 0)
+        quiz_history = session.get('quiz_history', [])
         
-        if data and 'selected' in data and 'time_taken' in data:
-            selected = int(data['selected'])
-            time_taken = float(data['time_taken'])
-            correct = questions[current_question]['correct']
+        if current_question >= len(questions):
+            return jsonify({'success': False, 'error': '問題が見つかりません'})
             
-            # QuizAttemptの作成と保存
+        question = questions[current_question]
+        correct_index = question['correct']
+        is_correct = str(selected_index) == str(correct_index)
+        
+        # スコアの更新
+        if is_correct:
+            current_score += 1
+            session['score'] = current_score
+            
+        # 履歴の保存
+        quiz_history.append({
+            'question': question['question'],
+            'selected_option': question['options'][int(selected_index)],
+            'correct_option': question['options'][int(correct_index)],
+            'is_correct': is_correct,
+            'time_taken': time_taken
+        })
+        session['quiz_history'] = quiz_history
+        
+        # 次の問題のインデックスを計算
+        next_question = current_question + 1
+        session['current_question'] = next_question
+        
+        # 最後の問題かどうかを確認
+        is_last_question = next_question >= len(questions)
+        
+        # レスポンスを返す
+        response_data = {
+            'success': True,
+            'isCorrect': is_correct,
+            'isLastQuestion': is_last_question
+        }
+        
+        if is_last_question:
+            # 最後の問題の場合、結果画面へのURLを追加
+            response_data['redirectUrl'] = url_for('next_question')
+            
+            # QuizAttemptを保存
             quiz_attempt = QuizAttempt(
                 grade=session.get('grade'),
                 category=session.get('category'),
                 subcategory=session.get('subcategory'),
                 difficulty=session.get('difficulty'),
-                question_text=questions[current_question]['question'],
-                selected_answer=questions[current_question]['options'][selected],
-                correct_answer=questions[current_question]['options'][correct],
-                is_correct=(selected == correct),
-                time_taken=time_taken
+                score=current_score,
+                total_questions=len(questions),
+                quiz_history=quiz_history
             )
             db.session.add(quiz_attempt)
             db.session.commit()
-            
-            # セッションのスコアを更新
-            if selected == correct:
-                session['score'] = session.get('score', 0) + 1
-            
-            return jsonify({
-                'success': True,
-                'isLastQuestion': current_question == len(questions) - 1
-            })
+            logger.info(f"Saved quiz attempt: score={current_score}/{len(questions)}")
+        
+        return jsonify(response_data)
             
     except Exception as e:
-        logger.error(f"Error in submit_answer route: {e}")
+        logger.error(f"Error in submit_answer: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/next_question', methods=['GET'])
 def next_question():
     try:
-        current_question = session.get('current_question', 0)
-        score = session.get('score', 0)
         questions = session.get('questions', [])
+        current_question = session.get('current_question', 0)
         quiz_history = session.get('quiz_history', [])
         
-        logger.debug(f"Moving to question {current_question + 1}, current score: {score}")
-        logger.debug(f"Current quiz history: {quiz_history}")
+        logger.debug(f"Current question index: {current_question}")
+        logger.debug(f"Quiz history: {quiz_history}")
         
-        if current_question >= len(questions) - 1:
+        # 全問題が終了した場合
+        if current_question >= len(questions):
             logger.debug("Quiz completed")
-            logger.debug(f"Final quiz history: {session.get('quiz_history', [])}")
+            logger.debug(f"Final quiz history: {quiz_history}")
             return render_template('result.html', 
-                                score=session.get('score', 0),
+                                correct_answers=session.get('score', 0),
                                 total_questions=len(questions),
-                                quiz_history=session.get('quiz_history', []))
+                                quiz_history=quiz_history)
         
-        # Update current question
-        current_question += 1
-        session['current_question'] = current_question
-        
+        # 現在の問題を表示
         return render_template('quiz.html',
                             question=questions[current_question],
                             question_number=current_question + 1,
-                            total_questions=len(questions))
+                            total_questions=len(questions),
+                            correct_answers=session.get('score', 0))
     except Exception as e:
         logger.error(f"Error in next_question route: {e}")
         return "An error occurred", 500
