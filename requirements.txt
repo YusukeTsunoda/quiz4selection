@@ -6,3 +6,4 @@ psycopg2-binary==2.9.9
 flask-login==0.6.2
 Flask-SQLAlchemy==2.5.1
 SQLAlchemy==1.4.46
+supabase-py==1.25.0
