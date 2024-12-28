@@ -180,36 +180,6 @@ def get_prioritized_questions(questions, grade, category, subcategory, difficult
         logger.error(f"Error in get_prioritized_questions: {e}")
         return None
 
-@app.route('/show_question')
-def show_question():
-    """現在の問題を表示する"""
-    try:
-        current_question = session.get('current_question', 0)
-        questions = session.get('questions', [])
-        total_questions = len(questions)
-        
-        if not questions or current_question >= total_questions:
-            logger.error("No questions available or invalid question index")
-            return redirect(url_for('select_grade'))
-            
-        # 現在の正答数を取得
-        current_score = session.get('score', 0)
-        
-        # セッションに保存された問題をそのまま使用（再シャッフルしない）
-        current_q = questions[current_question]
-        
-        logger.info(f"Showing question {current_question + 1} of {total_questions}")
-        logger.info(f"Current question correct index: {current_q['correct']}")
-            
-        return render_template('quiz.html',
-                             question=current_q,
-                             question_number=current_question + 1,
-                             total_questions=total_questions,
-                             correct_answers=current_score)
-    except Exception as e:
-        logger.error(f"Error in show_question: {e}")
-        return redirect(url_for('select_grade'))
-
 @app.route('/')
 def select_grade():
     return render_template('grade_select.html')
@@ -220,7 +190,6 @@ def select_category(grade):
 
 @app.route('/grade/<int:grade>/category/<category>/subcategory')
 def select_subcategory(grade, category):
-    # カテゴリに応じたサブカテゴリのリストを取得
     subcategories = get_subcategories(grade, category)
     return render_template('subcategory_select.html',
                          grade=grade,
@@ -478,12 +447,11 @@ def submit_answer():
         # 最後の問題の場合、リダイレクトURLを設定
         if is_last_question:
             try:
-                redirect_url = url_for('result')
-                response_data['redirectUrl'] = redirect_url
-                logger.info(f"Last question - Setting redirect URL: {redirect_url}")
+                # 直接URLを設定（url_forを使用しない）
+                response_data['redirectUrl'] = '/result'
+                logger.info(f"Last question - Setting redirect URL: {response_data['redirectUrl']}")
             except Exception as e:
-                logger.error(f"Error building redirect URL: {e}")
-                response_data['redirectUrl'] = '/result'  # フォールバックとしてハードコードされたURLを使用
+                logger.error(f"Error setting redirect URL: {e}")
         else:
             # 次の問題のインデックスを更新（最後の問題でない場合のみ）
             next_question = current_question + 1
