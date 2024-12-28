@@ -44,7 +44,7 @@ SUBCATEGORY_NAMES = {
     'kanji': '漢字',
     'reading': '読解',
     'grammar': '文法',
-    'writing': '作��',
+    'writing': '作文',
     # 算数
     'calculation': '計算',
     'figure': '図形',

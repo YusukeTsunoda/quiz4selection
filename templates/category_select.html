@@ -58,45 +58,28 @@
 <style>
   .category-button {
     background-color: #fff;
+    border: 3px solid #3498db;
     transition: all 0.3s ease;
     cursor: pointer;
+    border-radius: 8px;
+    padding: 20px;
   }
 
   .category-button:hover {
+    background-color: #3498db;
     color: white;
     transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
   }
 
   .category-button span {
     font-weight: bold;
+    font-size: 1.4rem;
+    color: #3498db;
   }
 
-  .japanese {
-    border: 3px solid #ff6b6b;
-  }
-  .japanese:hover {
-    background-color: #ff6b6b;
-  }
-
-  .math {
-    border: 3px solid #4ecdc4;
-  }
-  .math:hover {
-    background-color: #4ecdc4;
-  }
-
-  .science {
-    border: 3px solid #45b7d1;
-  }
-  .science:hover {
-    background-color: #45b7d1;
-  }
-
-  .society {
-    border: 3px solid #96ceb4;
-  }
-  .society:hover {
-    background-color: #96ceb4;
+  .category-button:hover span {
+    color: white;
   }
 </style>
 {% endblock %}
