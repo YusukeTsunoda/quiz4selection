@@ -52,62 +52,112 @@
               >スコア: {{ attempt.score }}/{{ attempt.total_questions }}</span
             >
           </div>
-          {% if attempt.quiz_history %} {% for question in attempt.quiz_history
-          %}
-          <div class="question-item mb-3">
-            <div class="question-text">
-              <span class="question-number">問題 {{ loop.index }}:</span>
-              {{ question.question }}
-            </div>
-            <div class="answer-review">
-              <div class="selected-answer">
-                <span class="review-label">選択した回答:</span>
-                <span
-                  class="review-answer {% if not question.is_correct %}wrong{% else %}right{% endif %}"
-                >
-                  {{ question.selected_option }}
-                </span>
-              </div>
-              {% if not question.is_correct %}
-              <div class="correct-answer mt-2">
-                <span class="review-label">正解:</span>
-                <span class="review-answer right"
-                  >{{ question.correct_option }}</span
-                >
-              </div>
-              {% endif %}
-              <div class="time-taken mt-2">
-                <span class="review-label">回答時間:</span>
-                <span class="review-time"
-                  >{{ "%.1f"|format(question.time_taken) }}秒</span
-                >
+          {% if attempt.quiz_history %}
+          <div class="question-review">
+            {% for question in attempt.quiz_history %}
+            <div
+              class="card mb-4 {% if not question.is_correct %}incorrect-card{% endif %}"
+            >
+              <div class="card-body">
+                <p class="question-text">
+                  {{ loop.index }}. {{ question.question }}
+                </p>
+                <div class="selected-answer mt-3">
+                  <div
+                    class="answer-text {% if question.is_correct %}correct-text{% else %}incorrect-text{% endif %}"
+                  >
+                    あなたの回答: {{ question.selected_option }}
+                  </div>
+                </div>
+                {% if not question.is_correct %}
+                <div class="correct-answer mt-2">
+                  正解: {{ question.correct_option }}
+                </div>
+                {% endif %}
               </div>
             </div>
+            {% endfor %}
           </div>
-          {% endfor %} {% endif %}
+          {% endif %}
         </div>
         {% endfor %}
       </div>
 
       <!-- 問題別統計タブ -->
       <div class="tab-pane fade" id="questions" role="tabpanel">
-        {% for question, stats in question_stats.items() %}
-        <div class="question-stats-card mb-4">
-          <div class="question-text mb-3">{{ question }}</div>
-          <div class="stats-info">
-            <div>試行回数: {{ stats.attempts }}回</div>
-            <div>正答率: {{ "%.1f"|format(stats.correct_rate * 100) }}%</div>
-            <div>平均回答時間: {{ "%.1f"|format(stats.avg_time) }}秒</div>
+        <div class="accordion" id="questionAccordion">
+          {% for question, stats in question_stats.items() %}
+          <div class="accordion-item mb-3">
+            <h2 class="accordion-header">
+              <button
+                class="accordion-button collapsed"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#question{{ loop.index }}"
+              >
+                <div
+                  class="d-flex w-100 justify-content-between align-items-center"
+                >
+                  <div class="question-title">{{ question }}</div>
+                  <div class="stats-summary">
+                    <span class="badge bg-info me-2"
+                      >試行: {{ stats.attempts }}回</span
+                    >
+                    <span
+                      class="badge {% if stats.correct_rate > 0.7 %}bg-success{% elif stats.correct_rate > 0.4 %}bg-warning{% else %}bg-danger{% endif %}"
+                    >
+                      正答率: {{ "%.1f"|format(stats.correct_rate * 100) }}%
+                    </span>
+                  </div>
+                </div>
+              </button>
+            </h2>
+            <div
+              id="question{{ loop.index }}"
+              class="accordion-collapse collapse"
+            >
+              <div class="accordion-body">
+                <div class="history-stats mb-3">
+                  <div>平均回答時間: {{ "%.1f"|format(stats.avg_time) }}秒</div>
+                </div>
+                {% if stats.recent_answers %}
+                <h5 class="mb-3">最近の回答履歴（最新10件）</h5>
+                <div class="recent-answers">
+                  {% for answer in stats.recent_answers[:10] %}
+                  <div
+                    class="answer-item mb-3 {% if answer.is_correct %}correct-answer-item{% else %}incorrect-answer-item{% endif %}"
+                  >
+                    <div class="answer-date text-muted">
+                      {{ answer.timestamp.strftime('%Y-%m-%d %H:%M') }}
+                    </div>
+                    <div
+                      class="answer-text {% if answer.is_correct %}correct-text{% else %}incorrect-text{% endif %}"
+                    >
+                      あなたの回答: {{ answer.selected_option }}
+                    </div>
+                    {% if not answer.is_correct %}
+                    <div class="correct-answer mt-1">
+                      正解: {{ answer.correct_option }}
+                    </div>
+                    {% endif %}
+                  </div>
+                  {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted">回答履歴はありません</p>
+                {% endif %}
+              </div>
+            </div>
           </div>
+          {% endfor %}
         </div>
-        {% endfor %}
       </div>
     </div>
 
     <!-- 戻るボタン -->
     <div class="text-center mt-4">
-      <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
-        <i class="fas fa-arrow-left me-2"></i>ダッシュボードに戻る
+      <a href="{{ url_for('dashboard') }}" class="btn">
+        <i class="fas fa-arrow-left"></i>ダッシュボードに戻る
       </a>
     </div>
   </div>
@@ -117,14 +167,6 @@
   .quiz-history-container {
     max-width: 900px;
     margin: 0 auto;
-  }
-
-  .attempt-card {
-    background-color: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   }
 
   .attempt-header {
@@ -143,55 +185,60 @@
 
   .score-info {
     font-weight: bold;
-    color: #28a745;
+    color: #3498db;
   }
 
-  .question-item {
-    padding: 15px;
-    border-bottom: 1px solid #eee;
+  .question-review {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin: 20px 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.3s ease;
+  }
+
+  .card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .incorrect-card {
+    border: 2px solid #dc3545;
+  }
+
+  .incorrect-card:hover {
+    border: 2px solid #dc3545;
   }
 
   .question-text {
-    font-size: 1.1rem;
-    color: #212529;
-  }
-
-  .question-number {
+    font-size: 1.1em;
     font-weight: bold;
-    color: #0d6efd;
-    margin-right: 10px;
+    color: #2c3e50;
+    margin-bottom: 15px;
   }
 
-  .answer-review {
-    background-color: #f8f9fa;
-    padding: 15px;
-    border-radius: 6px;
-    margin-top: 10px;
+  .selected-answer {
+    margin-bottom: 10px;
   }
 
-  .review-label {
-    font-weight: bold;
-    color: #495057;
-    margin-right: 10px;
+  .answer-text {
+    font-size: 1.05em;
   }
 
-  .review-answer {
-    padding: 4px 8px;
-    border-radius: 4px;
+  .correct-text {
+    color: #28a745;
   }
 
-  .review-answer.right {
-    background-color: #d4edda;
-    color: #155724;
+  .incorrect-text {
+    color: #dc3545;
   }
 
-  .review-answer.wrong {
-    background-color: #f8d7da;
-    color: #721c24;
-  }
-
-  .review-time {
-    color: #6c757d;
+  .correct-answer {
+    font-size: 1.05em;
+    color: #28a745;
   }
 
   .question-stats-card {
@@ -218,8 +265,60 @@
   }
 
   .nav-tabs .nav-link.active {
-    color: #0d6efd;
+    color: #3498db;
     font-weight: bold;
+  }
+
+  .accordion-button:not(.collapsed) {
+    background-color: #e7f1ff;
+    color: #3498db;
+  }
+
+  .accordion-button:focus {
+    box-shadow: none;
+    border-color: rgba(0, 0, 0, 0.125);
+  }
+
+  .question-title {
+    font-size: 1.1em;
+    font-weight: 500;
+    flex-grow: 1;
+    margin-right: 20px;
+  }
+
+  .stats-summary {
+    font-size: 0.9em;
+    white-space: nowrap;
+  }
+
+  .answer-item {
+    padding: 15px;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    margin-bottom: 10px;
+  }
+
+  .correct-answer-item {
+    border-left: 3px solid #28a745;
+  }
+
+  .incorrect-answer-item {
+    border-left: 3px solid #dc3545;
+  }
+
+  .answer-date {
+    font-size: 0.9em;
+    margin-bottom: 5px;
+  }
+
+  .history-stats {
+    color: #666;
+    font-size: 0.95em;
+  }
+
+  .badge {
+    font-weight: 500;
+    padding: 6px 10px;
   }
 </style>
 {% endblock %}

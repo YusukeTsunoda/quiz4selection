@@ -1,7 +1,7 @@
 from flask_login import UserMixin
 from datetime import datetime
 from extensions import db
-from sqlalchemy import func, JSON
+from sqlalchemy import func, JSON, desc
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,11 +33,11 @@ class QuizAttempt(db.Model):
             return 0.0
         return (self.score / self.total_questions) * 100
 
-    @staticmethod
-    def get_stats(grade, category, subcategory, difficulty):
+    @classmethod
+    def get_stats(cls, grade, category, subcategory, difficulty):
         """特定の条件での統計情報を取得"""
         try:
-            attempts = QuizAttempt.query.filter_by(
+            attempts = cls.query.filter_by(
                 grade=grade,
                 category=category,
                 subcategory=subcategory,
@@ -67,52 +67,91 @@ class QuizAttempt(db.Model):
                 'highest_score': 0.0
             }
 
-    @staticmethod
-    def get_question_stats(grade, category, subcategory, difficulty):
+    @classmethod
+    def get_question_stats(cls, grade, category, subcategory, difficulty):
         """問題ごとの統計情報を取得"""
         try:
-            attempts = QuizAttempt.query.filter_by(
+            attempts = cls.query.filter_by(
                 grade=grade,
                 category=category,
                 subcategory=subcategory,
                 difficulty=difficulty
-            ).all()
+            ).order_by(desc(cls.timestamp)).all()
 
-            if not attempts:
-                return {}
+            question_stats = {}
 
-            # 問題ごとの統計を集計
-            stats = {}
             for attempt in attempts:
                 if not attempt.quiz_history:
                     continue
 
-                for question in attempt.quiz_history:
-                    q_text = question.get('question', '')
-                    if not q_text:
+                for history in attempt.quiz_history:
+                    question = history.get('question')
+                    if not question:
                         continue
 
-                    if q_text not in stats:
-                        stats[q_text] = {
+                    if question not in question_stats:
+                        question_stats[question] = {
                             'attempts': 0,
                             'correct': 0,
                             'total_time': 0,
-                            'correct_rate': 0,
-                            'avg_time': 0
+                            'recent_answers': []
                         }
 
-                    stats[q_text]['attempts'] += 1
-                    if question.get('is_correct', False):
-                        stats[q_text]['correct'] += 1
-                    stats[q_text]['total_time'] += question.get('time_taken', 0)
+                    stats = question_stats[question]
+                    stats['attempts'] += 1
+                    if history.get('is_correct'):
+                        stats['correct'] += 1
+                    stats['total_time'] += history.get('time_taken', 0)
 
-            # 統計を計算
-            for q_stats in stats.values():
-                if q_stats['attempts'] > 0:
-                    q_stats['correct_rate'] = q_stats['correct'] / q_stats['attempts']
-                    q_stats['avg_time'] = q_stats['total_time'] / q_stats['attempts']
+                    # 回答履歴を追加
+                    answer_record = {
+                        'timestamp': attempt.timestamp,
+                        'is_correct': history.get('is_correct'),
+                        'selected_option': history.get('selected_option'),
+                        'correct_option': history.get('correct_option'),
+                        'time_taken': history.get('time_taken', 0)
+                    }
+                    stats['recent_answers'].append(answer_record)
 
-            return stats
+            # 統計を計算して整形
+            for question, stats in question_stats.items():
+                stats['correct_rate'] = stats['correct'] / stats['attempts'] if stats['attempts'] > 0 else 0
+                stats['avg_time'] = stats['total_time'] / stats['attempts'] if stats['attempts'] > 0 else 0
+                # 最新10件の回答のみを保持
+                stats['recent_answers'] = sorted(
+                    stats['recent_answers'],
+                    key=lambda x: x['timestamp'],
+                    reverse=True
+                )[:10]
+
+            return question_stats
         except Exception as e:
             logger.error(f"Error in get_question_stats: {e}")
             return {}
+
+    @classmethod
+    def get_question_history(cls, grade, category, subcategory, difficulty, question_text):
+        """特定の問題の回答履歴を取得"""
+        attempts = cls.query.filter_by(
+            grade=grade,
+            category=category,
+            subcategory=subcategory,
+            difficulty=difficulty
+        ).order_by(desc(cls.timestamp)).all()
+
+        history = []
+        for attempt in attempts:
+            if not attempt.quiz_history:
+                continue
+
+            for question in attempt.quiz_history:
+                if question.get('question') == question_text:
+                    history.append({
+                        'timestamp': attempt.timestamp,
+                        'is_correct': question.get('is_correct'),
+                        'selected_option': question.get('selected_option'),
+                        'correct_option': question.get('correct_option'),
+                        'time_taken': question.get('time_taken', 0)
+                    })
+
+        return sorted(history, key=lambda x: x['timestamp'], reverse=True)

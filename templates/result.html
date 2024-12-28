@@ -13,14 +13,20 @@
   </div>
 
   <div class="question-review mt-4">
-    <h3 class="mb-3">問題の振り返り</h3>
+    <h3 class="mb-4">問題の振り返り</h3>
     {% for history in quiz_history %}
-    <div class="card mb-3">
+    <div
+      class="card mb-4 {% if not history.is_correct %}incorrect-card{% endif %}"
+    >
       <div class="card-body">
         <p class="question-text">{{ loop.index }}. {{ history.question }}</p>
 
-        <div class="selected-answer mt-2">
-          あなたの回答: {{ history.selected_option }}
+        <div class="selected-answer mt-3">
+          <div
+            class="answer-text {% if history.is_correct %}correct-text{% else %}incorrect-text{% endif %}"
+          >
+            あなたの回答: {{ history.selected_option }}
+          </div>
         </div>
 
         {% if not history.is_correct %}
@@ -28,21 +34,15 @@
           正解: {{ history.correct_option }}
         </div>
         {% endif %}
-
-        <div class="answer-status mt-2">
-          {% if history.is_correct %}
-          <span class="text-success">✓ 正解</span>
-          {% else %}
-          <span class="text-danger">✗ 不正解</span>
-          {% endif %}
-        </div>
       </div>
     </div>
     {% endfor %}
   </div>
 
   <div class="navigation-buttons text-center mt-4">
-    <a href="/dashboard" class="btn btn-primary">ダッシュボードへ戻る</a>
+    <a href="/dashboard" class="btn">
+      <i class="fas fa-chart-bar"></i>ダッシュボードへ戻る
+    </a>
   </div>
 </div>
 
@@ -59,23 +59,56 @@
   }
 
   .question-review {
-    background-color: #fff;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin: 20px 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.3s ease;
+  }
+
+  .card:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .incorrect-card {
+    border: 2px solid #dc3545;
+  }
+
+  .incorrect-card:hover {
+    border: 2px solid #dc3545;
   }
 
   .question-text {
     font-size: 1.1em;
     font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 15px;
   }
 
   .selected-answer {
-    padding-left: 1rem;
-    border-left: 3px solid #dc3545;
+    margin-bottom: 10px;
+  }
+
+  .answer-text {
+    font-size: 1.05em;
+  }
+
+  .correct-text {
+    color: #28a745;
+  }
+
+  .incorrect-text {
+    color: #dc3545;
   }
 
   .correct-answer {
-    padding-left: 1rem;
-    border-left: 3px solid #28a745;
+    font-size: 1.05em;
+    color: #28a745;
   }
 
   .perfect-score {
@@ -85,10 +118,6 @@
 
   .navigation-buttons {
     margin-top: 2rem;
-  }
-
-  .btn-primary {
-    padding: 0.5rem 2rem;
   }
 </style>
 {% endblock %}

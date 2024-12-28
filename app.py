@@ -44,7 +44,7 @@ SUBCATEGORY_NAMES = {
     'kanji': '漢字',
     'reading': '読解',
     'grammar': '文法',
-    'writing': '作文',
+    'writing': '作��',
     # 算数
     'calculation': '計算',
     'figure': '図形',
@@ -554,7 +554,7 @@ def quiz_history(grade, category, subcategory, difficulty):
             difficulty=difficulty
         ).order_by(QuizAttempt.timestamp.desc()).all()
         
-        # 問題単位の統計情報を取得
+        # 問題別の統計情報を取得
         question_stats = QuizAttempt.get_question_stats(grade, category, subcategory, difficulty)
         
         return render_template('quiz_history.html',
