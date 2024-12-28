@@ -1,109 +1,298 @@
-{% extends "base.html" %}
+{% extends "base.html" %} {% block content %}
+<div class="container mt-4">
+  <div class="quiz-history-container fade show">
+    <h2 class="text-center mb-4">
+      クイズ履歴
+      <span class="spacer">&nbsp;</span>
+      {{ grade }}年生 - {{ category_name }} - {{ subcategory_name }} - {{
+      difficulty_name }}
+    </h2>
 
-{% block content %}
-<div class="container">
-    <div class="quiz-history-container fade show">
-        <h2 class="text-center mb-4">クイズ履歴 
-            <span class="spacer">&nbsp;</span> 
-            {{ category }} - {{ difficulty|title }}
-        </h2>
+    <!-- タブナビゲーション -->
+    <ul class="nav nav-tabs mb-4" id="historyTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button
+          class="nav-link active"
+          id="attempts-tab"
+          data-bs-toggle="tab"
+          data-bs-target="#attempts"
+          type="button"
+          role="tab"
+          aria-controls="attempts"
+          aria-selected="true"
+        >
+          テスト履歴
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button
+          class="nav-link"
+          id="questions-tab"
+          data-bs-toggle="tab"
+          data-bs-target="#questions"
+          type="button"
+          role="tab"
+        >
+          問題別の回答履歴
+        </button>
+      </li>
+    </ul>
 
-        <!-- タブナビゲーション -->
-        <ul class="nav nav-tabs mb-4" id="historyTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="attempts-tab" data-bs-toggle="tab" data-bs-target="#attempts" type="button" role="tab" aria-controls="attempts" aria-selected="true">
-                    テスト履歴
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="questions-tab" data-bs-toggle="tab" data-bs-target="#questions" type="button" role="tab">
-                    問題別の回答履歴
-                </button>
-            </li>
-        </ul>
-
-        <!-- タブコンテンツ -->
-        <div class="tab-content" id="historyTabContent">
-            <!-- 試行履歴タブ -->
-            <div class="tab-pane fade show active" id="attempts" role="tabpanel">
-                {% for attempt in attempts %}
-                <div class="attempt-card mb-4">
-                    <div class="attempt-header">
-                        <span class="attempt-score">
-                            正解率: {{ "%.0f"|format(attempt.score / attempt.questions_history|length * 100) }}% ({{ attempt.score }}/{{ attempt.questions_history|length }})
-                        </span>
-                        <span class="attempt-date">{{ attempt.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
-                    </div>
-                    
-                    <div class="questions-list">
-                        {% for question in attempt.questions_history %}
-                        <div class="history-question {% if not question.correct_answer %}incorrect{% else %}correct{% endif %}">
-                            <div class="review-question mb-4">
-                                <div class="question-text mb-3">
-                                    <span class="question-number">問題 {{ loop.index }}:</span>
-                                    {{ question.question }}
-                                </div>
-                                
-                                <div class="answer-review">
-                                    <div class="selected-answer">
-                                        <span class="review-label">選択した回答:</span>
-                                        <span class="review-answer {% if not question.correct_answer %}wrong{% else %}right{% endif %}">
-                                            {{ question.selected }}
-                                        </span>
-                                    </div>
-                                    <div class="correct-answer mt-2">
-                                        <span class="review-label">正解:</span>
-                                        <span class="review-answer right">{{ question.correct }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endfor %}
+    <!-- タブコンテンツ -->
+    <div class="tab-content" id="historyTabContent">
+      <!-- 試行履歴タブ -->
+      <div class="tab-pane fade show active" id="attempts" role="tabpanel">
+        {% for attempt in attempts %}
+        <div class="attempt-card mb-4">
+          <div class="attempt-header">
+            <span class="attempt-date"
+              >{{ attempt.timestamp.strftime('%Y-%m-%d %H:%M') }}</span
+            >
+          </div>
+          <div class="question-text mb-3">
+            <span class="question-number">問題:</span>
+            {{ attempt.question_text }}
+          </div>
+          <div class="answer-review">
+            <div class="selected-answer">
+              <span class="review-label">選択した回答:</span>
+              <span
+                class="review-answer {% if not attempt.is_correct %}wrong{% else %}right{% endif %}"
+              >
+                {{ attempt.selected_answer }}
+              </span>
             </div>
-
-            <!-- 問題別履歴タブ -->
-            <div class="tab-pane fade" id="questions" role="tabpanel">
-                {% for question, stats in question_stats.items() %}
-                <div class="question-stats-card mb-4">
-                    <!-- 問題情報ヘッダー -->
-                    <div class="question-info">
-                        <!-- 1行目: 問題文 -->
-                        <div class="question-text mb-2">{{ question }}</div>
-                        <!-- 2行目: 正解 -->
-                        <div class="correct-answer mb-2">正解: {{ stats.history[0].correct }}</div>
-                        <!-- 3行目: 正答率と回答回数 -->
-                        <div class="stats-info mb-3">
-                            正答率: {{ "%.0f"|format(stats.accuracy) }}%
-                            <span class="spacer">&nbsp;</span>
-                            回答回数: {{ stats.total_attempts }}回
-                        </div>
-                    </div>
-                    
-                    <!-- 回答履歴 -->
-                    <div class="answer-history">
-                        {% for entry in stats.history %}
-                        <div class="history-entry {% if entry.is_correct %}correct{% else %}incorrect{% endif %}">
-                            <div class="answer-line">
-                                <span class="timestamp">{{ entry.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
-                                <span class="spacer">&nbsp;&nbsp;&nbsp;</span>
-                                <span class="selected-answer {% if entry.is_correct %}right{% else %}wrong{% endif %}">
-                                    {{ entry.selected }}
-                                </span>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endfor %}
+            <div class="correct-answer mt-2">
+              <span class="review-label">正解:</span>
+              <span class="review-answer right"
+                >{{ attempt.correct_answer }}</span
+              >
             </div>
+            <div class="time-taken mt-2">
+              <span class="review-label">回答時間:</span>
+              <span class="review-time"
+                >{{ "%.1f"|format(attempt.time_taken) }}秒</span
+              >
+            </div>
+          </div>
         </div>
+        {% endfor %}
+      </div>
 
-        <div class="text-center mt-4">
-            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">ダッシュボードに戻る</a>
+      <!-- 問題別履歴タブ -->
+      <div class="tab-pane fade" id="questions" role="tabpanel">
+        {% for question, stats in question_stats.items() %}
+        <div class="question-stats-card mb-4">
+          <!-- 問題情報ヘッダー -->
+          <div class="question-info">
+            <!-- 1行目: 問題文 -->
+            <div class="question-text mb-2">{{ question }}</div>
+            <!-- 2行目: 統計情報 -->
+            <div class="stats-info mb-3">
+              正答率: {{ "%.1f"|format(stats.correct_rate * 100) }}%
+              <span class="spacer">&nbsp;</span>
+              回答回数: {{ stats.attempts }}回
+              <span class="spacer">&nbsp;</span>
+              平均回答時間: {{ "%.1f"|format(stats.avg_time) }}秒
+            </div>
+          </div>
+
+          <!-- 詳細履歴ボタン -->
+          <button
+            class="btn btn-info btn-sm show-history"
+            data-grade="{{ grade }}"
+            data-category="{{ category }}"
+            data-subcategory="{{ subcategory }}"
+            data-difficulty="{{ difficulty }}"
+            data-question="{{ question }}"
+          >
+            詳細履歴を見る
+          </button>
         </div>
+        {% endfor %}
+      </div>
     </div>
+
+    <!-- 戻るボタン -->
+    <div class="text-center mt-4">
+      <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left me-2"></i>ダッシュボードに戻る
+      </a>
+    </div>
+  </div>
 </div>
+
+<!-- 問題履歴モーダル -->
+<div class="modal fade" id="historyModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">問題の詳細履歴</h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <div id="historyContent"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .quiz-history-container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .attempt-card {
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+
+  .attempt-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #dee2e6;
+  }
+
+  .attempt-date {
+    color: #6c757d;
+    font-size: 0.9rem;
+  }
+
+  .question-text {
+    font-size: 1.1rem;
+    color: #212529;
+  }
+
+  .question-number {
+    font-weight: bold;
+    color: #0d6efd;
+    margin-right: 10px;
+  }
+
+  .answer-review {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 6px;
+  }
+
+  .review-label {
+    font-weight: bold;
+    color: #495057;
+    margin-right: 10px;
+  }
+
+  .review-answer {
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+
+  .review-answer.right {
+    background-color: #d4edda;
+    color: #155724;
+  }
+
+  .review-answer.wrong {
+    background-color: #f8d7da;
+    color: #721c24;
+  }
+
+  .review-time {
+    color: #6c757d;
+  }
+
+  .question-stats-card {
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+
+  .stats-info {
+    color: #6c757d;
+    font-size: 0.9rem;
+  }
+
+  .spacer {
+    display: inline-block;
+    width: 20px;
+  }
+
+  .nav-tabs .nav-link {
+    color: #495057;
+    font-weight: 500;
+  }
+
+  .nav-tabs .nav-link.active {
+    color: #0d6efd;
+    font-weight: bold;
+  }
+
+  .btn-info {
+    color: white;
+  }
+
+  .modal-dialog {
+    max-width: 800px;
+  }
+</style>
+
+<script>
+  document.querySelectorAll(".show-history").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const grade = button.dataset.grade;
+      const category = button.dataset.category;
+      const subcategory = button.dataset.subcategory;
+      const difficulty = button.dataset.difficulty;
+      const question = button.dataset.question;
+
+      try {
+        const response = await fetch(
+          `/question_history/${grade}/${category}/${subcategory}/${difficulty}/${encodeURIComponent(
+            question
+          )}`
+        );
+        const history = await response.json();
+
+        let content = '<div class="table-responsive"><table class="table">';
+        content +=
+          "<thead><tr><th>日時</th><th>結果</th><th>回答時間</th></tr></thead><tbody>";
+
+        history.forEach((attempt) => {
+          content += `<tr>
+                    <td>${new Date(attempt.timestamp).toLocaleString()}</td>
+                    <td>${
+                      attempt.is_correct
+                        ? '<span class="badge bg-success">正解</span>'
+                        : '<span class="badge bg-danger">不正解</span>'
+                    }</td>
+                    <td>${attempt.time_taken.toFixed(1)}秒</td>
+                </tr>`;
+        });
+
+        content += "</tbody></table></div>";
+        document.getElementById("historyContent").innerHTML = content;
+
+        const modal = new bootstrap.Modal(
+          document.getElementById("historyModal")
+        );
+        modal.show();
+      } catch (error) {
+        console.error("Error fetching history:", error);
+        alert("履歴の取得に失敗しました");
+      }
+    });
+  });
+</script>
 {% endblock %}

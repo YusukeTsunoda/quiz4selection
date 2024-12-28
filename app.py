@@ -44,7 +44,7 @@ SUBCATEGORY_NAMES = {
     'kanji': '漢字',
     'reading': '読解',
     'grammar': '文法',
-    'writing': '作��',
+    'writing': '作文',
     # 算数
     'calculation': '計算',
     'figure': '図形',
@@ -231,6 +231,7 @@ def start_quiz(grade, category, subcategory, difficulty):
         session['current_question'] = 0
         session['score'] = 0
         session['quiz_history'] = []
+        session['grade'] = grade
         session['category'] = category
         session['subcategory'] = subcategory
         session['difficulty'] = difficulty
@@ -270,50 +271,29 @@ def submit_answer():
         current_question = session.get('current_question', 0)
         questions = session.get('questions', [])
         
-        if data and 'selected' in data:
+        if data and 'selected' in data and 'time_taken' in data:
             selected = int(data['selected'])
+            time_taken = float(data['time_taken'])
             correct = questions[current_question]['correct']
             
-            # Record question attempt with detailed information
-            question_record = {
-                'question': questions[current_question]['question'],
-                'selected': questions[current_question]['options'][selected],
-                'correct': questions[current_question]['options'][correct],
-                'correct_answer': selected == correct
-            }
+            # QuizAttemptの作成と保存
+            quiz_attempt = QuizAttempt(
+                grade=session.get('grade'),
+                category=session.get('category'),
+                subcategory=session.get('subcategory'),
+                difficulty=session.get('difficulty'),
+                question_text=questions[current_question]['question'],
+                selected_answer=questions[current_question]['options'][selected],
+                correct_answer=questions[current_question]['options'][correct],
+                is_correct=(selected == correct),
+                time_taken=time_taken
+            )
+            db.session.add(quiz_attempt)
+            db.session.commit()
             
-            # Initialize quiz_history if not exists
-            if 'quiz_history' not in session:
-                session['quiz_history'] = []
-            
-            # Update quiz history
-            quiz_history = session['quiz_history']
-            quiz_history.append(question_record)
-            session['quiz_history'] = quiz_history
-            session.modified = True  # Ensure session is saved
-            logger.debug(f"Question {current_question + 1} added to history: {'correct' if selected == correct else 'incorrect'}")
-
-            # Update score if answer is correct
+            # セッションのスコアを更新
             if selected == correct:
                 session['score'] = session.get('score', 0) + 1
-                logger.debug(f"Correct answer! New score: {session['score']}")
-
-            # Save quiz attempt if this is the last question
-            if current_question == len(questions) - 1:
-                try:
-                    quiz_attempt = QuizAttempt(
-                        category=session.get('category'),
-                        difficulty=session.get('difficulty'),
-                        score=session.get('score', 0),
-                        questions_history=session.get('quiz_history', [])
-                    )
-                    db.session.add(quiz_attempt)
-                    db.session.commit()
-                    logger.debug("Quiz attempt saved to database")
-                    logger.debug(f"Final quiz history: {session.get('quiz_history', [])}")
-                except Exception as e:
-                    logger.error(f"Error saving quiz attempt: {e}")
-                    db.session.rollback()
             
             return jsonify({
                 'success': True,
@@ -358,68 +338,91 @@ def next_question():
 @app.route('/dashboard')
 def dashboard():
     try:
-        # 全カテゴリーの進捗を取得
+        # 全学年の進捗を取得
         progress = {}
-        for category in questions_by_category.keys():
-            progress[category] = {}
-            for difficulty in ['easy', 'medium', 'hard']:
-                try:
-                    attempts = QuizAttempt.query.filter_by(
-                        category=category,
-                        difficulty=difficulty
-                    ).all()
-                    
-                    if not attempts:
-                        stats = {
-                            'attempts': 0,
-                            'avg_score': 0,
-                            'highest_score': 0
-                        }
-                    else:
-                        stats = {
-                            'attempts': len(attempts),
-                            'avg_score': sum(attempt.get_percentage() for attempt in attempts) / len(attempts),
-                            'highest_score': max((attempt.get_percentage() for attempt in attempts), default=0)
-                        }
-                    progress[category][difficulty] = stats
-                except Exception as e:
-                    logger.error(f"Error processing {category} - {difficulty}: {e}")
-                    progress[category][difficulty] = {
-                        'attempts': 0,
-                        'avg_score': 0,
-                        'highest_score': 0
+        for grade in range(1, 7):  # 1年生から6年生まで
+            progress[grade] = {}
+            for category, category_name in CATEGORY_NAMES.items():
+                progress[grade][category] = {
+                    'name': category_name,
+                    'subcategories': {}
+                }
+                # カテゴリごとのサブカテゴリを取得
+                subcategories = get_subcategories(grade, category)
+                for subcategory in subcategories:
+                    progress[grade][category]['subcategories'][subcategory] = {
+                        'name': SUBCATEGORY_NAMES[subcategory],
+                        'levels': {}
                     }
+                    for difficulty in ['easy', 'medium', 'hard']:
+                        try:
+                            attempts = QuizAttempt.query.filter_by(
+                                grade=grade,
+                                category=category,
+                                subcategory=subcategory,
+                                difficulty=difficulty
+                            ).all()
+                            
+                            if not attempts:
+                                stats = {
+                                    'attempts': 0,
+                                    'avg_score': 0,
+                                    'highest_score': 0
+                                }
+                            else:
+                                stats = {
+                                    'attempts': len(attempts),
+                                    'avg_score': sum(attempt.get_percentage() for attempt in attempts) / len(attempts),
+                                    'highest_score': max((attempt.get_percentage() for attempt in attempts), default=0)
+                                }
+                            progress[grade][category]['subcategories'][subcategory]['levels'][difficulty] = stats
+                        except Exception as e:
+                            logger.error(f"Error processing {grade}年生 - {category} - {subcategory} - {difficulty}: {e}")
+                            progress[grade][category]['subcategories'][subcategory]['levels'][difficulty] = {
+                                'attempts': 0,
+                                'avg_score': 0,
+                                'highest_score': 0
+                            }
         
-        return render_template('dashboard.html', progress=progress)
+        return render_template('dashboard.html', 
+                             progress=progress,
+                             difficulty_names={'easy': 'かんたん', 'medium': 'ふつう', 'hard': 'むずかしい'})
     except Exception as e:
         logger.error(f"Error in dashboard route: {e}")
         return "An error occurred", 500
 
-@app.route('/quiz_history/<category>/<difficulty>')
-def quiz_history(category, difficulty):
+@app.route('/quiz_history/<int:grade>/<category>/<subcategory>/<difficulty>')
+def quiz_history(grade, category, subcategory, difficulty):
     try:
         # 通常の試行履歴を取得
         attempts = QuizAttempt.query.filter_by(
+            grade=grade,
             category=category,
+            subcategory=subcategory,
             difficulty=difficulty
         ).order_by(QuizAttempt.timestamp.desc()).all()
         
         # 問題単位の統計情報を取得
-        question_stats = QuizAttempt.get_question_stats(category, difficulty)
+        question_stats = QuizAttempt.get_question_stats(grade, category, subcategory, difficulty)
         
         return render_template('quiz_history.html',
+                             grade=grade,
                              category=category,
+                             category_name=CATEGORY_NAMES[category],
+                             subcategory=subcategory,
+                             subcategory_name=SUBCATEGORY_NAMES[subcategory],
                              difficulty=difficulty,
+                             difficulty_name={'easy': 'かんたん', 'medium': 'ふつう', 'hard': 'むずかしい'}[difficulty],
                              attempts=attempts,
                              question_stats=question_stats)
     except Exception as e:
         logger.error(f"Error in quiz_history route: {e}")
         return "An error occurred", 500
 
-@app.route('/question_history/<category>/<difficulty>/<path:question_text>')
-def question_history(category, difficulty, question_text):
+@app.route('/question_history/<int:grade>/<category>/<subcategory>/<difficulty>/<path:question_text>')
+def question_history(grade, category, subcategory, difficulty, question_text):
     try:
-        history = QuizAttempt.get_question_history(category, difficulty, question_text)
+        history = QuizAttempt.get_question_history(grade, category, subcategory, difficulty, question_text)
         return jsonify(history)
     except Exception as e:
         logger.error(f"Error in question_history route: {e}")

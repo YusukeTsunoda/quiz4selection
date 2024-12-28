@@ -1,45 +1,157 @@
-{% extends "base.html" %}
+{% extends "base.html" %} {% block content %}
+<div class="container mt-4">
+  <!-- 戻るボタン（右上に配置） -->
+  <div class="back-button-container">
+    <a href="{{ url_for('select_grade') }}" class="btn btn-primary back-button">
+      <i class="fas fa-arrow-left me-2"></i>学年選択に戻る
+    </a>
+  </div>
 
-{% block content %}
-<div class="container">
-    <div class="dashboard-container fade show">
-        <!-- ページタイトル -->
-        <h2 class="text-center mb-4">学習進捗ダッシュボード</h2>
-        
-        <div class="categories-overview">
-            {% for category, levels in progress.items() %}
-            <!-- カテゴリごとのセクション -->
-            <div class="category-section mb-5">
-                <h3 class="category-title mb-3">{{ category }}</h3>
-                <div class="difficulty-grid">
-                    {% for level, stats in levels.items() %}
-                    <!-- 難易度ごとのカード -->
-                    <div class="difficulty-card">
-                        <div class="card">
-                            <div class="card-body">
-                                <!-- 難易度名 -->
-                                <h5 class="card-title">{{ level|title }}</h5>
-                                <div class="stats">
-                                    <!-- テスト回数 -->
-                                    <p>テスト回数: {{ stats.attempts }}</p>
-                                    <!-- 平均スコア -->
-                                    <p>平均スコア: {{ "%.0f"|format(stats.avg_score) }}%</p>
-                                    <!-- 最高スコア -->
-                                    <p>最高スコア: {{ "%.0f"|format(stats.highest_score) }}%</p>
-                                </div>
-                                <!-- 詳細履歴ページへのリンク -->
-                                <a href="{{ url_for('quiz_history', category=category, difficulty=level) }}" 
-                                   class="btn btn-outline-primary btn-sm mt-2">
-                                    詳細履歴を見る
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endfor %}
+  <div class="text-center mb-4">
+    <h1 class="display-4 fw-bold">学習成績</h1>
+  </div>
+
+  <!-- タブナビゲーション -->
+  <ul class="nav nav-tabs mb-4" id="gradeTabs" role="tablist">
+    {% for grade in range(1, 7) %}
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link {% if grade == 1 %}active{% endif %}"
+        id="grade{{ grade }}-tab"
+        data-bs-toggle="tab"
+        data-bs-target="#grade{{ grade }}"
+        type="button"
+        role="tab"
+      >
+        {{ grade }}年生
+      </button>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <!-- タブコンテンツ -->
+  <div class="tab-content" id="gradeTabContent">
+    {% for grade in range(1, 7) %}
+    <div
+      class="tab-pane fade {% if grade == 1 %}show active{% endif %}"
+      id="grade{{ grade }}"
+      role="tabpanel"
+    >
+      {% for category, category_data in progress[grade].items() %}
+      <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+          <h3 class="mb-0">{{ category_data.name }}</h3>
         </div>
+        <div class="card-body">
+          {% for subcategory, subcategory_data in
+          category_data.subcategories.items() %}
+          <div class="subcategory-section mb-4">
+            <h4 class="mb-3">{{ subcategory_data.name }}</h4>
+            <div class="row">
+              {% for level, stats in subcategory_data.levels.items() %}
+              <div class="col-md-4 mb-3">
+                <div class="level-card p-3 border rounded">
+                  <h5>{{ difficulty_names[level] }}</h5>
+                  <div class="stats">
+                    <p>受験回数: {{ stats.attempts }}回</p>
+                    <p>平均スコア: {{ "%.1f"|format(stats.avg_score) }}%</p>
+                    <p>最高スコア: {{ "%.1f"|format(stats.highest_score) }}%</p>
+                  </div>
+                  <div class="mt-3">
+                    <a
+                      href="{{ url_for('quiz_history', grade=grade, category=category, subcategory=subcategory, difficulty=level) }}"
+                      class="btn btn-info btn-sm w-100"
+                    >
+                      <i class="fas fa-history me-1"></i>履歴を確認
+                    </a>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
     </div>
+    {% endfor %}
+  </div>
 </div>
+
+<style>
+  .back-button-container {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+  }
+
+  .back-button {
+    padding: 8px 16px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .back-button:hover {
+    transform: translateX(-5px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .nav-tabs .nav-link {
+    color: #495057;
+    font-weight: bold;
+    padding: 12px 20px;
+  }
+
+  .nav-tabs .nav-link.active {
+    color: #0d6efd;
+    font-weight: bold;
+    border-bottom: 3px solid #0d6efd;
+  }
+
+  .level-card {
+    background-color: #f8f9fa;
+    transition: all 0.3s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .level-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .stats p {
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+  }
+
+  .btn-info {
+    color: white;
+    background-color: #17a2b8;
+  }
+
+  .btn-info:hover {
+    background-color: #138496;
+    color: white;
+  }
+
+  .subcategory-section h4 {
+    color: #2c3e50;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 0.5rem;
+  }
+
+  .card-header {
+    background: linear-gradient(45deg, #0d6efd, #0a58ca);
+  }
+
+  .card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+</style>
 {% endblock %}

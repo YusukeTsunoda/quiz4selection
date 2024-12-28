@@ -18,6 +18,16 @@
     </div>
     {% endfor %}
   </div>
+
+  <!-- ダッシュボードボタン -->
+  <div class="text-center mt-5">
+    <a
+      href="{{ url_for('dashboard') }}"
+      class="btn btn-primary btn-lg dashboard-button"
+    >
+      <i class="fas fa-chart-bar me-2"></i>学習成績を確認する
+    </a>
+  </div>
 </div>
 
 <style>
@@ -36,6 +46,20 @@
 
   .grade-button span {
     font-weight: bold;
+  }
+
+  .dashboard-button {
+    background-color: #3498db;
+    border: none;
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
+    transition: all 0.3s ease;
+  }
+
+  .dashboard-button:hover {
+    background-color: #2980b9;
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   }
 </style>
 {% endblock %}
