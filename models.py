@@ -3,6 +3,7 @@ from datetime import datetime
 from extensions import db
 from sqlalchemy import func, JSON, desc
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ class QuizAttempt(db.Model):
     def get_question_stats(cls, grade, category, subcategory, difficulty):
         """問題ごとの統計情報を取得"""
         try:
+            # 既存の回答履歴を取得
             attempts = cls.query.filter_by(
                 grade=grade,
                 category=category,
@@ -78,27 +80,40 @@ class QuizAttempt(db.Model):
                 difficulty=difficulty
             ).order_by(desc(cls.timestamp)).all()
 
+            # 問題データを読み込む
+            quiz_file = f'quiz_data/grade_{grade}/{category}.json'
+            with open(quiz_file, 'r', encoding='utf-8') as f:
+                quiz_data = json.load(f)
+
+            # 該当するカテゴリと難易度の全問題を取得
+            all_questions = quiz_data.get(subcategory, {}).get(difficulty, [])
             question_stats = {}
 
+            # まず全問題を統計情報に追加（未回答状態で）
+            for q in all_questions:
+                question = q.get('question')
+                if question:
+                    question_stats[question] = {
+                        'attempts': 0,
+                        'correct': 0,
+                        'total_time': 0,
+                        'recent_answers': [],
+                        'is_answered': False  # 回答済みフラグを追加
+                    }
+
+            # 回答履歴から統計情報を更新
             for attempt in attempts:
                 if not attempt.quiz_history:
                     continue
 
                 for history in attempt.quiz_history:
                     question = history.get('question')
-                    if not question:
+                    if not question or question not in question_stats:
                         continue
-
-                    if question not in question_stats:
-                        question_stats[question] = {
-                            'attempts': 0,
-                            'correct': 0,
-                            'total_time': 0,
-                            'recent_answers': []
-                        }
 
                     stats = question_stats[question]
                     stats['attempts'] += 1
+                    stats['is_answered'] = True  # 回答済みとマーク
                     if history.get('is_correct'):
                         stats['correct'] += 1
                     stats['total_time'] += history.get('time_taken', 0)
@@ -113,18 +128,36 @@ class QuizAttempt(db.Model):
                     }
                     stats['recent_answers'].append(answer_record)
 
-            # 統計を計算して整形
-            for question, stats in question_stats.items():
-                stats['correct_rate'] = stats['correct'] / stats['attempts'] if stats['attempts'] > 0 else 0
-                stats['avg_time'] = stats['total_time'] / stats['attempts'] if stats['attempts'] > 0 else 0
-                # 最新10件の回答のみを保持
-                stats['recent_answers'] = sorted(
-                    stats['recent_answers'],
-                    key=lambda x: x['timestamp'],
-                    reverse=True
-                )[:10]
+            # 平均時間と正答率を計算
+            for stats in question_stats.values():
+                if stats['attempts'] > 0:
+                    stats['avg_time'] = stats['total_time'] / stats['attempts']
+                    stats['correct_rate'] = stats['correct'] / stats['attempts']
+                else:
+                    stats['avg_time'] = 0
+                    stats['correct_rate'] = 0
 
-            return question_stats
+            # 問題を出題済みと未出題で分類してソート
+            sorted_stats = {}
+            
+            # 1. 出題済みの問題を追加（正答率の高い順）
+            answered_questions = {q: stats for q, stats in question_stats.items() if stats['is_answered']}
+            sorted_answered = sorted(
+                answered_questions.items(),
+                key=lambda x: (x[1]['correct_rate'], x[1]['attempts']),
+                reverse=True
+            )
+            for question, stats in sorted_answered:
+                sorted_stats[question] = stats
+
+            # 2. 未出題の問題を追加
+            unanswered_questions = {q: stats for q, stats in question_stats.items() if not stats['is_answered']}
+            sorted_unanswered = sorted(unanswered_questions.items(), key=lambda x: x[0])  # 問題文でソート
+            for question, stats in sorted_unanswered:
+                sorted_stats[question] = stats
+
+            return sorted_stats
+
         except Exception as e:
             logger.error(f"Error in get_question_stats: {e}")
             return {}
