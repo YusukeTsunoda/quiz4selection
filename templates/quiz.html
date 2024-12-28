@@ -1,12 +1,5 @@
 {% extends "base.html" %} {% block content %}
 <div class="container mt-4 quiz-container">
-  <!-- 戻るボタン -->
-  <div class="back-button-container">
-    <a href="{{ url_for('select_grade') }}" class="btn back-button">
-      <i class="fas fa-arrow-left"></i>学年選択に戻る
-    </a>
-  </div>
-
   <div class="progress mb-4">
     <div
       class="progress-fill"
@@ -27,6 +20,13 @@
         {{ option }}
       </div>
       {% endfor %}
+    </div>
+
+    <!-- 戻るボタン -->
+    <div class="back-button-container">
+      <a href="{{ url_for('select_grade') }}" class="btn back-button">
+        <i class="fas fa-arrow-left"></i>学年選択に戻る
+      </a>
     </div>
   </div>
 </div>
@@ -67,7 +67,7 @@
             });
 
             const result = await response.json();
-            console.log("Server response:", result); // デバッグ用
+            console.log("Server response:", result); // デバッ��用
 
             if (result.success) {
               // 正解・不正解の表示
@@ -84,7 +84,7 @@
                 correctOption.classList.add("correct");
               }
 
-              // 正解の場合���み正答数を更新
+              // 正解の場合み正答数を更新
               if (isCorrect) {
                 const correctAnswersDisplay = document.querySelector(
                   ".progress-info span:last-child"
@@ -212,10 +212,8 @@
   }
 
   .back-button-container {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    z-index: 1000;
+    text-align: center;
+    margin-top: 40px; /* 選択肢との間隔を設定 */
   }
 
   .back-button {
@@ -239,11 +237,6 @@
 
   .back-button i {
     margin-right: 8px;
-  }
-
-  /* コンテナのposition調整 */
-  .container {
-    position: relative;
   }
 </style>
 {% endblock %}
