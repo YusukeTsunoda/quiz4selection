@@ -87,7 +87,7 @@ def get_shuffled_question(question):
     
     return shuffled_question
 
-def get_prioritized_questions(category, difficulty, num_questions=10):
+def get_prioritized_questions(questions, category, subcategory, difficulty):
     """
     優先順位付けされた問題を取得する（10問固定）
     1. まだ回答していない問題
@@ -95,21 +95,19 @@ def get_prioritized_questions(category, difficulty, num_questions=10):
     3. その他の問題
     """
     try:
-        # カテゴリと難易度の全問題を取得
-        all_questions = questions_by_category[category][difficulty]
-        if len(all_questions) < 10:
-            logger.error(f"Not enough questions in {category} - {difficulty}. Only {len(all_questions)} available")
-            return all_questions  # 10問未満の場合は全問題を返す
+        if len(questions) < 10:
+            logger.info(f"Not enough questions in {category} - {subcategory} - {difficulty}. Only {len(questions)} available")
+            return questions  # 10問未満の場合は全問題を返す
         
         # 問題の統計情報を取得
-        stats = QuizAttempt.get_question_stats(category, difficulty)
+        stats = QuizAttempt.get_question_stats(category, subcategory, difficulty)
         
         # 問題を3つのグループに分類
         unanswered_questions = []
         low_accuracy_questions = []
         other_questions = []
         
-        for question in all_questions:
+        for question in questions:
             q_text = question['question']
             if q_text not in stats:
                 # 未回答の問題
@@ -135,10 +133,10 @@ def get_prioritized_questions(category, difficulty, num_questions=10):
         
         # 低正答率問題から選択（4問）
         remaining = 10 - len(selected_questions)
-        num_low_accuracy = min(len(low_accuracy_questions), 4)
+        num_low_accuracy = min(len(low_accuracy_questions), remaining)
         selected_questions.extend(low_accuracy_questions[:num_low_accuracy])
         
-        # 残りをその他の問題から選択（2問）
+        # 残りをその他の問題から選択
         remaining = 10 - len(selected_questions)
         if remaining > 0:
             additional_questions = other_questions[:remaining]
@@ -152,7 +150,7 @@ def get_prioritized_questions(category, difficulty, num_questions=10):
         
         # 10問に満たない場合、残りの問題からランダムに追加
         while len(selected_questions) < 10:
-            remaining_questions = [q for q in all_questions if q not in selected_questions]
+            remaining_questions = [q for q in questions if q not in selected_questions]
             if not remaining_questions:
                 break
             random.shuffle(remaining_questions)
@@ -160,13 +158,11 @@ def get_prioritized_questions(category, difficulty, num_questions=10):
         
         # 最終的な問題リストをシャッフル
         random.shuffle(selected_questions)
-        return selected_questions[:10]  # 必ず10問を返す
+        return selected_questions
         
     except Exception as e:
         logger.error(f"Error in get_prioritized_questions: {e}")
-        # エラーが発生した場合は、通常のランダム選択で10問を選ぶ
-        all_questions = questions_by_category[category][difficulty]
-        return random.sample(all_questions, min(10, len(all_questions)))
+        return None
 
 def show_question():
     """現在の問題を表示する"""
@@ -217,7 +213,7 @@ def select_difficulty(grade, category, subcategory):
 @app.route('/grade/<int:grade>/category/<category>/subcategory/<subcategory>/difficulty/<difficulty>/start')
 def start_quiz(grade, category, subcategory, difficulty):
     try:
-        # クイズデータを取得
+        # ���イズデータを取得
         quiz_data = get_quiz_data(grade, category, subcategory, difficulty)
         if not quiz_data:
             flash('クイズデータが見つかりませんでした。', 'error')
@@ -259,9 +255,15 @@ def get_quiz_data(grade, category, subcategory, difficulty):
         file_path = f'quiz_data/grade_{grade}/{category}.json'
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            return data[subcategory][difficulty]
+            all_questions = data[subcategory][difficulty]
+            # 優先順位付けされた問題を取得
+            questions = get_prioritized_questions(all_questions, category, subcategory, difficulty)
+            if questions is None:
+                logger.error("Failed to get prioritized questions")
+                return None
+            return questions
     except Exception as e:
-        print(f"Error loading quiz data: {e}")
+        logger.error(f"Error loading quiz data: {e}")
         return None
 
 @app.route('/submit_answer', methods=['POST'])
