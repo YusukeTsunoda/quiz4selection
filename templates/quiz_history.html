@@ -1,6 +1,13 @@
 {% extends "base.html" %} {% block content %}
 <div class="container mt-4">
   <div class="quiz-history-container fade show">
+    <!-- 戻るボタン -->
+    <div class="back-button-container">
+      <a href="{{ url_for('dashboard') }}" class="btn back-button">
+        <i class="fas fa-arrow-left"></i>ダッシュボードに戻る
+      </a>
+    </div>
+
     <h2 class="text-center mb-4">
       クイズ履歴
       <span class="spacer">&nbsp;</span>
@@ -160,13 +167,6 @@
           {% endfor %}
         </div>
       </div>
-    </div>
-
-    <!-- 戻るボタン -->
-    <div class="text-center mt-4">
-      <a href="{{ url_for('dashboard') }}" class="btn">
-        <i class="fas fa-arrow-left"></i>ダッシュボードに戻る
-      </a>
     </div>
   </div>
 </div>
@@ -344,6 +344,41 @@
 
   .text-muted {
     color: #6c757d !important;
+  }
+
+  .back-button-container {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+  }
+
+  .back-button {
+    font-size: 1rem;
+    padding: 8px 20px;
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+  }
+
+  .back-button:hover {
+    background-color: #5a6268;
+    color: white;
+    transform: translateY(-2px);
+  }
+
+  .back-button i {
+    margin-right: 8px;
+  }
+
+  /* コンテナのposition調整 */
+  .container {
+    position: relative;
   }
 </style>
 {% endblock %}
