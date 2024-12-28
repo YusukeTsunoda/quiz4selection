@@ -195,8 +195,11 @@ def show_question():
         # 現在の正答数を取得
         current_score = session.get('score', 0)
         
-        # 現在の問題をシャッフル
-        current_q = get_shuffled_question(questions[current_question])
+        # セッションに保存された問題をそのまま使用（再シャッフルしない）
+        current_q = questions[current_question]
+        
+        logger.info(f"Showing question {current_question + 1} of {total_questions}")
+        logger.info(f"Current question correct index: {current_q['correct']}")
             
         return render_template('quiz.html',
                              question=current_q,
@@ -314,6 +317,10 @@ def start_quiz(grade, category, subcategory, difficulty):
             flash('問題の取得に失敗しました。', 'error')
             return redirect(url_for('select_difficulty', grade=grade, category=category, subcategory=subcategory))
             
+        # デバッグログを追加
+        logger.info(f"Starting quiz with {len(questions)} questions")
+        logger.info(f"Question categories: {category}, {subcategory}, {difficulty}")
+            
         # セッションに情報を保存
         session['questions'] = questions
         session['current_question'] = 0
@@ -373,6 +380,9 @@ def get_quiz_data(grade, category, subcategory, difficulty):
             num_questions = len(all_questions)
             target_questions = min(10, num_questions)  # 10問または利用可能な全問題数の少ない方
             
+            logger.info(f"Total available questions: {num_questions}")
+            logger.info(f"Target number of questions: {target_questions}")
+            
             # 問題をランダムに選択
             selected_questions = random.sample(all_questions, target_questions)
             
@@ -380,6 +390,9 @@ def get_quiz_data(grade, category, subcategory, difficulty):
             shuffled_questions = [get_shuffled_question(q) for q in selected_questions]
             
             logger.info(f"Successfully loaded and shuffled {len(shuffled_questions)} questions")
+            for i, q in enumerate(shuffled_questions):
+                logger.info(f"Question {i+1} correct index: {q['correct']}")
+            
             return shuffled_questions, None
             
     except Exception as e:
@@ -398,17 +411,31 @@ def submit_answer():
         current_score = session.get('score', 0)
         quiz_history = session.get('quiz_history', [])
         
+        # 受信データのログ
+        logger.info(f"Received answer - Selected Index: {selected_index}, Type: {type(selected_index)}")
+        logger.info(f"Current Question State - Number: {current_question + 1}, Total: {len(questions)}")
+        
         if current_question >= len(questions):
+            logger.error("Question index out of range")
             return jsonify({'success': False, 'error': '問題が見つかりません'})
             
         question = questions[current_question]
         correct_index = question['correct']
+        
+        # インデックスの比較前の型と値を確認
+        logger.info(f"Comparing indices - Selected: {selected_index} ({type(selected_index)}), Correct: {correct_index} ({type(correct_index)})")
         is_correct = str(selected_index) == str(correct_index)
+        logger.info(f"Answer is correct: {is_correct}")
+        
+        # 最後の問題かどうかを確認（スコア更新前）
+        is_last_question = (current_question + 1) >= len(questions)
+        logger.info(f"Question check - Current: {current_question + 1}, Total: {len(questions)}, Is Last: {is_last_question}")
         
         # スコアの更新
         if is_correct:
             current_score += 1
             session['score'] = current_score
+            logger.info(f"Score updated - New score: {current_score}")
             
         # 履歴の保存
         quiz_history.append({
@@ -419,39 +446,52 @@ def submit_answer():
             'time_taken': time_taken
         })
         session['quiz_history'] = quiz_history
+        logger.info(f"Quiz history updated - Total entries: {len(quiz_history)}")
         
-        # 次の問題のインデックスを計算
-        next_question = current_question + 1
-        session['current_question'] = next_question
+        # 最後の問題の場合、QuizAttemptを保存
+        if is_last_question:
+            try:
+                quiz_attempt = QuizAttempt(
+                    grade=session.get('grade'),
+                    category=session.get('category'),
+                    subcategory=session.get('subcategory'),
+                    difficulty=session.get('difficulty'),
+                    score=current_score,
+                    total_questions=len(questions),
+                    quiz_history=quiz_history
+                )
+                db.session.add(quiz_attempt)
+                db.session.commit()
+                logger.info(f"Quiz attempt saved - Final score: {current_score}/{len(questions)}")
+            except Exception as e:
+                logger.error(f"Error saving quiz attempt: {e}")
+                db.session.rollback()
         
-        # 最後の問題かどうかを確認
-        is_last_question = next_question >= len(questions)
-        
-        # レスポンスを返す
+        # レスポンスデータの準備
         response_data = {
             'success': True,
             'isCorrect': is_correct,
+            'currentScore': current_score,
             'isLastQuestion': is_last_question
         }
         
+        # 最後の問題の場合、リダイレクトURLを設定
         if is_last_question:
-            # 最後の問題の場合、結果画面へのURLを追加
-            response_data['redirectUrl'] = url_for('next_question')
-            
-            # QuizAttemptを保存
-            quiz_attempt = QuizAttempt(
-                grade=session.get('grade'),
-                category=session.get('category'),
-                subcategory=session.get('subcategory'),
-                difficulty=session.get('difficulty'),
-                score=current_score,
-                total_questions=len(questions),
-                quiz_history=quiz_history
-            )
-            db.session.add(quiz_attempt)
-            db.session.commit()
-            logger.info(f"Saved quiz attempt: score={current_score}/{len(questions)}")
+            try:
+                redirect_url = url_for('result')
+                response_data['redirectUrl'] = redirect_url
+                logger.info(f"Last question - Setting redirect URL: {redirect_url}")
+            except Exception as e:
+                logger.error(f"Error building redirect URL: {e}")
+                response_data['redirectUrl'] = '/result'  # フォールバックとしてハードコードされたURLを使用
+        else:
+            # 次の問題のインデックスを更新（最後の問題でない場合のみ）
+            next_question = current_question + 1
+            session['current_question'] = next_question
+            logger.info(f"Next question index set to: {next_question}")
         
+        # 最終レスポンスの内容を確認
+        logger.info(f"Sending response: {response_data}")
         return jsonify(response_data)
             
     except Exception as e:
@@ -579,3 +619,27 @@ def question_history(grade, category, subcategory, difficulty, question_text):
     except Exception as e:
         logger.error(f"Error in question_history route: {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/result')
+def result():
+    """クイズ結果を表示する"""
+    try:
+        # セッションから必要な情報を取得
+        score = session.get('score', 0)
+        total_questions = len(session.get('questions', []))
+        quiz_history = session.get('quiz_history', [])
+        
+        if not quiz_history:
+            logger.error("No quiz history found")
+            return redirect(url_for('select_grade'))
+            
+        logger.info(f"Showing result page - Score: {score}/{total_questions}")
+        
+        return render_template('result.html',
+                             correct_answers=score,
+                             total_questions=total_questions,
+                             quiz_history=quiz_history)
+                             
+    except Exception as e:
+        logger.error(f"Error in result route: {e}")
+        return redirect(url_for('select_grade'))

@@ -55,6 +55,10 @@
             const selectedIndex = this.dataset.index;
             const timeTaken = (Date.now() - startTime) / 1000;
 
+            // 回答処理とレスポンス確認のログ
+            console.log("Selected index:", selectedIndex);
+            console.log("Time taken:", timeTaken);
+
             const response = await fetch("/submit_answer", {
               method: "POST",
               headers: {
@@ -67,44 +71,64 @@
             });
 
             const result = await response.json();
-            console.log("Server response:", result); // デバッ��用
+            console.log("Server response details:", {
+              success: result.success,
+              isCorrect: result.isCorrect,
+              currentScore: result.currentScore,
+              isLastQuestion: result.isLastQuestion,
+              redirectUrl: result.redirectUrl,
+            });
 
             if (result.success) {
               // 正解・不正解の表示
               const correctIndex = optionsContainer.dataset.correct;
+              console.log("Comparing indices:", {
+                selected: selectedIndex,
+                correct: correctIndex,
+                isCorrect: result.isCorrect,
+              });
+
               const selectedOption = this;
               const correctOption = options[correctIndex];
-              const isCorrect = selectedIndex === correctIndex;
 
               // 正解/不正解のスタイル適用
-              if (isCorrect) {
+              if (result.isCorrect) {
+                console.log("Marking as correct");
                 selectedOption.classList.add("correct");
               } else {
+                console.log("Marking as incorrect");
                 selectedOption.classList.add("incorrect");
                 correctOption.classList.add("correct");
               }
 
-              // 正解の場合み正答数を更新
-              if (isCorrect) {
-                const correctAnswersDisplay = document.querySelector(
-                  ".progress-info span:last-child"
-                );
-                const currentCorrectAnswers = parseInt(
-                  correctAnswersDisplay.textContent.replace(/[^0-9]/g, "")
-                );
-                correctAnswersDisplay.textContent = `正答数: ${
-                  currentCorrectAnswers + 1
-                }問`;
-              }
+              // スコア更新
+              const correctAnswersDisplay = document.querySelector(
+                ".progress-info span:last-child"
+              );
+              correctAnswersDisplay.textContent = `正答数: ${result.currentScore}問`;
+              console.log("Updated score display:", result.currentScore);
+
+              // 遷移処理の判断
+              console.log("Checking redirect conditions:", {
+                isLastQuestion: result.isLastQuestion,
+                hasRedirectUrl: !!result.redirectUrl,
+                redirectUrl: result.redirectUrl,
+              });
 
               // アニメーション表示のための遅延
               await new Promise((resolve) => setTimeout(resolve, 800));
 
-              // 遷移処理
               if (result.isLastQuestion && result.redirectUrl) {
+                console.log("Redirecting to result page:", result.redirectUrl);
                 window.location.href = result.redirectUrl;
-              } else {
+              } else if (!result.isLastQuestion) {
+                console.log("Moving to next question");
                 window.location.href = "/next_question";
+              } else {
+                console.log("No redirect condition met - Debug info:", {
+                  isLastQuestion: result.isLastQuestion,
+                  redirectUrl: result.redirectUrl,
+                });
               }
             } else {
               console.error("Error from server:", result.error);
