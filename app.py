@@ -59,7 +59,8 @@ SUBCATEGORY_NAMES = {
     'history': '歴史',
     'geography': '地理',
     'civics': '公民',
-    'current_events': '時事'
+    'current_events': '時事',
+    'prefectures': '都道府県'
 }
 
 def get_shuffled_question(question):
@@ -245,7 +246,7 @@ def get_subcategories(grade, category):
         'japanese': ['kanji', 'reading', 'grammar', 'writing'],
         'math': ['calculation', 'figure', 'measurement', 'graph'],
         'science': ['physics', 'chemistry', 'biology', 'earth_science'],
-        'society': ['history', 'geography', 'civics', 'current_events']
+        'society': ['history', 'geography', 'civics', 'current_events', 'prefectures']
     }
     return category_subcategories.get(category, [])
 
