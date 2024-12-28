@@ -1,0 +1,51 @@
+{% extends "base.html" %} {% block content %}
+<div class="container mt-4">
+  <div class="text-center mb-4">
+    <h1 class="display-4 fw-bold">{{ grade }}年生 {{ category_name }}</h1>
+    <h2 class="h3 mb-4">どの分野？</h2>
+  </div>
+
+  <div class="row justify-content-center g-4">
+    {% for subcategory in subcategories %}
+    <div class="col-6 col-md-4">
+      <a
+        href="{{ url_for('select_difficulty', grade=grade, category=category, subcategory=subcategory) }}"
+        class="text-decoration-none"
+      >
+        <div class="subcategory-button p-4 rounded-lg shadow text-center">
+          <span class="fs-2">{{ subcategory_names[subcategory] }}</span>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="text-center mt-5">
+    <a
+      href="{{ url_for('select_category', grade=grade) }}"
+      class="btn btn-secondary btn-lg"
+    >
+      <i class="fas fa-arrow-left me-2"></i>もどる
+    </a>
+  </div>
+</div>
+
+<style>
+  .subcategory-button {
+    background-color: #fff;
+    border: 3px solid #6c63ff;
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+
+  .subcategory-button:hover {
+    background-color: #6c63ff;
+    color: white;
+    transform: translateY(-5px);
+  }
+
+  .subcategory-button span {
+    font-weight: bold;
+  }
+</style>
+{% endblock %}

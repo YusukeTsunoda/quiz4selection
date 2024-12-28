@@ -1,28 +1,102 @@
-{% extends "base.html" %}
+{% extends "base.html" %} {% block content %}
+<div class="container mt-4">
+  <div class="text-center mb-4">
+    <h1 class="display-4 fw-bold">{{ grade }}年生</h1>
+    <h2 class="h3 mb-4">どの教科？</h2>
+  </div>
 
-{% block content %}
-<div class="container">
-    <div class="quiz-container fade show">
-        <!-- ページタイトル -->
-        <h2 class="text-center mb-4">クイズカテゴリを選択</h2>
-        
-        <div class="category-grid">
-            {% for category in categories %}
-            <!-- 各クイズカテゴリのカード -->
-            <a href="{{ url_for('select_difficulty', category=category) }}" class="category-card">
-                <div class="card">
-                    <div class="card-body text-center">
-                        <!-- カテゴリ名を表示 -->
-                        <h5 class="card-title">{{ category }}</h5>
-                    </div>
-                </div>
-            </a>
-            {% endfor %}
+  <div class="row justify-content-center g-4">
+    <div class="col-6 col-md-4">
+      <a
+        href="{{ url_for('select_subcategory', grade=grade, category='japanese') }}"
+        class="text-decoration-none"
+      >
+        <div class="category-button japanese p-4 rounded-lg shadow text-center">
+          <span class="fs-2">国語</span>
         </div>
-        <div class="text-center mt-4">
-            <!-- 学習進捗ページへのリンク -->
-            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">学習進捗を確認</a>
-        </div>
+      </a>
     </div>
+    <div class="col-6 col-md-4">
+      <a
+        href="{{ url_for('select_subcategory', grade=grade, category='math') }}"
+        class="text-decoration-none"
+      >
+        <div class="category-button math p-4 rounded-lg shadow text-center">
+          <span class="fs-2">算数</span>
+        </div>
+      </a>
+    </div>
+    <div class="col-6 col-md-4">
+      <a
+        href="{{ url_for('select_subcategory', grade=grade, category='science') }}"
+        class="text-decoration-none"
+      >
+        <div class="category-button science p-4 rounded-lg shadow text-center">
+          <span class="fs-2">理科</span>
+        </div>
+      </a>
+    </div>
+    <div class="col-6 col-md-4">
+      <a
+        href="{{ url_for('select_subcategory', grade=grade, category='society') }}"
+        class="text-decoration-none"
+      >
+        <div class="category-button society p-4 rounded-lg shadow text-center">
+          <span class="fs-2">社会</span>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <div class="text-center mt-5">
+    <a href="{{ url_for('select_grade') }}" class="btn btn-secondary btn-lg">
+      <i class="fas fa-arrow-left me-2"></i>もどる
+    </a>
+  </div>
 </div>
+
+<style>
+  .category-button {
+    background-color: #fff;
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+
+  .category-button:hover {
+    color: white;
+    transform: translateY(-5px);
+  }
+
+  .category-button span {
+    font-weight: bold;
+  }
+
+  .japanese {
+    border: 3px solid #ff6b6b;
+  }
+  .japanese:hover {
+    background-color: #ff6b6b;
+  }
+
+  .math {
+    border: 3px solid #4ecdc4;
+  }
+  .math:hover {
+    background-color: #4ecdc4;
+  }
+
+  .science {
+    border: 3px solid #45b7d1;
+  }
+  .science:hover {
+    background-color: #45b7d1;
+  }
+
+  .society {
+    border: 3px solid #96ceb4;
+  }
+  .society:hover {
+    background-color: #96ceb4;
+  }
+</style>
 {% endblock %}

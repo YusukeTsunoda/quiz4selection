@@ -1,31 +1,91 @@
-{% extends "base.html" %}
+{% extends "base.html" %} {% block content %}
+<div class="container mt-4">
+  <div class="text-center mb-4">
+    <h1 class="display-4 fw-bold">{{ grade }}年生 {{ category_name }}</h1>
+    <h2 class="h3">{{ subcategory_name }}</h2>
+    <h3 class="h4 mb-4">むずかしさは？</h3>
+  </div>
 
-{% block content %}
-<div class="container">
-    <div class="quiz-container fade show">
-        <!-- ページタイトル -->
-        <h2 class="text-center mb-4">難易度を選択</h2>
-        <!-- 選択中のカテゴリ -->
-        <h5 class="text-center mb-4">カテゴリ: {{ category }}</h5>
-        
-        <div class="difficulty-grid">
-            {% for difficulty in difficulties %}
-            <!-- 各難易度のカード -->
-            <a href="{{ url_for('start_quiz', category=category, difficulty=difficulty) }}" class="difficulty-card">
-                <div class="card">
-                    <div class="card-body text-center">
-                        <!-- 難易度名 -->
-                        <h5 class="card-title">{{ difficulty|title }}</h5>
-                    </div>
-                </div>
-            </a>
-            {% endfor %}
+  <div class="row justify-content-center g-4">
+    <div class="col-md-6">
+      <a
+        href="{{ url_for('start_quiz', grade=grade, category=category, subcategory=subcategory, difficulty='easy') }}"
+        class="text-decoration-none"
+      >
+        <div
+          class="difficulty-button easy p-4 rounded-lg shadow text-center mb-4"
+        >
+          <span class="fs-2">かんたん</span>
         </div>
-        
-        <div class="text-center mt-4">
-            <!-- カテゴリ選択ページへのリンク -->
-            <a href="{{ url_for('index') }}" class="btn btn-secondary">カテゴリに戻る</a>
+      </a>
+
+      <a
+        href="{{ url_for('start_quiz', grade=grade, category=category, subcategory=subcategory, difficulty='medium') }}"
+        class="text-decoration-none"
+      >
+        <div
+          class="difficulty-button medium p-4 rounded-lg shadow text-center mb-4"
+        >
+          <span class="fs-2">ふつう</span>
         </div>
+      </a>
+
+      <a
+        href="{{ url_for('start_quiz', grade=grade, category=category, subcategory=subcategory, difficulty='hard') }}"
+        class="text-decoration-none"
+      >
+        <div class="difficulty-button hard p-4 rounded-lg shadow text-center">
+          <span class="fs-2">むずかしい</span>
+        </div>
+      </a>
     </div>
+  </div>
+
+  <div class="text-center mt-5">
+    <a
+      href="{{ url_for('select_subcategory', grade=grade, category=category) }}"
+      class="btn btn-secondary btn-lg"
+    >
+      <i class="fas fa-arrow-left me-2"></i>もどる
+    </a>
+  </div>
 </div>
+
+<style>
+  .difficulty-button {
+    background-color: #fff;
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+
+  .difficulty-button:hover {
+    color: white;
+    transform: translateY(-5px);
+  }
+
+  .difficulty-button span {
+    font-weight: bold;
+  }
+
+  .easy {
+    border: 3px solid #4caf50;
+  }
+  .easy:hover {
+    background-color: #4caf50;
+  }
+
+  .medium {
+    border: 3px solid #ffc107;
+  }
+  .medium:hover {
+    background-color: #ffc107;
+  }
+
+  .hard {
+    border: 3px solid #f44336;
+  }
+  .hard:hover {
+    background-color: #f44336;
+  }
+</style>
 {% endblock %}

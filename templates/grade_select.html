@@ -1,0 +1,41 @@
+{% extends "base.html" %} {% block content %}
+<div class="container mt-4">
+  <div class="text-center mb-4">
+    <h1 class="display-4 fw-bold">どの学年？</h1>
+  </div>
+
+  <div class="row justify-content-center g-4">
+    {% for grade in range(1, 7) %}
+    <div class="col-6 col-md-4">
+      <a
+        href="{{ url_for('select_category', grade=grade) }}"
+        class="text-decoration-none"
+      >
+        <div class="grade-button p-4 rounded-lg shadow text-center">
+          <span class="fs-2">{{ grade }}年生</span>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<style>
+  .grade-button {
+    background-color: #fff;
+    border: 3px solid #4caf50;
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+
+  .grade-button:hover {
+    background-color: #4caf50;
+    color: white;
+    transform: translateY(-5px);
+  }
+
+  .grade-button span {
+    font-weight: bold;
+  }
+</style>
+{% endblock %}

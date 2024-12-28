@@ -23,7 +23,12 @@ class QuizAttempt(db.Model):
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     def get_percentage(self):
-        return (self.score / len(self.questions_history)) * 100
+        try:
+            if not self.questions_history or len(self.questions_history) == 0:
+                return 0
+            return (self.score / len(self.questions_history)) * 100
+        except Exception as e:
+            return 0
 
     @classmethod
     def get_question_history(cls, category, difficulty, question_text):
