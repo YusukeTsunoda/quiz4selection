@@ -1,5 +1,6 @@
 import logging
 from app import app
+import os
 
 if __name__ == "__main__":
     # Configure logging
@@ -11,7 +12,8 @@ if __name__ == "__main__":
     
     try:
         logger.info("Starting Flask application...")
-        app.run(host="0.0.0.0", port=5000, debug=True)
+        port = int(os.environ.get('PORT', 5000))
+        app.run(host="0.0.0.0", port=port)
     except Exception as e:
         logger.error(f"Failed to start Flask application: {e}")
         raise

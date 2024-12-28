@@ -4,49 +4,28 @@ import logging
 from flask import Flask, render_template, session, request, jsonify
 from extensions import db
 from models import QuizAttempt
-from sqlalchemy import func
-from datetime import datetime
+from config import Config
 from flask_migrate import Migrate
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-from dotenv import load_dotenv
-load_dotenv()
-
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev_key_for_quiz_app")
-
-# Supabase PostgreSQL connection
-database_url = os.environ.get('DATABASE_URL')
-if not database_url:
-    raise ValueError("No DATABASE_URL environment variable set")
-
-# Ensure the URL uses postgresql://
-if database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
-
-# Configure SQLAlchemy with SSL requirements for Supabase
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "pool_pre_ping": True,
-    "pool_recycle": 300,
-    "connect_args": {
-        "sslmode": "require"
-    }
-}
+app.config.from_object(Config)
 
 # Initialize database
 db.init_app(app)
+migrate = Migrate(app, db)
 
 # Create database tables
 with app.app_context():
-    db.create_all()
-
-migrate = Migrate(app, db)
+    try:
+        db.create_all()
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Error creating database tables: {e}")
 
 from quiz_data import questions_by_category
 
