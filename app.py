@@ -8,6 +8,7 @@ from config import Config
 from flask_migrate import Migrate
 import json
 from sqlalchemy import text
+import socket
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -595,8 +596,6 @@ def dashboard():
 def quiz_history(grade, category, subcategory, difficulty):
     logger.info(f"Accessing quiz_history for grade={grade}, category={category}, subcategory={subcategory}, difficulty={difficulty}")
     logger.debug("Checking database connection...")
-
-    # config.py で設定された値をログ出力
     logger.debug(f"Configured SUPABASE_URL: {app.config['SUPABASE_URL']}")
     logger.debug(f"Configured DATABASE_URL: {app.config['DATABASE_URL']}")
 
@@ -612,37 +611,70 @@ def quiz_history(grade, category, subcategory, difficulty):
         logger.debug(f"Extracted port from DATABASE_URL: {db_port}")
     else:
         logger.error("DATABASE_URL is not set in app configuration.")
+        return "DATABASE_URL is not set", 500
 
     logger.debug(f"Testing connection to {db_host}:{db_port}")
+    logger.debug(f"Attempting DNS resolution for host: {db_host}, port: {db_port}")
+
+    ipv4_resolved = False
+    ipv6_resolved = False
 
     try:
-        import socket
-        # DNS解決を試みる直前にホスト名とポートを出力
-        logger.debug(f"Attempting DNS resolution for host: {db_host}, port: {db_port}")
-        addr_info = socket.getaddrinfo(db_host, db_port, socket.AF_INET, socket.SOCK_STREAM)
-        logger.debug(f"DNS resolution successful: {addr_info}")
-
-        if addr_info:
-            ipv4_addr = addr_info[0][4][0]
-            logger.debug(f"Resolved IPv4 address: {ipv4_addr}")
-            
-            # データベース接続テスト
-            try:
-                result = db.session.execute(text("SELECT 1"))
-                logger.info("Database connection test successful")
-                logger.debug(f"Test query result: {result.scalar()}")
-            except Exception as db_error:
-                logger.error(f"Database query test failed: {db_error}", exc_info=True)
-                raise
-        else:
-            logger.error("No IPv4 addresses found for host")
-            
+        # IPv4での解決を明示的に試行
+        logger.debug("Attempting IPv4 DNS resolution...")
+        addr_info_ipv4 = socket.getaddrinfo(db_host, db_port, socket.AF_INET, socket.SOCK_STREAM)
+        logger.debug(f"IPv4 DNS resolution successful: {addr_info_ipv4}")
+        ipv4_resolved = True
+        
+        # IPv4アドレスの詳細を出力
+        for addr in addr_info_ipv4:
+            family, socktype, proto, canonname, sockaddr = addr
+            logger.debug(f"IPv4 Address Details:")
+            logger.debug(f"  Family: {family}")
+            logger.debug(f"  Socket Type: {socktype}")
+            logger.debug(f"  Protocol: {proto}")
+            logger.debug(f"  Canonical Name: {canonname}")
+            logger.debug(f"  Socket Address: {sockaddr}")
     except socket.gaierror as e:
-        logger.error(f"DNS resolution failed: {e}", exc_info=True)
-        return "Database connection error", 500
-    except Exception as e:
-        logger.error(f"Error in quiz_history route: {e}", exc_info=True)
-        return "An error occurred", 500
+        logger.error(f"IPv4 DNS resolution failed: {e}", exc_info=True)
+
+    try:
+        # IPv6での解決も試行
+        logger.debug("Attempting IPv6 DNS resolution...")
+        addr_info_ipv6 = socket.getaddrinfo(db_host, db_port, socket.AF_INET6, socket.SOCK_STREAM)
+        logger.debug(f"IPv6 DNS resolution successful: {addr_info_ipv6}")
+        ipv6_resolved = True
+        
+        # IPv6アドレスの詳細を出力
+        for addr in addr_info_ipv6:
+            family, socktype, proto, canonname, sockaddr = addr
+            logger.debug(f"IPv6 Address Details:")
+            logger.debug(f"  Family: {family}")
+            logger.debug(f"  Socket Type: {socktype}")
+            logger.debug(f"  Protocol: {proto}")
+            logger.debug(f"  Canonical Name: {canonname}")
+            logger.debug(f"  Socket Address: {sockaddr}")
+    except socket.gaierror as e:
+        logger.error(f"IPv6 DNS resolution failed: {e}", exc_info=True)
+
+    # DNS解決の結果をサマリー
+    logger.info(f"DNS Resolution Summary:")
+    logger.info(f"  IPv4 Resolution: {'Success' if ipv4_resolved else 'Failed'}")
+    logger.info(f"  IPv6 Resolution: {'Success' if ipv6_resolved else 'Failed'}")
+
+    if not ipv4_resolved and not ipv6_resolved:
+        logger.error("Both IPv4 and IPv6 DNS resolution failed")
+        return "DNS resolution failed for database host", 500
+
+    try:
+        # データベース接続テスト
+        logger.debug("Attempting database connection test...")
+        result = db.session.execute(text("SELECT 1"))
+        logger.info("Database connection test successful")
+        logger.debug(f"Test query result: {result.scalar()}")
+    except Exception as db_error:
+        logger.error(f"Database connection test failed: {db_error}", exc_info=True)
+        return "Database connection failed", 500
 
     try:
         # 通常の試行履歴を取得
