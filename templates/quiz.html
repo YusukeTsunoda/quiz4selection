@@ -1,266 +1,153 @@
 {% extends "base.html" %} {% block content %}
-<div class="container mt-4 quiz-container">
-  <div class="progress mb-4">
-    <div
-      class="progress-fill"
-      style="width: {{ (question_number / total_questions) * 100 }}%"
-    ></div>
-  </div>
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="text-center">
+            問題 {{ current_question + 1 }} / {{ total_questions }}
+          </h2>
+        </div>
+        <div class="card-body">
+          <h3 class="card-title mb-4">{{ question }}</h3>
 
-  <div class="progress-info">
-    <span>問題 {{ question_number }}/{{ total_questions }}</span>
-    <span>正答数: {{ correct_answers }}問</span>
-  </div>
+          <!-- ヒントボタンと表示領域を追加 -->
+          <div class="mb-3">
+            <button id="hintButton" class="btn btn-info" onclick="showHint()">
+              <i class="fas fa-lightbulb"></i> ヒントを表示
+            </button>
+            <div
+              id="hintText"
+              class="alert alert-info mt-2"
+              style="display: none"
+            ></div>
+          </div>
 
-  <div class="question-container">
-    <h2 class="question-text mb-4">{{ question.question }}</h2>
-    <div class="options-container" data-correct="{{ question.correct }}">
-      {% for option in question.options %}
-      <div class="option mb-3 p-3 rounded" data-index="{{ loop.index0 }}">
-        {{ option }}
+          <div class="options">
+            {% for option in options %}
+            <div class="option mb-3">
+              <button
+                class="btn btn-outline-primary w-100 option-button"
+                onclick="submitAnswer({{ loop.index0 }})"
+              >
+                {{ option }}
+              </button>
+            </div>
+            {% endfor %}
+          </div>
+
+          <div id="result" class="mt-3" style="display: none">
+            <div id="correct-answer" class="alert alert-success">
+              正解です！
+            </div>
+            <div id="wrong-answer" class="alert alert-danger">不正解です。</div>
+            <div id="explanation" class="alert alert-info"></div>
+          </div>
+
+          <div class="text-center mt-3">
+            <span id="timer" class="badge bg-secondary">残り時間: 60秒</span>
+          </div>
+        </div>
       </div>
-      {% endfor %}
-    </div>
-
-    <!-- 戻るボタン -->
-    <div class="back-button-container">
-      <a href="{{ url_for('select_grade') }}" class="btn back-button">
-        <i class="fas fa-arrow-left"></i>学年選択に戻る
-      </a>
     </div>
   </div>
 </div>
 
 <script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const optionsContainer = document.querySelector(".options-container");
-    const options = document.querySelectorAll(".option");
-    let isAnswered = false;
-    let isProcessing = false;
-    const startTime = Date.now();
+  let timer;
+  let timeLeft = 60;
+  let questionData = {{ question_data | tojson | safe }};
 
-    options.forEach((option) => {
-      option.addEventListener(
-        "click",
-        async function (event) {
-          // イベントの伝播を停止
-          event.preventDefault();
-          event.stopPropagation();
+  function startTimer() {
+      timer = setInterval(function() {
+          timeLeft--;
+          document.getElementById('timer').textContent = `残り時間: ${timeLeft}秒`;
 
-          if (isAnswered || isProcessing) return;
-          isProcessing = true;
-          isAnswered = true;
-
-          try {
-            const selectedIndex = this.dataset.index;
-            const timeTaken = (Date.now() - startTime) / 1000;
-
-            // 回答処理とレスポンス確認のログ
-            console.log("Selected index:", selectedIndex);
-            console.log("Time taken:", timeTaken);
-
-            const response = await fetch("/submit_answer", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                selected: selectedIndex,
-                time_taken: timeTaken,
-              }),
-            });
-
-            const result = await response.json();
-            console.log("Server response details:", {
-              success: result.success,
-              isCorrect: result.isCorrect,
-              currentScore: result.currentScore,
-              isLastQuestion: result.isLastQuestion,
-              redirectUrl: result.redirectUrl,
-            });
-
-            if (result.success) {
-              // 正解・不正解の表示
-              const correctIndex = optionsContainer.dataset.correct;
-              console.log("Comparing indices:", {
-                selected: selectedIndex,
-                correct: correctIndex,
-                isCorrect: result.isCorrect,
-              });
-
-              const selectedOption = this;
-              const correctOption = options[correctIndex];
-
-              // 正解/不正解のスタイル適用
-              if (result.isCorrect) {
-                console.log("Marking as correct");
-                selectedOption.classList.add("correct");
-              } else {
-                console.log("Marking as incorrect");
-                selectedOption.classList.add("incorrect");
-                correctOption.classList.add("correct");
-              }
-
-              // スコア更新
-              const correctAnswersDisplay = document.querySelector(
-                ".progress-info span:last-child"
-              );
-              correctAnswersDisplay.textContent = `正答数: ${result.currentScore}問`;
-              console.log("Updated score display:", result.currentScore);
-
-              // 遷移処理の判断
-              console.log("Checking redirect conditions:", {
-                isLastQuestion: result.isLastQuestion,
-                hasRedirectUrl: !!result.redirectUrl,
-                redirectUrl: result.redirectUrl,
-              });
-
-              // アニメーション表示のための遅延
-              await new Promise((resolve) => setTimeout(resolve, 800));
-
-              if (result.isLastQuestion && result.redirectUrl) {
-                console.log("Redirecting to result page:", result.redirectUrl);
-                window.location.href = result.redirectUrl;
-              } else if (!result.isLastQuestion) {
-                console.log("Moving to next question");
-                window.location.href = "/next_question";
-              } else {
-                console.log("No redirect condition met - Debug info:", {
-                  isLastQuestion: result.isLastQuestion,
-                  redirectUrl: result.redirectUrl,
-                });
-              }
-            } else {
-              console.error("Error from server:", result.error);
-            }
-          } catch (error) {
-            console.error("Error:", error);
-          } finally {
-            isProcessing = false;
+          if (timeLeft <= 0) {
+              clearInterval(timer);
+              submitAnswer(-1); // タイムアウト時は-1を送信
           }
-        },
-        { once: true }
-      ); // イベントリスナーを1回だけ実行
-    });
-  });
+      }, 1000);
+  }
+
+  function showHint() {
+      const hintText = document.getElementById('hintText');
+      const hint = questionData.hint;
+
+      if (hint) {
+          hintText.textContent = hint;
+          hintText.style.display = 'block';
+      } else {
+          hintText.textContent = 'このクイズにはヒントがありません。';
+          hintText.style.display = 'block';
+      }
+  }
+
+  function submitAnswer(selectedIndex) {
+      clearInterval(timer);
+
+      const timeTaken = 60 - timeLeft;
+
+      fetch('/submit_answer', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+              selected: selectedIndex,
+              time_taken: timeTaken
+          })
+      })
+      .then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              document.getElementById('result').style.display = 'block';
+
+              if (data.isCorrect) {
+                  document.getElementById('correct-answer').style.display = 'block';
+                  document.getElementById('wrong-answer').style.display = 'none';
+              } else {
+                  document.getElementById('correct-answer').style.display = 'none';
+                  document.getElementById('wrong-answer').style.display = 'block';
+              }
+
+              // 説明を表示
+              const explanation = questionData.explanation;
+              if (explanation) {
+                  document.getElementById('explanation').textContent = explanation;
+                  document.getElementById('explanation').style.display = 'block';
+              }
+
+              // 全ての選択肢ボタンを無効化
+              const buttons = document.getElementsByClassName('option-button');
+              for (let button of buttons) {
+                  button.disabled = true;
+              }
+
+              // ヒントボタンを無効化
+              document.getElementById('hintButton').disabled = true;
+
+              if (data.isLastQuestion) {
+                  setTimeout(() => {
+                      window.location.href = data.redirectUrl;
+                  }, 3000);
+              } else {
+                  setTimeout(() => {
+                      window.location.href = '/next_question';
+                  }, 3000);
+              }
+          } else {
+              alert('エラーが発生しました: ' + data.error);
+          }
+      })
+      .catch(error => {
+          console.error('Error:', error);
+          alert('エラーが発生しました');
+      });
+  }
+
+  window.onload = function() {
+      startTimer();
+  }
 </script>
-
-<style>
-  .progress {
-    width: 100%;
-    height: 10px;
-    background-color: #e9ecef;
-    border-radius: 5px;
-    overflow: hidden;
-    margin-bottom: 20px;
-  }
-
-  .progress-fill {
-    height: 100%;
-    background-color: #4caf50;
-    transition: width 0.3s ease;
-  }
-
-  .progress-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 1.1em;
-    font-weight: 600;
-    color: #495057;
-    margin-bottom: 20px;
-    padding: 0 10px;
-  }
-
-  .question-container {
-    max-width: 800px;
-    margin: 0 auto;
-  }
-
-  .question-text {
-    font-size: 1.4em;
-    color: #212529;
-    text-align: left;
-    margin-bottom: 30px;
-    line-height: 1.6;
-    font-weight: 600;
-  }
-
-  .option {
-    background-color: #fff;
-    border: 2px solid #6c757d;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    padding: 15px 20px;
-    margin-bottom: 15px;
-    font-size: 1.1em;
-    color: #333;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    display: block;
-    width: 100%;
-    text-align: left;
-  }
-
-  .option:hover {
-    background-color: #f8f9fa;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    border-color: #495057;
-  }
-
-  .option.correct {
-    background-color: #d4edda;
-    border-color: #28a745;
-    color: #155724;
-    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
-  }
-
-  .option.incorrect {
-    background-color: #f8d7da;
-    border-color: #dc3545;
-    color: #721c24;
-    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);
-  }
-
-  .quiz-container {
-    opacity: 1;
-    transition: opacity 0.3s ease;
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px;
-  }
-
-  .quiz-container.fade {
-    opacity: 0;
-  }
-
-  .back-button-container {
-    text-align: center;
-    margin-top: 40px; /* 選択肢との間隔を設定 */
-  }
-
-  .back-button {
-    font-size: 1rem;
-    padding: 8px 20px;
-    background-color: #6c757d;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    transition: all 0.3s ease;
-    display: inline-flex;
-    align-items: center;
-    text-decoration: none;
-  }
-
-  .back-button:hover {
-    background-color: #5a6268;
-    color: white;
-    transform: translateY(-2px);
-  }
-
-  .back-button i {
-    margin-right: 8px;
-  }
-</style>
 {% endblock %}

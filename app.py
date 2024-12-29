@@ -693,3 +693,21 @@ def show_question():
         logger.error(f"Error in show_question: {e}")
         logger.exception("Full traceback:")
         return redirect(url_for('select_grade'))
+
+@app.route('/quiz')
+def quiz():
+    # セッションから現在の問題情報を取得
+    current_question = session.get('current_question', 0)
+    questions = session.get('questions', [])
+    
+    if not questions or current_question >= len(questions):
+        return redirect(url_for('select_grade'))
+    
+    question_data = questions[current_question]
+    
+    return render_template('quiz.html',
+                         question=question_data['question'],
+                         options=question_data['options'],
+                         current_question=current_question,
+                         total_questions=len(questions),
+                         question_data=question_data)  # ヒントと説明を含む全データを渡す
