@@ -593,40 +593,58 @@ def dashboard():
 
 @app.route('/quiz_history/<int:grade>/<category>/<subcategory>/<difficulty>')
 def quiz_history(grade, category, subcategory, difficulty):
+    logger.info(f"Accessing quiz_history for grade={grade}, category={category}, subcategory={subcategory}, difficulty={difficulty}")
+    logger.debug("Checking database connection...")
+
+    # config.py で設定された値をログ出力
+    logger.debug(f"Configured SUPABASE_URL: {app.config['SUPABASE_URL']}")
+    logger.debug(f"Configured DATABASE_URL: {app.config['DATABASE_URL']}")
+
+    db_host = None
+    db_port = None
+
+    if app.config['DATABASE_URL']:
+        from urllib.parse import urlparse
+        parsed_url = urlparse(app.config['DATABASE_URL'])
+        db_host = parsed_url.hostname
+        db_port = parsed_url.port or 5432
+        logger.debug(f"Extracted hostname from DATABASE_URL: {db_host}")
+        logger.debug(f"Extracted port from DATABASE_URL: {db_port}")
+    else:
+        logger.error("DATABASE_URL is not set in app configuration.")
+
+    logger.debug(f"Testing connection to {db_host}:{db_port}")
+
     try:
-        logger.info(f"Accessing quiz_history for grade={grade}, category={category}, subcategory={subcategory}, difficulty={difficulty}")
-        
-        # データベース接続の状態を確認
-        logger.debug("Checking database connection...")
-        try:
-            # 接続テスト
-            import socket
-            from urllib.parse import urlparse
+        import socket
+        # DNS解決を試みる直前にホスト名とポートを出力
+        logger.debug(f"Attempting DNS resolution for host: {db_host}, port: {db_port}")
+        addr_info = socket.getaddrinfo(db_host, db_port, socket.AF_INET, socket.SOCK_STREAM)
+        logger.debug(f"DNS resolution successful: {addr_info}")
+
+        if addr_info:
+            ipv4_addr = addr_info[0][4][0]
+            logger.debug(f"Resolved IPv4 address: {ipv4_addr}")
             
-            # データベースURLからホスト名を取得
-            db_url = app.config['SQLALCHEMY_DATABASE_URI']
-            parsed_url = urlparse(db_url)
-            host = parsed_url.hostname
-            port = parsed_url.port or 5432
-            
-            logger.debug(f"Testing connection to {host}:{port}")
-            
-            # IPv4での接続を試行
-            addr_info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
-            if addr_info:
-                ipv4_addr = addr_info[0][4][0]
-                logger.debug(f"Resolved IPv4 address: {ipv4_addr}")
-                
-                # 実際のデータベース接続テスト
-                db.session.execute(text("SELECT 1"))
+            # データベース接続テスト
+            try:
+                result = db.session.execute(text("SELECT 1"))
                 logger.info("Database connection test successful")
-            else:
-                logger.error("No IPv4 addresses found for host")
-                
-        except Exception as db_error:
-            logger.error(f"Database connection test failed: {db_error}", exc_info=True)
-            raise
-        
+                logger.debug(f"Test query result: {result.scalar()}")
+            except Exception as db_error:
+                logger.error(f"Database query test failed: {db_error}", exc_info=True)
+                raise
+        else:
+            logger.error("No IPv4 addresses found for host")
+            
+    except socket.gaierror as e:
+        logger.error(f"DNS resolution failed: {e}", exc_info=True)
+        return "Database connection error", 500
+    except Exception as e:
+        logger.error(f"Error in quiz_history route: {e}", exc_info=True)
+        return "An error occurred", 500
+
+    try:
         # 通常の試行履歴を取得
         logger.debug("Querying quiz attempts...")
         attempts = QuizAttempt.query.filter_by(
@@ -653,8 +671,8 @@ def quiz_history(grade, category, subcategory, difficulty):
                              attempts=attempts,
                              question_stats=question_stats)
     except Exception as e:
-        logger.error(f"Error in quiz_history route: {e}", exc_info=True)
-        return "An error occurred", 500
+        logger.error(f"Error processing quiz history data: {e}", exc_info=True)
+        return "An error occurred while processing quiz history", 500
 
 @app.route('/question_history/<int:grade>/<category>/<subcategory>/<difficulty>/<path:question_text>')
 def question_history(grade, category, subcategory, difficulty, question_text):
