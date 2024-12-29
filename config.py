@@ -1,8 +1,7 @@
 import os
 from dotenv import load_dotenv
-from supabase import create_client, Client
-import re
 import logging
+from supabase import create_client, Client
 
 # ロガーの設定
 logging.basicConfig(
@@ -22,8 +21,9 @@ class Config:
     
     # データベースURL
     DATABASE_URL = os.getenv('DATABASE_URL')
+    
+    # DNS解決テストとログ出力
     if DATABASE_URL:
-        # 接続URLの解析と変換前の状態をログ
         logger.debug(f"Original DATABASE_URL: {DATABASE_URL}")
         
         # postgresからpostgresqlへの変換
@@ -31,83 +31,52 @@ class Config:
             DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
             logger.debug(f"After protocol conversion: {DATABASE_URL}")
         
-        # URLの各コンポーネントを解析してログ
         try:
-            from urllib.parse import urlparse, urlunparse
-            parsed_url = urlparse(DATABASE_URL)
-            
-            # ホスト名からIPv4アドレスを取得
+            from urllib.parse import urlparse
             import socket
-            try:
-                host = parsed_url.hostname
-                logger.debug(f"Resolving hostname: {host}")
-                # IPv4アドレスのみを取得するように設定
-                addr_info = socket.getaddrinfo(
-                    host,
-                    None,
-                    socket.AF_INET,
-                    socket.SOCK_STREAM,
-                    0,
-                    socket.AI_ADDRCONFIG
-                )
-                ipv4_addr = addr_info[0][4][0]
-                logger.debug(f"Resolved IPv4 address: {ipv4_addr}")
-                
-                # URLを再構築（IPv4アドレスを使用）
-                new_netloc = f"{parsed_url.username}:{parsed_url.password}@{ipv4_addr}:{parsed_url.port}"
-                DATABASE_URL = urlunparse((
-                    parsed_url.scheme,
-                    new_netloc,
-                    parsed_url.path,
-                    parsed_url.params,
-                    parsed_url.query,
-                    parsed_url.fragment
-                ))
-                logger.debug(f"Updated DATABASE_URL with IPv4: {DATABASE_URL}")
-            except Exception as e:
-                logger.error(f"Error resolving IPv4 address: {e}", exc_info=True)
             
-            logger.debug("Parsed URL components:")
-            logger.debug(f"  scheme: {parsed_url.scheme}")
-            logger.debug(f"  username: {'present' if parsed_url.username else 'missing'}")
-            logger.debug(f"  password: {'present' if parsed_url.password else 'missing'}")
-            logger.debug(f"  hostname: {parsed_url.hostname}")
-            logger.debug(f"  port: {parsed_url.port}")
-            logger.debug(f"  database: {parsed_url.path}")
+            parsed_url = urlparse(DATABASE_URL)
+            host = parsed_url.hostname
+            logger.debug(f"Parsed hostname: {host}")
+            
+            # DNS解決テスト
+            try:
+                logger.debug("Testing DNS resolution...")
+                addr_info = socket.getaddrinfo(host, None)
+                logger.debug(f"DNS resolution successful. Address info: {addr_info}")
+                
+                # IPv4アドレスの取得を試行
+                ipv4_addrs = [addr[4][0] for addr in addr_info if addr[0] == socket.AF_INET]
+                if ipv4_addrs:
+                    logger.debug(f"Found IPv4 addresses: {ipv4_addrs}")
+                else:
+                    logger.warning("No IPv4 addresses found")
+                    
+            except socket.gaierror as e:
+                logger.error(f"DNS resolution failed: {e}", exc_info=True)
+                
         except Exception as e:
             logger.error(f"Error parsing DATABASE_URL: {e}", exc_info=True)
     else:
         logger.error("DATABASE_URL is not set")
     
+    # 基本的な接続設定
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
-    # データベース接続オプション
+    # 最小限の接続オプション
     SQLALCHEMY_ENGINE_OPTIONS = {
-        "pool_size": 5,
-        "max_overflow": 2,
-        "pool_timeout": 30,
-        "pool_recycle": 1800,
-        "pool_pre_ping": True,
+        "pool_size": 1,  # 最小限のプールサイズ
+        "max_overflow": 0,  # オーバーフローなし
         "connect_args": {
             "sslmode": "require",
-            "connect_timeout": 30,
-            "keepalives": 1,
-            "keepalives_idle": 30,
-            "keepalives_interval": 10,
-            "keepalives_count": 5,
-            "tcp_user_timeout": 30000,
-            "options": "-c search_path=public -c statement_timeout=30000",
-            "application_name": "quiz_app"
+            "connect_timeout": 30
         }
     }
     
-    logger.debug("SQLAlchemy engine options:")
-    logger.debug(f"  Pool size: {SQLALCHEMY_ENGINE_OPTIONS['pool_size']}")
-    logger.debug(f"  Max overflow: {SQLALCHEMY_ENGINE_OPTIONS['max_overflow']}")
-    logger.debug(f"  Pool timeout: {SQLALCHEMY_ENGINE_OPTIONS['pool_timeout']}")
-    logger.debug(f"  Pool recycle: {SQLALCHEMY_ENGINE_OPTIONS['pool_recycle']}")
-    logger.debug(f"  Connect args: {SQLALCHEMY_ENGINE_OPTIONS['connect_args']}")
+    logger.debug("SQLAlchemy configuration:")
+    logger.debug(f"  Database URI: {SQLALCHEMY_DATABASE_URI}")
+    logger.debug(f"  Engine options: {SQLALCHEMY_ENGINE_OPTIONS}")
 
 # Supabaseクライアントの初期化
 try:
