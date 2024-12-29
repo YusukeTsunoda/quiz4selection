@@ -14,6 +14,16 @@
 
   <div class="question-container">
     <h2 class="question-text mb-4">{{ question.question }}</h2>
+    {% if question.hint %}
+    <div class="hint-container mb-3">
+      <button class="hint-button" id="hintButton">
+        <i class="fas fa-lightbulb"></i> ヒントを見る
+      </button>
+      <div class="hint-text" id="hintText" style="display: none">
+        <i class="fas fa-lightbulb"></i> {{ question.hint }}
+      </div>
+    </div>
+    {% endif %}
     <div class="options-container" data-correct="{{ question.correct }}">
       {% for option in question.options %}
       <div class="option mb-3 p-3 rounded" data-index="{{ loop.index0 }}">
@@ -35,9 +45,28 @@
   document.addEventListener("DOMContentLoaded", function () {
     const optionsContainer = document.querySelector(".options-container");
     const options = document.querySelectorAll(".option");
+    const hintButton = document.getElementById("hintButton");
+    const hintText = document.getElementById("hintText");
     let isAnswered = false;
     let isProcessing = false;
     const startTime = Date.now();
+
+    // ヒントボタンのイベントリスナー
+    if (hintButton) {
+      hintButton.addEventListener("click", function () {
+        if (hintText) {
+          if (hintText.style.display === "none") {
+            hintText.style.display = "block";
+            hintButton.innerHTML =
+              '<i class="fas fa-lightbulb"></i> ヒントを隠す';
+          } else {
+            hintText.style.display = "none";
+            hintButton.innerHTML =
+              '<i class="fas fa-lightbulb"></i> ヒントを見る';
+          }
+        }
+      });
+    }
 
     options.forEach((option) => {
       option.addEventListener(
@@ -261,6 +290,61 @@
 
   .back-button i {
     margin-right: 8px;
+  }
+
+  .hint-container {
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .hint-button {
+    background-color: #ffc107;
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 20px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .hint-button:hover {
+    background-color: #ffb300;
+    transform: translateY(-2px);
+  }
+
+  .hint-button i {
+    margin-right: 8px;
+  }
+
+  .hint-text {
+    margin-top: 10px;
+    padding: 15px;
+    background-color: #fff3cd;
+    border: 1px solid #ffeeba;
+    border-radius: 8px;
+    color: #856404;
+    font-size: 1rem;
+    text-align: left;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .hint-text i {
+    margin-right: 8px;
+    color: #ffc107;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 </style>
 {% endblock %}
