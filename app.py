@@ -436,8 +436,8 @@ def submit_answer():
         is_correct = str(selected_index) == str(correct_index)
         logger.info(f"Answer is correct: {is_correct}")
         
-        # 最後の問題かどうかを確認（スコア更新前）
-        is_last_question = (current_question + 1) >= len(questions)
+        # 最後の問題かどうかを確認
+        is_last_question = current_question >= len(questions) - 1
         logger.info(f"Question check - Current: {current_question + 1}, Total: {len(questions)}, Is Last: {is_last_question}")
         
         # スコアの更新
@@ -487,16 +487,14 @@ def submit_answer():
         # 最後の問題の場合、リダイレクトURLを設定
         if is_last_question:
             try:
-                # 直接URLを設定（url_forを使用しない）
                 response_data['redirectUrl'] = '/result'
                 logger.info(f"Last question - Setting redirect URL: {response_data['redirectUrl']}")
             except Exception as e:
                 logger.error(f"Error setting redirect URL: {e}")
         else:
             # 次の問題のインデックスを更新（最後の問題でない場合のみ）
-            next_question = current_question + 1
-            session['current_question'] = next_question
-            logger.info(f"Next question index set to: {next_question}")
+            session['current_question'] = current_question + 1
+            logger.info(f"Next question index set to: {current_question + 1}")
         
         # 最終レスポンスの内容を確認
         logger.info(f"Sending response: {response_data}")

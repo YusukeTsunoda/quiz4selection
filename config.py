@@ -41,9 +41,7 @@ class Config:
             "keepalives_count": 5,  # 5回試行後に接続を切断
             "tcp_user_timeout": 30000,  # TCPタイムアウトを30秒に設定
             "options": "-c search_path=public -c statement_timeout=30000",  # タイムアウト設定
-            "application_name": "quiz_app",  # アプリケーション名を設定
-            # IPv4を強制
-            "host_routing": "prefer-ipv4"
+            "application_name": "quiz_app"  # アプリケーション名を設定
         }
     }
 
