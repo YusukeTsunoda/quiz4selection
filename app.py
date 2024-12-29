@@ -1,10 +1,10 @@
 import os
 import random
 import logging
-from flask import Flask, render_template, session, request, jsonify, flash, redirect, url_for
+from flask import Flask, render_template, session, request, jsonify, flash, redirect, url_for, g
 from extensions import db
 from models import QuizAttempt
-from config import Config
+from config import Config, db_connection
 from flask_migrate import Migrate
 import json
 from sqlalchemy import text, create_engine
@@ -12,8 +12,8 @@ import socket
 import time
 from functools import wraps
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
+# ロガーの設定
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize Flask app
@@ -23,6 +23,41 @@ app.config.from_object(Config)
 # Initialize database
 db.init_app(app)
 migrate = Migrate(app, db)
+
+# リクエスト前のデータベース接続確認
+@app.before_request
+def before_request():
+    start_time = time.time()
+    g.request_start_time = start_time
+    logger.info(f"Starting request to {request.endpoint}")
+    
+    # データベース接続の確認
+    try:
+        db.session.execute(text("SELECT 1"))
+        logger.info("Database connection verified")
+    except Exception as e:
+        logger.error(f"Database connection error: {e}")
+        db.session.rollback()
+        return "Database connection error", 500
+
+# リクエスト後の処理
+@app.after_request
+def after_request(response):
+    if hasattr(g, 'request_start_time'):
+        total_time = time.time() - g.request_start_time
+        logger.info(f"Request to {request.endpoint} completed in {total_time:.2f} seconds")
+        
+        # Vercelのタイムアウトに近づいている場合は警告
+        if total_time > 8:
+            logger.warning(f"Request time ({total_time:.2f}s) is approaching Vercel timeout")
+    
+    return response
+
+# エラーハンドラー
+@app.errorhandler(504)
+def gateway_timeout(error):
+    logger.error(f"Gateway Timeout Error: {error}")
+    return "Request timeout. Please try again.", 504
 
 # Create database tables
 with app.app_context():
@@ -77,8 +112,7 @@ def log_performance(f):
             end_time = time.time()
             execution_time = end_time - start_time
             logger.info(f"Function {f.__name__} executed in {execution_time:.2f} seconds")
-            # Vercelのタイムアウトに近づいている場合は警告
-            if execution_time > 8:  # 10秒のタイムアウトに対して8秒を警告閾値とする
+            if execution_time > 8:
                 logger.warning(f"Function {f.__name__} execution time ({execution_time:.2f}s) is approaching Vercel timeout")
             return result
         except Exception as e:
@@ -617,25 +651,29 @@ def dashboard():
         return "An error occurred", 500
 
 @app.route('/quiz_history/<int:grade>/<category>/<subcategory>/<difficulty>')
+@log_performance
 def quiz_history(grade, category, subcategory, difficulty):
     logger.info(f"Accessing quiz_history for grade={grade}, category={category}, subcategory={subcategory}, difficulty={difficulty}")
 
     try:
-        # データベース接続テスト
-        result = db.session.execute(text("SELECT 1"))
-        logger.info("Database connection test successful")
+        # データベース接続テスト（タイムアウト付き）
+        with db.session.begin():
+            result = db.session.execute(text("SELECT 1"))
+            logger.info("Database connection test successful")
 
-        # 通常の試行履歴を取得
-        attempts = QuizAttempt.query.filter_by(
-            grade=grade,
-            category=category,
-            subcategory=subcategory,
-            difficulty=difficulty
-        ).order_by(QuizAttempt.timestamp.desc()).all()
-        logger.info(f"Retrieved {len(attempts)} quiz attempts")
+        # 通常の試行履歴を取得（タイムアウト付き）
+        with db.session.begin():
+            attempts = QuizAttempt.query.filter_by(
+                grade=grade,
+                category=category,
+                subcategory=subcategory,
+                difficulty=difficulty
+            ).order_by(QuizAttempt.timestamp.desc()).all()
+            logger.info(f"Retrieved {len(attempts)} quiz attempts")
         
-        # 問題別の統計情報を取得
-        question_stats = QuizAttempt.get_question_stats(grade, category, subcategory, difficulty)
+        # 問題別の統計情報を取得（タイムアウト付き）
+        with db.session.begin():
+            question_stats = QuizAttempt.get_question_stats(grade, category, subcategory, difficulty)
         
         return render_template('quiz_history.html',
                              grade=grade,
@@ -649,6 +687,7 @@ def quiz_history(grade, category, subcategory, difficulty):
                              question_stats=question_stats)
     except Exception as e:
         logger.error(f"Error in quiz_history: {e}", exc_info=True)
+        db.session.rollback()
         return "An error occurred", 500
 
 @app.route('/question_history/<int:grade>/<category>/<subcategory>/<difficulty>/<path:question_text>')
