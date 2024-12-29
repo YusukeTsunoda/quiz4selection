@@ -595,21 +595,13 @@ def dashboard():
 @app.route('/quiz_history/<int:grade>/<category>/<subcategory>/<difficulty>')
 def quiz_history(grade, category, subcategory, difficulty):
     logger.info(f"Accessing quiz_history for grade={grade}, category={category}, subcategory={subcategory}, difficulty={difficulty}")
-    logger.debug("Checking database connection...")
 
     try:
         # データベース接続テスト
-        logger.debug("Attempting database connection test...")
         result = db.session.execute(text("SELECT 1"))
         logger.info("Database connection test successful")
-        logger.debug(f"Test query result: {result.scalar()}")
-    except Exception as e:
-        logger.error(f"Database connection test failed: {e}", exc_info=True)
-        return "Database connection failed", 500
 
-    try:
         # 通常の試行履歴を取得
-        logger.debug("Querying quiz attempts...")
         attempts = QuizAttempt.query.filter_by(
             grade=grade,
             category=category,
@@ -619,9 +611,7 @@ def quiz_history(grade, category, subcategory, difficulty):
         logger.info(f"Retrieved {len(attempts)} quiz attempts")
         
         # 問題別の統計情報を取得
-        logger.debug("Getting question statistics...")
         question_stats = QuizAttempt.get_question_stats(grade, category, subcategory, difficulty)
-        logger.info(f"Retrieved statistics for {len(question_stats) if question_stats else 0} questions")
         
         return render_template('quiz_history.html',
                              grade=grade,
@@ -634,8 +624,8 @@ def quiz_history(grade, category, subcategory, difficulty):
                              attempts=attempts,
                              question_stats=question_stats)
     except Exception as e:
-        logger.error(f"Error processing quiz history data: {e}", exc_info=True)
-        return "An error occurred while processing quiz history", 500
+        logger.error(f"Error in quiz_history: {e}", exc_info=True)
+        return "An error occurred", 500
 
 @app.route('/question_history/<int:grade>/<category>/<subcategory>/<difficulty>/<path:question_text>')
 def question_history(grade, category, subcategory, difficulty, question_text):
