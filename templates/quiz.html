@@ -14,16 +14,19 @@
 
   <div class="question-container">
     <h2 class="question-text mb-4">{{ question.question }}</h2>
+
+    <!-- ヒントボタンとヒント表示エリアを追加 -->
     {% if question.hint %}
-    <div class="hint-container mb-3">
-      <button class="hint-button" id="hintButton">
+    <div class="hint-container mb-4">
+      <button id="hintButton" class="btn hint-button">
         <i class="fas fa-lightbulb"></i> ヒントを見る
       </button>
-      <div class="hint-text" id="hintText" style="display: none">
-        <i class="fas fa-lightbulb"></i> {{ question.hint }}
+      <div id="hintText" class="hint-text" style="display: none">
+        {{ question.hint }}
       </div>
     </div>
     {% endif %}
+
     <div class="options-container" data-correct="{{ question.correct }}">
       {% for option in question.options %}
       <div class="option mb-3 p-3 rounded" data-index="{{ loop.index0 }}">
@@ -52,18 +55,16 @@
     const startTime = Date.now();
 
     // ヒントボタンのイベントリスナー
-    if (hintButton) {
+    if (hintButton && hintText) {
       hintButton.addEventListener("click", function () {
-        if (hintText) {
-          if (hintText.style.display === "none") {
-            hintText.style.display = "block";
-            hintButton.innerHTML =
-              '<i class="fas fa-lightbulb"></i> ヒントを隠す';
-          } else {
-            hintText.style.display = "none";
-            hintButton.innerHTML =
-              '<i class="fas fa-lightbulb"></i> ヒントを見る';
-          }
+        if (hintText.style.display === "none") {
+          hintText.style.display = "block";
+          hintButton.innerHTML =
+            '<i class="fas fa-lightbulb"></i> ヒントを隠す';
+        } else {
+          hintText.style.display = "none";
+          hintButton.innerHTML =
+            '<i class="fas fa-lightbulb"></i> ヒントを見る';
         }
       });
     }
@@ -292,22 +293,21 @@
     margin-right: 8px;
   }
 
+  /* ヒント関連のスタイルを追加 */
   .hint-container {
-    margin-bottom: 20px;
     text-align: center;
+    margin: 20px 0;
   }
 
   .hint-button {
     background-color: #ffc107;
     color: #000;
     border: none;
-    border-radius: 8px;
     padding: 8px 20px;
+    border-radius: 8px;
     font-size: 1rem;
-    cursor: pointer;
     transition: all 0.3s ease;
-    display: inline-flex;
-    align-items: center;
+    margin-bottom: 10px;
   }
 
   .hint-button:hover {
@@ -315,25 +315,16 @@
     transform: translateY(-2px);
   }
 
-  .hint-button i {
-    margin-right: 8px;
-  }
-
   .hint-text {
-    margin-top: 10px;
-    padding: 15px;
     background-color: #fff3cd;
     border: 1px solid #ffeeba;
-    border-radius: 8px;
     color: #856404;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 10px;
     font-size: 1rem;
     text-align: left;
     animation: fadeIn 0.3s ease;
-  }
-
-  .hint-text i {
-    margin-right: 8px;
-    color: #ffc107;
   }
 
   @keyframes fadeIn {
