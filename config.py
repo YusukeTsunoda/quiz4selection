@@ -28,10 +28,6 @@ class Config:
             DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
             logger.debug(f"After protocol conversion: {DATABASE_URL}")
         
-        # ポート番号の変更（5432 → 6543）
-        DATABASE_URL = re.sub(r':5432/', ':6543/', DATABASE_URL)
-        logger.debug(f"After port conversion: {DATABASE_URL}")
-        
         # URLの各コンポーネントを解析してログ
         try:
             from urllib.parse import urlparse
