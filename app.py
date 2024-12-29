@@ -9,6 +9,8 @@ from flask_migrate import Migrate
 import json
 from sqlalchemy import text, create_engine
 import socket
+import time
+from functools import wraps
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -64,6 +66,26 @@ SUBCATEGORY_NAMES = {
     'current_events': '時事',
     'prefectures': '都道府県'
 }
+
+# パフォーマンス計測用デコレータ
+def log_performance(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        start_time = time.time()
+        try:
+            result = f(*args, **kwargs)
+            end_time = time.time()
+            execution_time = end_time - start_time
+            logger.info(f"Function {f.__name__} executed in {execution_time:.2f} seconds")
+            # Vercelのタイムアウトに近づいている場合は警告
+            if execution_time > 8:  # 10秒のタイムアウトに対して8秒を警告閾値とする
+                logger.warning(f"Function {f.__name__} execution time ({execution_time:.2f}s) is approaching Vercel timeout")
+            return result
+        except Exception as e:
+            end_time = time.time()
+            logger.error(f"Error in {f.__name__}: {str(e)}, execution time: {end_time - start_time:.2f}s", exc_info=True)
+            raise
+    return decorated_function
 
 def get_shuffled_question(question):
     """
@@ -411,6 +433,7 @@ def get_quiz_data(grade, category, subcategory, difficulty):
         return None, "問題データの読み込み中にエラーが発生しました"
 
 @app.route('/submit_answer', methods=['POST'])
+@log_performance
 def submit_answer():
     try:
         data = request.get_json()
@@ -507,6 +530,7 @@ def submit_answer():
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/next_question', methods=['GET'])
+@log_performance
 def next_question():
     """次の問題を表示する"""
     try:

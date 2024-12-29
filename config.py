@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 import logging
+import time
 from supabase import create_client, Client
 
 # ロガーの設定
@@ -11,6 +12,23 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 load_dotenv()
+
+# Supabaseクライアントをグローバル変数として保持
+_supabase_client = None
+
+def get_supabase_client():
+    global _supabase_client
+    if _supabase_client is None:
+        start_time = time.time()
+        try:
+            logger.info("Initializing Supabase client...")
+            _supabase_client = create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY)
+            end_time = time.time()
+            logger.info(f"Supabase client initialized successfully in {end_time - start_time:.2f} seconds")
+        except Exception as e:
+            logger.error(f"Error initializing Supabase client: {e}", exc_info=True)
+            return None
+    return _supabase_client
 
 class Config:
     SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'your-secret-key')
@@ -45,19 +63,21 @@ class Config:
         "pool_size": 1,
         "max_overflow": 0,
         "connect_args": {
-            "sslmode": "require" if IS_PRODUCTION else "disable",  # 本番環境のみSSLを有効化
-            "connect_timeout": 30,
+            "sslmode": "require" if IS_PRODUCTION else "disable",
+            "connect_timeout": 10,  # タイムアウトを10秒に設定
             "application_name": "quiz_app"
-        }
+        },
+        # コネクションプールの設定を追加
+        "pool_pre_ping": True,  # コネクションの有効性をチェック
+        "pool_recycle": 300,    # 5分でコネクションをリサイクル
+        "pool_timeout": 10      # プールからの取得を10秒でタイムアウト
     }
 
     logger.info(f"SSL mode: {'enabled' if IS_PRODUCTION else 'disabled'}")
+    logger.info(f"Database connection timeout: {SQLALCHEMY_ENGINE_OPTIONS['connect_args']['connect_timeout']} seconds")
+    logger.info(f"Pool settings - Size: {SQLALCHEMY_ENGINE_OPTIONS['pool_size']}, "
+               f"Timeout: {SQLALCHEMY_ENGINE_OPTIONS['pool_timeout']}, "
+               f"Recycle: {SQLALCHEMY_ENGINE_OPTIONS['pool_recycle']}")
 
-# Supabaseクライアントの初期化
-try:
-    logger.info("Initializing Supabase client...")
-    supabase: Client = create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY)
-    logger.info("Supabase client initialized successfully")
-except Exception as e:
-    logger.error(f"Error initializing Supabase client: {e}", exc_info=True)
-    supabase = None
+# Supabaseクライアントの初期化（シングルトンパターン）
+supabase = get_supabase_client()
