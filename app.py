@@ -7,7 +7,7 @@ from models import QuizAttempt
 from config import Config
 from flask_migrate import Migrate
 import json
-from sqlalchemy import text
+from sqlalchemy import text, create_engine
 import socket
 
 # Configure logging
@@ -616,15 +616,13 @@ def quiz_history(grade, category, subcategory, difficulty):
     logger.debug(f"Testing connection to {db_host}:{db_port}")
     logger.debug(f"Attempting DNS resolution for host: {db_host}, port: {db_port}")
 
-    ipv4_resolved = False
-    ipv6_resolved = False
-
+    ipv4_addresses = []
     try:
-        # IPv4での解決を明示的に試行
         logger.debug("Attempting IPv4 DNS resolution...")
         addr_info_ipv4 = socket.getaddrinfo(db_host, db_port, socket.AF_INET, socket.SOCK_STREAM)
         logger.debug(f"IPv4 DNS resolution successful: {addr_info_ipv4}")
-        ipv4_resolved = True
+        ipv4_addresses = [info[4][0] for info in addr_info_ipv4]
+        logger.debug(f"Resolved IPv4 Addresses: {ipv4_addresses}")
         
         # IPv4アドレスの詳細を出力
         for addr in addr_info_ipv4:
@@ -638,12 +636,13 @@ def quiz_history(grade, category, subcategory, difficulty):
     except socket.gaierror as e:
         logger.error(f"IPv4 DNS resolution failed: {e}", exc_info=True)
 
+    ipv6_addresses = []
     try:
-        # IPv6での解決も試行
         logger.debug("Attempting IPv6 DNS resolution...")
         addr_info_ipv6 = socket.getaddrinfo(db_host, db_port, socket.AF_INET6, socket.SOCK_STREAM)
         logger.debug(f"IPv6 DNS resolution successful: {addr_info_ipv6}")
-        ipv6_resolved = True
+        ipv6_addresses = [info[4][0] for info in addr_info_ipv6]
+        logger.debug(f"Resolved IPv6 Addresses: {ipv6_addresses}")
         
         # IPv6アドレスの詳細を出力
         for addr in addr_info_ipv6:
@@ -657,23 +656,30 @@ def quiz_history(grade, category, subcategory, difficulty):
     except socket.gaierror as e:
         logger.error(f"IPv6 DNS resolution failed: {e}", exc_info=True)
 
-    # DNS解決の結果をサマリー
-    logger.info(f"DNS Resolution Summary:")
-    logger.info(f"  IPv4 Resolution: {'Success' if ipv4_resolved else 'Failed'}")
-    logger.info(f"  IPv6 Resolution: {'Success' if ipv6_resolved else 'Failed'}")
+    logger.info("DNS Resolution Summary:")
+    logger.info(f"  IPv4 Resolution: {'Success' if ipv4_addresses else 'Failed'}")
+    logger.info(f"  IPv6 Resolution: {'Success' if ipv6_addresses else 'Failed'}")
 
-    if not ipv4_resolved and not ipv6_resolved:
+    if not ipv4_addresses and not ipv6_addresses:
         logger.error("Both IPv4 and IPv6 DNS resolution failed")
         return "DNS resolution failed for database host", 500
 
     try:
-        # データベース接続テスト
-        logger.debug("Attempting database connection test...")
-        result = db.session.execute(text("SELECT 1"))
-        logger.info("Database connection test successful")
-        logger.debug(f"Test query result: {result.scalar()}")
-    except Exception as db_error:
-        logger.error(f"Database connection test failed: {db_error}", exc_info=True)
+        # SQLAlchemy Engine の接続オプションを確認
+        engine_options = app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {})
+        logger.debug(f"SQLAlchemy Engine Options: {engine_options}")
+
+        # 接続文字列をログ出力 (機密情報はマスク)
+        db_url_masked = app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1] if '@' in app.config['SQLALCHEMY_DATABASE_URI'] else app.config['SQLALCHEMY_DATABASE_URI']
+        logger.debug(f"Attempting database connection with URI (masked): ...@{db_url_masked}")
+
+        # SQLAlchemy Engineを使用した接続テスト
+        engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'], **app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {}))
+        with engine.connect() as connection:
+            logger.info("Database connection test successful (SQLAlchemy)")
+            connection.execute(text("SELECT 1"))
+    except Exception as e:
+        logger.error(f"Database connection test failed: {e}", exc_info=True)
         return "Database connection failed", 500
 
     try:
