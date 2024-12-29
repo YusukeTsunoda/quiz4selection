@@ -593,16 +593,31 @@ def dashboard():
 @app.route('/quiz_history/<int:grade>/<category>/<subcategory>/<difficulty>')
 def quiz_history(grade, category, subcategory, difficulty):
     try:
+        logger.info(f"Accessing quiz_history for grade={grade}, category={category}, subcategory={subcategory}, difficulty={difficulty}")
+        
+        # データベース接続の状態を確認
+        logger.debug("Checking database connection...")
+        try:
+            db.session.execute("SELECT 1")
+            logger.info("Database connection test successful")
+        except Exception as db_error:
+            logger.error(f"Database connection test failed: {db_error}", exc_info=True)
+            raise
+        
         # 通常の試行履歴を取得
+        logger.debug("Querying quiz attempts...")
         attempts = QuizAttempt.query.filter_by(
             grade=grade,
             category=category,
             subcategory=subcategory,
             difficulty=difficulty
         ).order_by(QuizAttempt.timestamp.desc()).all()
+        logger.info(f"Retrieved {len(attempts)} quiz attempts")
         
         # 問題別の統計情報を取得
+        logger.debug("Getting question statistics...")
         question_stats = QuizAttempt.get_question_stats(grade, category, subcategory, difficulty)
+        logger.info(f"Retrieved statistics for {len(question_stats) if question_stats else 0} questions")
         
         return render_template('quiz_history.html',
                              grade=grade,
@@ -615,7 +630,7 @@ def quiz_history(grade, category, subcategory, difficulty):
                              attempts=attempts,
                              question_stats=question_stats)
     except Exception as e:
-        logger.error(f"Error in quiz_history route: {e}")
+        logger.error(f"Error in quiz_history route: {e}", exc_info=True)
         return "An error occurred", 500
 
 @app.route('/question_history/<int:grade>/<category>/<subcategory>/<difficulty>/<path:question_text>')
