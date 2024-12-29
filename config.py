@@ -34,7 +34,16 @@ class Config:
         "pool_pre_ping": True,  # 接続前の生存確認
         "connect_args": {
             "sslmode": "require",  # SSL接続を強制
-            "connect_timeout": 10  # 接続タイムアウト（秒）
+            "connect_timeout": 30,  # 接続タイムアウトを30秒に延長
+            "keepalives": 1,  # TCP keepaliveを有効化
+            "keepalives_idle": 30,  # アイドル30秒後にkeepalive開始
+            "keepalives_interval": 10,  # keepaliveの間隔を10秒に
+            "keepalives_count": 5,  # 5回試行後に接続を切断
+            "tcp_user_timeout": 30000,  # TCPタイムアウトを30秒に設定
+            "options": "-c search_path=public -c statement_timeout=30000",  # タイムアウト設定
+            "application_name": "quiz_app",  # アプリケーション名を設定
+            # IPv4を強制
+            "host_routing": "prefer-ipv4"
         }
     }
 
