@@ -7,6 +7,7 @@ from models import QuizAttempt
 from config import Config
 from flask_migrate import Migrate
 import json
+from sqlalchemy import text
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -598,8 +599,30 @@ def quiz_history(grade, category, subcategory, difficulty):
         # データベース接続の状態を確認
         logger.debug("Checking database connection...")
         try:
-            db.session.execute("SELECT 1")
-            logger.info("Database connection test successful")
+            # 接続テスト
+            import socket
+            from urllib.parse import urlparse
+            
+            # データベースURLからホスト名を取得
+            db_url = app.config['SQLALCHEMY_DATABASE_URI']
+            parsed_url = urlparse(db_url)
+            host = parsed_url.hostname
+            port = parsed_url.port or 5432
+            
+            logger.debug(f"Testing connection to {host}:{port}")
+            
+            # IPv4での接続を試行
+            addr_info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+            if addr_info:
+                ipv4_addr = addr_info[0][4][0]
+                logger.debug(f"Resolved IPv4 address: {ipv4_addr}")
+                
+                # 実際のデータベース接続テスト
+                db.session.execute(text("SELECT 1"))
+                logger.info("Database connection test successful")
+            else:
+                logger.error("No IPv4 addresses found for host")
+                
         except Exception as db_error:
             logger.error(f"Database connection test failed: {db_error}", exc_info=True)
             raise

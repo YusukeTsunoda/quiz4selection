@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
 import logging
-import socket
 from supabase import create_client, Client
 
 # ロガーの設定
@@ -33,24 +32,58 @@ class Config:
             logger.debug(f"After protocol conversion: {DATABASE_URL}")
         
         try:
-            from urllib.parse import urlparse
+            from urllib.parse import urlparse, urlunparse
             import socket
             
             parsed_url = urlparse(DATABASE_URL)
             host = parsed_url.hostname
             logger.debug(f"Parsed hostname: {host}")
             
-            # DNS解決テスト用ソケット作成
-            
+            # DNS解決テスト
             try:
                 logger.debug("Testing DNS resolution...")
-                addr_info = socket.getaddrinfo(host, None)
-                logger.debug(f"DNS resolution successful. Address info: {addr_info}")
                 
-                # IPv4アドレスの取得を試行
-                ipv4_addrs = [addr[4][0] for addr in addr_info if addr[0] == socket.AF_INET]
-                if ipv4_addrs:
-                    logger.debug(f"Found IPv4 addresses: {ipv4_addrs}")
+                # IPv4のみの解決を試行
+                logger.debug("Attempting IPv4-only resolution...")
+                addr_info_v4 = socket.getaddrinfo(
+                    host,
+                    parsed_url.port or 5432,
+                    socket.AF_INET,
+                    socket.SOCK_STREAM,
+                    0,
+                    socket.AI_ADDRCONFIG
+                )
+                logger.debug(f"IPv4 resolution result: {addr_info_v4}")
+                
+                if addr_info_v4:
+                    ipv4_addr = addr_info_v4[0][4][0]
+                    logger.debug(f"Selected IPv4 address: {ipv4_addr}")
+                    
+                    # 接続テスト
+                    logger.debug(f"Testing connection to {ipv4_addr}:5432")
+                    test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    test_socket.settimeout(5)
+                    
+                    try:
+                        test_socket.connect((ipv4_addr, 5432))
+                        logger.debug("Socket connection test successful")
+                        
+                        # URLを更新
+                        new_netloc = f"{parsed_url.username}:{parsed_url.password}@{ipv4_addr}:{parsed_url.port or 5432}"
+                        DATABASE_URL = urlunparse((
+                            parsed_url.scheme,
+                            new_netloc,
+                            parsed_url.path,
+                            parsed_url.params,
+                            parsed_url.query,
+                            parsed_url.fragment
+                        ))
+                        logger.debug(f"Updated DATABASE_URL with IPv4: {DATABASE_URL}")
+                        
+                    except Exception as e:
+                        logger.error(f"Socket connection test failed: {e}", exc_info=True)
+                    finally:
+                        test_socket.close()
                 else:
                     logger.warning("No IPv4 addresses found")
                     
@@ -71,8 +104,9 @@ class Config:
         "pool_size": 1,  # 最小限のプールサイズ
         "max_overflow": 0,  # オーバーフローなし
         "connect_args": {
-            "sslmode": "require",
-            "connect_timeout": 30
+            "sslmode": "disable",
+            "connect_timeout": 30,
+            "application_name": "quiz_app"
         }
     }
     
