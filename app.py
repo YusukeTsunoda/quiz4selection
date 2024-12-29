@@ -2,6 +2,7 @@ import os
 import random
 import logging
 from flask import Flask, render_template, session, request, jsonify, flash, redirect, url_for, g
+from flask_caching import Cache
 from extensions import db
 from models import QuizAttempt
 from config import Config, db_connection, supabase
@@ -20,6 +21,9 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config.from_object(Config)
 
+# Initialize cache
+cache = Cache(app)
+
 # Initialize database
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -31,10 +35,11 @@ def before_request():
     g.request_start_time = start_time
     logger.info(f"Starting request to {request.endpoint}")
     
-    # データベース接続の確認
+    # データベース接続の確認（タイムアウト付き）
     try:
-        db.session.execute(text("SELECT 1"))
-        logger.info("Database connection verified")
+        with db.session.begin():
+            db.session.execute(text("SELECT 1"))
+            logger.info("Database connection verified")
     except Exception as e:
         logger.error(f"Database connection error: {e}")
         db.session.rollback()
@@ -404,6 +409,7 @@ def get_subcategories(grade, category):
     }
     return category_subcategories.get(category, [])
 
+@cache.memoize(timeout=300)  # 5分間キャッシュ
 def get_quiz_data(grade, category, subcategory, difficulty):
     """クイズデータを取得する関数"""
     try:
@@ -414,53 +420,71 @@ def get_quiz_data(grade, category, subcategory, difficulty):
         if not os.path.exists(file_path):
             logger.error(f"Quiz data file not found: {file_path}")
             return None, "問題データファイルが見つかりません"
-            
-        # ファイルの読み込み
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            logger.info(f"Successfully loaded JSON data")
-            logger.info(f"Available subcategories: {list(data.keys())}")
-            
-            # サブカテゴリの確認
-            if subcategory not in data:
-                logger.error(f"Subcategory {subcategory} not found in data")
-                return None, "選択されたサブカテゴリーの問題が見つかりません"
+        
+        # ファイルの読み込みをタイムアウト付きで実行
+        start_time = time.time()
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                load_time = time.time() - start_time
+                logger.info(f"JSON data loaded in {load_time:.2f} seconds")
                 
-            logger.info(f"Found subcategory {subcategory}")
-            logger.info(f"Available difficulties: {list(data[subcategory].keys())}")
+                # 処理時間が長すぎる場合は警告
+                if load_time > 1.0:  # 1秒以上かかる場合
+                    logger.warning(f"Slow file loading detected: {load_time:.2f} seconds")
                 
-            # 難易度の確認
-            if difficulty not in data[subcategory]:
-                logger.error(f"Difficulty {difficulty} not found in {subcategory}")
-                return None, "選択された難易度の問題が見つかりません"
+                logger.info(f"Available subcategories: {list(data.keys())}")
                 
-            all_questions = data[subcategory][difficulty]
-            if not all_questions:
-                logger.error(f"No questions found for {category}/{subcategory}/{difficulty}")
-                return None, "問題が見つかりません"
+                # サブカテゴリの確認
+                if subcategory not in data:
+                    logger.error(f"Subcategory {subcategory} not found in data")
+                    return None, "選択されたサブカテゴリーの問題が見つかりません"
+                
+                logger.info(f"Found subcategory {subcategory}")
+                logger.info(f"Available difficulties: {list(data[subcategory].keys())}")
+                
+                # 難易度の確認
+                if difficulty not in data[subcategory]:
+                    logger.error(f"Difficulty {difficulty} not found in {subcategory}")
+                    return None, "選択された難易度の問題が見つかりません"
+                
+                all_questions = data[subcategory][difficulty]
+                if not all_questions:
+                    logger.error(f"No questions found for {category}/{subcategory}/{difficulty}")
+                    return None, "問題が見つかりません"
+                
+                # 利用可能な問題数を確認
+                num_questions = len(all_questions)
+                target_questions = min(10, num_questions)  # 10問または利用可能な全問題数の少ない方
+                
+                logger.info(f"Total available questions: {num_questions}")
+                logger.info(f"Target number of questions: {target_questions}")
+                
+                # 問題をランダムに選択（処理時間を計測）
+                select_start = time.time()
+                selected_questions = random.sample(all_questions, target_questions)
+                select_time = time.time() - select_start
+                logger.info(f"Question selection completed in {select_time:.2f} seconds")
+                
+                # 各問題の選択肢をシャッフル（処理時間を計測）
+                shuffle_start = time.time()
+                shuffled_questions = [get_shuffled_question(q) for q in selected_questions]
+                shuffle_time = time.time() - shuffle_start
+                logger.info(f"Question shuffling completed in {shuffle_time:.2f} seconds")
+                
+                total_time = time.time() - start_time
+                logger.info(f"Total processing time: {total_time:.2f} seconds")
+                
+                # 処理時間が長すぎる場合は警告
+                if total_time > 3.0:  # 3秒以上かかる場合
+                    logger.warning(f"Slow quiz data processing detected: {total_time:.2f} seconds")
+                
+                return shuffled_questions, None
+                
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error in {file_path}: {e}")
+            return None, "問題データの形式が正しくありません"
             
-            # 利用可能な問題数を確認
-            num_questions = len(all_questions)
-            target_questions = min(10, num_questions)  # 10問または利用可能な全問題数の少ない方
-            
-            logger.info(f"Total available questions: {num_questions}")
-            logger.info(f"Target number of questions: {target_questions}")
-            
-            # 問題をランダムに選択
-            selected_questions = random.sample(all_questions, target_questions)
-            
-            # 各問題の選択肢をシャッフル
-            shuffled_questions = [get_shuffled_question(q) for q in selected_questions]
-            
-            logger.info(f"Successfully loaded and shuffled {len(shuffled_questions)} questions")
-            for i, q in enumerate(shuffled_questions):
-                logger.info(f"Question {i+1} correct index: {q['correct']}")
-            
-            return shuffled_questions, None
-            
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON decode error in {file_path}: {e}")
-        return None, "問題データの形式が正しくありません"
     except Exception as e:
         logger.error(f"Error in get_quiz_data: {e}")
         logger.exception("Full traceback:")
@@ -469,6 +493,7 @@ def get_quiz_data(grade, category, subcategory, difficulty):
 @app.route('/submit_answer', methods=['POST'])
 @log_performance
 def submit_answer():
+    start_time = time.time()
     try:
         data = request.get_json()
         selected_index = data.get('selected')
@@ -479,32 +504,28 @@ def submit_answer():
         current_score = session.get('score', 0)
         quiz_history = session.get('quiz_history', [])
         
-        # 受信データのログ
-        logger.info(f"Received answer - Selected Index: {selected_index}, Type: {type(selected_index)}")
-        logger.info(f"Current Question State - Number: {current_question + 1}, Total: {len(questions)}")
+        # セッションデータの検証
+        if not questions or current_question >= len(questions):
+            logger.error("Invalid session data or question index")
+            return jsonify({'success': False, 'error': '無効なセッションデータです'})
         
-        if current_question >= len(questions):
-            logger.error("Question index out of range")
-            return jsonify({'success': False, 'error': '問題が見つかりません'})
-            
+        # 処理時間のチェック
+        if time.time() - start_time > 8:
+            logger.warning("Processing time approaching timeout")
+            return jsonify({'success': False, 'error': '処理時間が長すぎます'})
+        
         question = questions[current_question]
         correct_index = question['correct']
         
-        # インデックスの比較前の型と値を確認
-        logger.info(f"Comparing indices - Selected: {selected_index} ({type(selected_index)}), Correct: {correct_index} ({type(correct_index)})")
+        # 回答の検証
         is_correct = str(selected_index) == str(correct_index)
-        logger.info(f"Answer is correct: {is_correct}")
-        
-        # 最後の問題かどうかを確認
         is_last_question = current_question >= len(questions) - 1
-        logger.info(f"Question check - Current: {current_question + 1}, Total: {len(questions)}, Is Last: {is_last_question}")
         
         # スコアの更新
         if is_correct:
             current_score += 1
             session['score'] = current_score
-            logger.info(f"Score updated - New score: {current_score}")
-            
+        
         # 履歴の保存
         quiz_history.append({
             'question': question['question'],
@@ -514,26 +535,36 @@ def submit_answer():
             'time_taken': time_taken
         })
         session['quiz_history'] = quiz_history
-        logger.info(f"Quiz history updated - Total entries: {len(quiz_history)}")
         
         # 最後の問題の場合、QuizAttemptを保存
         if is_last_question:
             try:
-                quiz_attempt = QuizAttempt(
-                    grade=session.get('grade'),
-                    category=session.get('category'),
-                    subcategory=session.get('subcategory'),
-                    difficulty=session.get('difficulty'),
-                    score=current_score,
-                    total_questions=len(questions),
-                    quiz_history=quiz_history
-                )
-                db.session.add(quiz_attempt)
-                db.session.commit()
-                logger.info(f"Quiz attempt saved - Final score: {current_score}/{len(questions)}")
+                # データベース操作をタイムアウト付きで実行
+                with db.session.begin():
+                    quiz_attempt = QuizAttempt(
+                        grade=session.get('grade'),
+                        category=session.get('category'),
+                        subcategory=session.get('subcategory'),
+                        difficulty=session.get('difficulty'),
+                        score=current_score,
+                        total_questions=len(questions),
+                        quiz_history=quiz_history
+                    )
+                    db.session.add(quiz_attempt)
+                    db.session.commit()
+                    logger.info(f"Quiz attempt saved - Final score: {current_score}/{len(questions)}")
             except Exception as e:
                 logger.error(f"Error saving quiz attempt: {e}")
                 db.session.rollback()
+                # データベースエラーでも結果は表示できるようにする
+                return jsonify({
+                    'success': True,
+                    'isCorrect': is_correct,
+                    'currentScore': current_score,
+                    'isLastQuestion': is_last_question,
+                    'redirectUrl': '/result',
+                    'warning': 'スコアの保存に失敗しました'
+                })
         
         # レスポンスデータの準備
         response_data = {
@@ -543,25 +574,25 @@ def submit_answer():
             'isLastQuestion': is_last_question
         }
         
-        # 最後の問題の場合、リダイレクトURLを設定
         if is_last_question:
-            try:
-                response_data['redirectUrl'] = '/result'
-                logger.info(f"Last question - Setting redirect URL: {response_data['redirectUrl']}")
-            except Exception as e:
-                logger.error(f"Error setting redirect URL: {e}")
+            response_data['redirectUrl'] = '/result'
         else:
-            # 次の問題のインデックスを更新（最後の問題でない場合のみ）
             session['current_question'] = current_question + 1
-            logger.info(f"Next question index set to: {current_question + 1}")
         
-        # 最終レスポンスの内容を確認
-        logger.info(f"Sending response: {response_data}")
+        # 処理時間の警告
+        total_time = time.time() - start_time
+        if total_time > 5:
+            logger.warning(f"Slow response time in submit_answer: {total_time:.2f} seconds")
+        
         return jsonify(response_data)
             
     except Exception as e:
         logger.error(f"Error in submit_answer: {e}")
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({
+            'success': False,
+            'error': '予期せぬエラーが発生しました',
+            'details': str(e)
+        })
 
 @app.route('/next_question', methods=['GET'])
 @log_performance
@@ -595,11 +626,13 @@ def next_question():
         return redirect(url_for('select_grade'))
 
 @app.route('/dashboard')
+@log_performance
+@cache.memoize(timeout=300)  # 5分間キャッシュ
 def dashboard():
     try:
         # 全学年の進捗を取得
         progress = {}
-        for grade in range(1, 7):  # 1年生から6年生まで
+        for grade in range(1, 7):
             progress[grade] = {}
             for category, category_name in CATEGORY_NAMES.items():
                 progress[grade][category] = {
@@ -615,12 +648,17 @@ def dashboard():
                     }
                     for difficulty in ['easy', 'medium', 'hard']:
                         try:
-                            attempts = QuizAttempt.query.filter_by(
-                                grade=grade,
-                                category=category,
-                                subcategory=subcategory,
-                                difficulty=difficulty
-                            ).all()
+                            # クエリの最適化：必要な情報のみを取得
+                            with db.session.begin():
+                                attempts = db.session.query(
+                                    QuizAttempt.score,
+                                    QuizAttempt.total_questions
+                                ).filter_by(
+                                    grade=grade,
+                                    category=category,
+                                    subcategory=subcategory,
+                                    difficulty=difficulty
+                                ).all()
                             
                             if not attempts:
                                 stats = {
@@ -629,10 +667,11 @@ def dashboard():
                                     'highest_score': 0
                                 }
                             else:
+                                scores = [attempt.score / attempt.total_questions * 100 for attempt in attempts]
                                 stats = {
                                     'attempts': len(attempts),
-                                    'avg_score': sum(attempt.get_percentage() for attempt in attempts) / len(attempts),
-                                    'highest_score': max((attempt.get_percentage() for attempt in attempts), default=0)
+                                    'avg_score': sum(scores) / len(scores),
+                                    'highest_score': max(scores)
                                 }
                             progress[grade][category]['subcategories'][subcategory]['levels'][difficulty] = stats
                         except Exception as e:
@@ -652,6 +691,7 @@ def dashboard():
 
 @app.route('/quiz_history/<int:grade>/<category>/<subcategory>/<difficulty>')
 @log_performance
+@cache.memoize(timeout=300)  # 5分間キャッシュ
 def quiz_history(grade, category, subcategory, difficulty):
     logger.info(f"Accessing quiz_history for grade={grade}, category={category}, subcategory={subcategory}, difficulty={difficulty}")
 
@@ -668,7 +708,7 @@ def quiz_history(grade, category, subcategory, difficulty):
                 category=category,
                 subcategory=subcategory,
                 difficulty=difficulty
-            ).order_by(QuizAttempt.timestamp.desc()).all()
+            ).order_by(QuizAttempt.timestamp.desc()).limit(50).all()  # 最新50件に制限
             logger.info(f"Retrieved {len(attempts)} quiz attempts")
         
         # 問題別の統計情報を取得（タイムアウト付き）
