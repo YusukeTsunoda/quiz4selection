@@ -102,3 +102,6 @@ class Config:
 
 # データベース接続のシングルトンインスタンスを作成
 db_connection = DatabaseConnection()
+
+# models.pyで使用するsupabaseクライアントを公開
+supabase = get_supabase_client()
