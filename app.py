@@ -601,9 +601,10 @@ def quiz_history(grade, category, subcategory, difficulty):
 
     db_host = None
     db_port = None
+    ipv4_addr = None
 
     if app.config['DATABASE_URL']:
-        from urllib.parse import urlparse
+        from urllib.parse import urlparse, urlunparse
         parsed_url = urlparse(app.config['DATABASE_URL'])
         db_host = parsed_url.hostname
         db_port = parsed_url.port or 5432
@@ -616,68 +617,68 @@ def quiz_history(grade, category, subcategory, difficulty):
     logger.debug(f"Testing connection to {db_host}:{db_port}")
     logger.debug(f"Attempting DNS resolution for host: {db_host}, port: {db_port}")
 
-    ipv4_addresses = []
+    # IPv4のみを使用してDNS解決を試行
     try:
-        logger.debug("Attempting IPv4 DNS resolution...")
-        addr_info_ipv4 = socket.getaddrinfo(db_host, db_port, socket.AF_INET, socket.SOCK_STREAM)
+        logger.debug("Attempting IPv4-only DNS resolution...")
+        addr_info_ipv4 = socket.getaddrinfo(
+            db_host,
+            db_port,
+            socket.AF_INET,  # IPv4のみを指定
+            socket.SOCK_STREAM,
+            0,
+            socket.AI_ADDRCONFIG | socket.AI_FAMILY
+        )
         logger.debug(f"IPv4 DNS resolution successful: {addr_info_ipv4}")
-        ipv4_addresses = [info[4][0] for info in addr_info_ipv4]
-        logger.debug(f"Resolved IPv4 Addresses: {ipv4_addresses}")
         
-        # IPv4アドレスの詳細を出力
-        for addr in addr_info_ipv4:
-            family, socktype, proto, canonname, sockaddr = addr
+        if addr_info_ipv4:
+            ipv4_addr = addr_info_ipv4[0][4][0]
+            logger.debug(f"Selected IPv4 address: {ipv4_addr}")
+            
+            # IPv4アドレスの詳細を出力
+            family, socktype, proto, canonname, sockaddr = addr_info_ipv4[0]
             logger.debug(f"IPv4 Address Details:")
             logger.debug(f"  Family: {family}")
             logger.debug(f"  Socket Type: {socktype}")
             logger.debug(f"  Protocol: {proto}")
             logger.debug(f"  Canonical Name: {canonname}")
             logger.debug(f"  Socket Address: {sockaddr}")
+            
+            # 接続URLをIPv4アドレスで更新
+            new_netloc = f"{parsed_url.username}:{parsed_url.password}@{ipv4_addr}:{db_port}"
+            ipv4_database_url = urlunparse((
+                parsed_url.scheme,
+                new_netloc,
+                parsed_url.path,
+                parsed_url.params,
+                parsed_url.query,
+                parsed_url.fragment
+            ))
+            logger.debug(f"Updated DATABASE_URL with IPv4 address (masked): ...@{ipv4_addr}:{db_port}{parsed_url.path}")
+            
+            # SQLAlchemy Engine の接続オプションを設定
+            engine_options = app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {}).copy()
+            engine_options['connect_args'] = engine_options.get('connect_args', {})
+            engine_options['connect_args'].update({
+                'sslmode': 'disable',
+                'connect_timeout': 30,
+                'application_name': 'quiz_app',
+                'host': ipv4_addr  # 明示的にIPv4アドレスを指定
+            })
+            
+            logger.debug(f"SQLAlchemy Engine Options: {engine_options}")
+            
+            # IPv4アドレスを使用して接続を試行
+            engine = create_engine(ipv4_database_url, **engine_options)
+            with engine.connect() as connection:
+                logger.info("Database connection test successful (SQLAlchemy with IPv4)")
+                connection.execute(text("SELECT 1"))
+        else:
+            logger.error("No IPv4 addresses found")
+            return "No IPv4 addresses found for database host", 500
+            
     except socket.gaierror as e:
         logger.error(f"IPv4 DNS resolution failed: {e}", exc_info=True)
-
-    ipv6_addresses = []
-    try:
-        logger.debug("Attempting IPv6 DNS resolution...")
-        addr_info_ipv6 = socket.getaddrinfo(db_host, db_port, socket.AF_INET6, socket.SOCK_STREAM)
-        logger.debug(f"IPv6 DNS resolution successful: {addr_info_ipv6}")
-        ipv6_addresses = [info[4][0] for info in addr_info_ipv6]
-        logger.debug(f"Resolved IPv6 Addresses: {ipv6_addresses}")
-        
-        # IPv6アドレスの詳細を出力
-        for addr in addr_info_ipv6:
-            family, socktype, proto, canonname, sockaddr = addr
-            logger.debug(f"IPv6 Address Details:")
-            logger.debug(f"  Family: {family}")
-            logger.debug(f"  Socket Type: {socktype}")
-            logger.debug(f"  Protocol: {proto}")
-            logger.debug(f"  Canonical Name: {canonname}")
-            logger.debug(f"  Socket Address: {sockaddr}")
-    except socket.gaierror as e:
-        logger.error(f"IPv6 DNS resolution failed: {e}", exc_info=True)
-
-    logger.info("DNS Resolution Summary:")
-    logger.info(f"  IPv4 Resolution: {'Success' if ipv4_addresses else 'Failed'}")
-    logger.info(f"  IPv6 Resolution: {'Success' if ipv6_addresses else 'Failed'}")
-
-    if not ipv4_addresses and not ipv6_addresses:
-        logger.error("Both IPv4 and IPv6 DNS resolution failed")
-        return "DNS resolution failed for database host", 500
-
-    try:
-        # SQLAlchemy Engine の接続オプションを確認
-        engine_options = app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {})
-        logger.debug(f"SQLAlchemy Engine Options: {engine_options}")
-
-        # 接続文字列をログ出力 (機密情報はマスク)
-        db_url_masked = app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1] if '@' in app.config['SQLALCHEMY_DATABASE_URI'] else app.config['SQLALCHEMY_DATABASE_URI']
-        logger.debug(f"Attempting database connection with URI (masked): ...@{db_url_masked}")
-
-        # SQLAlchemy Engineを使用した接続テスト
-        engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'], **app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {}))
-        with engine.connect() as connection:
-            logger.info("Database connection test successful (SQLAlchemy)")
-            connection.execute(text("SELECT 1"))
+        return "DNS resolution failed", 500
     except Exception as e:
         logger.error(f"Database connection test failed: {e}", exc_info=True)
         return "Database connection failed", 500
