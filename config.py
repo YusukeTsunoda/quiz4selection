@@ -39,22 +39,34 @@ class Config:
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # データベース接続オプション
+    # データベース接続オプションの最適化
     SQLALCHEMY_ENGINE_OPTIONS = {
-        "pool_size": 1,
-        "max_overflow": 0,
+        "pool_size": 5,  # コネクションプールサイズを増やす
+        "max_overflow": 10,  # 最大オーバーフロー接続数
+        "pool_timeout": 5,  # プール接続のタイムアウト（秒）
+        "pool_recycle": 1800,  # 30分でコネクションをリサイクル
+        "pool_pre_ping": True,  # 接続前の生存確認
         "connect_args": {
             "sslmode": "require",  # SSL接続は必須
-            "connect_timeout": 30,
-            "application_name": "quiz_app"
+            "connect_timeout": 5,  # 接続タイムアウトを5秒に設定
+            "application_name": "quiz_app",
+            "keepalives": 1,  # TCP keepaliveを有効化
+            "keepalives_idle": 30,  # アイドル30秒後にkeepalive開始
+            "keepalives_interval": 10,  # keepalive間隔10秒
+            "keepalives_count": 5  # 5回試行後に接続断と判断
         }
     }
 
-# Supabaseクライアントの初期化
-try:
-    logger.info("Initializing Supabase client...")
-    supabase: Client = create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY)
-    logger.info("Supabase client initialized successfully")
-except Exception as e:
-    logger.error(f"Error initializing Supabase client: {e}", exc_info=True)
-    supabase = None
+# Supabaseクライアントの初期化（遅延初期化）
+supabase = None
+
+def get_supabase_client():
+    global supabase
+    if supabase is None:
+        try:
+            logger.info("Initializing Supabase client...")
+            supabase = create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY)
+            logger.info("Supabase client initialized successfully")
+        except Exception as e:
+            logger.error(f"Error initializing Supabase client: {e}", exc_info=True)
+    return supabase
