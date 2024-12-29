@@ -60,11 +60,11 @@ class Config:
 
     # データベース接続オプション
     SQLALCHEMY_ENGINE_OPTIONS = {
-        "pool_size": 1,
+        "pool_size": 5,
         "max_overflow": 0,
         "connect_args": {
             "sslmode": "require" if IS_PRODUCTION else "disable",
-            "connect_timeout": 10,  # タイムアウトを10秒に設定
+            "connect_timeout": 30,  # タイムアウトを10秒に設定
             "application_name": "quiz_app"
         },
         # コネクションプールの設定を追加
