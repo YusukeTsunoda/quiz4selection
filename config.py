@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 import logging
+import socket
 from supabase import create_client, Client
 
 # ロガーの設定
@@ -39,7 +40,8 @@ class Config:
             host = parsed_url.hostname
             logger.debug(f"Parsed hostname: {host}")
             
-            # DNS解決テスト
+            # DNS解決テスト用ソケット作成
+            
             try:
                 logger.debug("Testing DNS resolution...")
                 addr_info = socket.getaddrinfo(host, None)
