@@ -14,6 +14,17 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
+class DatabaseConnection:
+    """データベース接続を管理するクラス"""
+    def __init__(self):
+        self._client = None
+
+    @property
+    def client(self):
+        if self._client is None:
+            self._client = get_supabase_client()
+        return self._client
+
 class Config:
     # 環境変数の読み込みを先に行う
     IS_PRODUCTION = os.getenv('VERCEL_ENV') == 'production'
@@ -87,5 +98,9 @@ logger.info(f"Pool settings - Size: {Config.SQLALCHEMY_ENGINE_OPTIONS['pool_size
            f"Timeout: {Config.SQLALCHEMY_ENGINE_OPTIONS['pool_timeout']}, "
            f"Recycle: {Config.SQLALCHEMY_ENGINE_OPTIONS['pool_recycle']}")
 
-# models.pyで使用するsupabaseクライアントを公開
+# データベース接続とSupabaseクライアントのインスタンスを作成
+db_connection = DatabaseConnection()
 supabase = get_supabase_client()
+
+# エクスポートする変数を明示的に定義
+__all__ = ['Config', 'db_connection', 'supabase']

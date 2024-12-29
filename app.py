@@ -4,7 +4,7 @@ import logging
 from flask import Flask, render_template, session, request, jsonify, flash, redirect, url_for, g
 from extensions import db
 from models import QuizAttempt
-from config import Config, db_connection
+from config import Config, db_connection, supabase
 from flask_migrate import Migrate
 import json
 from sqlalchemy import text, create_engine
