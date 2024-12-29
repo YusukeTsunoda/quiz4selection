@@ -347,56 +347,48 @@ def get_questions(grade, category, subcategory, difficulty):
         return []
 
 @app.route('/start_quiz/<int:grade>/<category>/<subcategory>/<difficulty>')
+@log_performance
 def start_quiz(grade, category, subcategory, difficulty):
     """クイズを開始する"""
     try:
-        # デバッグログを追加
-        logger.info(f"Starting quiz with parameters:")
-        logger.info(f"Grade: {grade}")
-        logger.info(f"Category: {category}")
-        logger.info(f"Subcategory: {subcategory}")
-        logger.info(f"Difficulty: {difficulty}")
-        
         # セッションをクリア
-        session.clear()
-        logger.info("Session cleared")
-        
-        # 問題を取得
-        questions = get_questions(grade, category, subcategory, difficulty)
-        logger.info(f"Retrieved {len(questions) if questions else 0} questions")
-        
-        if not questions:
-            logger.error("No questions retrieved")
-            flash('問題の取得に失敗しました。', 'error')
-            return redirect(url_for('select_difficulty', grade=grade, category=category, subcategory=subcategory))
-            
-        logger.info(f"Starting quiz with {len(questions)} questions")
-        logger.info(f"Question categories: {category}, {subcategory}, {difficulty}")
-            
-        # セッションに情報を保存
-        session['questions'] = questions
         session['current_question'] = 0
         session['score'] = 0
         session['quiz_history'] = []
+        
+        # 選択された情報をセッションに保存
         session['grade'] = grade
         session['category'] = category
         session['subcategory'] = subcategory
         session['difficulty'] = difficulty
-        logger.info("Session data saved")
+        
+        # 問題データを取得
+        questions, error = get_quiz_data(grade, category, subcategory, difficulty)
+        
+        if error or not questions:
+            logger.error(f"Error getting quiz data: {error}")
+            flash(error or '問題の取得に失敗しました', 'error')
+            return redirect(url_for('select_difficulty'))
+            
+        # 問題をセッションに保存
+        session['questions'] = questions
         
         # 最初の問題を表示
-        logger.info("Rendering first question")
-        return render_template('quiz.html',
-                            question=questions[0],
-                            question_number=1,
-                            total_questions=len(questions),
-                            correct_answers=0)
+        current_question = 0
+        question_data = questions[current_question]
         
+        return render_template('quiz.html',
+                             question=question_data['question'],
+                             options=question_data['options'],
+                             current_question=current_question,
+                             total_questions=len(questions),
+                             question_data=question_data)
+                             
     except Exception as e:
         logger.error(f"Error in start_quiz: {e}")
         logger.exception("Full traceback:")
-        flash('クイズの開始中にエラーが発生しました。', 'error')
-        return redirect(url_for('select_difficulty', grade=grade, category=category, subcategory=subcategory))
+        flash('クイズの開始に失敗しました', 'error')
+        return redirect(url_for('select_difficulty'))
 
 def get_subcategories(grade, category):
     """定された学年とカテゴリのサブカテゴリを取得"""
@@ -602,6 +594,7 @@ def next_question():
         questions = session.get('questions', [])
         current_question = session.get('current_question', 0)
         quiz_history = session.get('quiz_history', [])
+        score = session.get('score', 0)
         
         logger.info(f"Current question index: {current_question}")
         logger.info(f"Total questions: {len(questions)}")
@@ -613,12 +606,16 @@ def next_question():
             return redirect(url_for('result'))
         
         # 現在の問題を表示
+        question_data = questions[current_question]
         logger.info(f"Showing question {current_question + 1}")
+        
         return render_template('quiz.html',
-                            question=questions[current_question],
-                            question_number=current_question + 1,
+                            question=question_data['question'],
+                            options=question_data['options'],
+                            current_question=current_question,
                             total_questions=len(questions),
-                            correct_answers=session.get('score', 0))
+                            score=score,
+                            question_data=question_data)
                             
     except Exception as e:
         logger.error(f"Error in next_question route: {e}")
