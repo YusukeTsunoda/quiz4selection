@@ -601,7 +601,6 @@ def quiz_history(grade, category, subcategory, difficulty):
 
     db_host = None
     db_port = None
-    ipv4_addr = None
 
     if app.config['DATABASE_URL']:
         from urllib.parse import urlparse, urlunparse
@@ -617,65 +616,68 @@ def quiz_history(grade, category, subcategory, difficulty):
     logger.debug(f"Testing connection to {db_host}:{db_port}")
     logger.debug(f"Attempting DNS resolution for host: {db_host}, port: {db_port}")
 
-    # IPv4のみを使用してDNS解決を試行
+    ipv4_addresses = []
     try:
-        logger.debug("Attempting IPv4-only DNS resolution...")
+        logger.debug("Attempting IPv4 DNS resolution...")
+        # IPv4のみを使用してDNS解決を試行
         addr_info_ipv4 = socket.getaddrinfo(
             db_host,
             db_port,
             socket.AF_INET,  # IPv4のみを指定
             socket.SOCK_STREAM,
-            0,
-            socket.AI_ADDRCONFIG | socket.AI_FAMILY
+            0
         )
         logger.debug(f"IPv4 DNS resolution successful: {addr_info_ipv4}")
-        
-        if addr_info_ipv4:
-            ipv4_addr = addr_info_ipv4[0][4][0]
-            logger.debug(f"Selected IPv4 address: {ipv4_addr}")
-            
-            # IPv4アドレスの詳細を出力
-            family, socktype, proto, canonname, sockaddr = addr_info_ipv4[0]
-            logger.debug(f"IPv4 Address Details:")
-            logger.debug(f"  Family: {family}")
-            logger.debug(f"  Socket Type: {socktype}")
-            logger.debug(f"  Protocol: {proto}")
-            logger.debug(f"  Canonical Name: {canonname}")
-            logger.debug(f"  Socket Address: {sockaddr}")
-            
-            # 接続URLをIPv4アドレスで更新
-            new_netloc = f"{parsed_url.username}:{parsed_url.password}@{ipv4_addr}:{db_port}"
-            ipv4_database_url = urlunparse((
-                parsed_url.scheme,
-                new_netloc,
-                parsed_url.path,
-                parsed_url.params,
-                parsed_url.query,
-                parsed_url.fragment
-            ))
-            logger.debug(f"Updated DATABASE_URL with IPv4 address (masked): ...@{ipv4_addr}:{db_port}{parsed_url.path}")
-            
-            # SQLAlchemy Engine の接続オプションを設定
-            engine_options = app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {}).copy()
-            engine_options['connect_args'] = engine_options.get('connect_args', {})
-            engine_options['connect_args'].update({
-                'sslmode': 'disable',
-                'connect_timeout': 30,
-                'application_name': 'quiz_app',
-                'host': ipv4_addr  # 明示的にIPv4アドレスを指定
-            })
-            
-            logger.debug(f"SQLAlchemy Engine Options: {engine_options}")
-            
-            # IPv4アドレスを使用して接続を試行
-            engine = create_engine(ipv4_database_url, **engine_options)
-            with engine.connect() as connection:
-                logger.info("Database connection test successful (SQLAlchemy with IPv4)")
-                connection.execute(text("SELECT 1"))
-        else:
+        ipv4_addresses = [info[4][0] for info in addr_info_ipv4]
+        logger.debug(f"Resolved IPv4 Addresses: {ipv4_addresses}")
+
+        if not ipv4_addresses:
             logger.error("No IPv4 addresses found")
             return "No IPv4 addresses found for database host", 500
-            
+
+        # 最初のIPv4アドレスを使用
+        ipv4_addr = ipv4_addresses[0]
+        logger.debug(f"Selected IPv4 address: {ipv4_addr}")
+
+        # IPv4アドレスの詳細を出力
+        family, socktype, proto, canonname, sockaddr = addr_info_ipv4[0]
+        logger.debug(f"IPv4 Address Details:")
+        logger.debug(f"  Family: {family}")
+        logger.debug(f"  Socket Type: {socktype}")
+        logger.debug(f"  Protocol: {proto}")
+        logger.debug(f"  Canonical Name: {canonname}")
+        logger.debug(f"  Socket Address: {sockaddr}")
+
+        # 接続URLをIPv4アドレスで更新
+        new_netloc = f"{parsed_url.username}:{parsed_url.password}@{ipv4_addr}:{db_port}"
+        ipv4_database_url = urlunparse((
+            parsed_url.scheme,
+            new_netloc,
+            parsed_url.path,
+            parsed_url.params,
+            parsed_url.query,
+            parsed_url.fragment
+        ))
+        logger.debug(f"Updated DATABASE_URL with IPv4 address (masked): ...@{ipv4_addr}:{db_port}{parsed_url.path}")
+
+        # SQLAlchemy Engine の接続オプションを設定
+        engine_options = app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {}).copy()
+        engine_options['connect_args'] = engine_options.get('connect_args', {})
+        engine_options['connect_args'].update({
+            'sslmode': 'disable',
+            'connect_timeout': 30,
+            'application_name': 'quiz_app',
+            'host': ipv4_addr  # 明示的にIPv4アドレスを指定
+        })
+
+        logger.debug(f"SQLAlchemy Engine Options: {engine_options}")
+
+        # IPv4アドレスを使用して接続を試行
+        engine = create_engine(ipv4_database_url, **engine_options)
+        with engine.connect() as connection:
+            logger.info("Database connection test successful (SQLAlchemy with IPv4)")
+            connection.execute(text("SELECT 1"))
+
     except socket.gaierror as e:
         logger.error(f"IPv4 DNS resolution failed: {e}", exc_info=True)
         return "DNS resolution failed", 500
