@@ -30,8 +30,32 @@ class Config:
         
         # URLの各コンポーネントを解析してログ
         try:
-            from urllib.parse import urlparse
+            from urllib.parse import urlparse, urlunparse
             parsed_url = urlparse(DATABASE_URL)
+            
+            # ホスト名からIPv4アドレスを取得
+            import socket
+            try:
+                host = parsed_url.hostname
+                logger.debug(f"Resolving hostname: {host}")
+                addr_info = socket.getaddrinfo(host, None, socket.AF_INET)
+                ipv4_addr = addr_info[0][4][0]
+                logger.debug(f"Resolved IPv4 address: {ipv4_addr}")
+                
+                # URLを再構築（IPv4アドレスを使用）
+                new_netloc = f"{parsed_url.username}:{parsed_url.password}@{ipv4_addr}:{parsed_url.port}"
+                DATABASE_URL = urlunparse((
+                    parsed_url.scheme,
+                    new_netloc,
+                    parsed_url.path,
+                    parsed_url.params,
+                    parsed_url.query,
+                    parsed_url.fragment
+                ))
+                logger.debug(f"Updated DATABASE_URL with IPv4: {DATABASE_URL}")
+            except Exception as e:
+                logger.error(f"Error resolving IPv4 address: {e}")
+            
             logger.debug(f"Parsed URL components:")
             logger.debug(f"  scheme: {parsed_url.scheme}")
             logger.debug(f"  username: {'present' if parsed_url.username else 'missing'}")
@@ -63,7 +87,8 @@ class Config:
             "keepalives_count": 5,
             "tcp_user_timeout": 30000,
             "options": "-c search_path=public -c statement_timeout=30000",
-            "application_name": "quiz_app"
+            "application_name": "quiz_app",
+            "host_name_type": "ip-address"  # IPアドレスを使用
         }
     }
     
