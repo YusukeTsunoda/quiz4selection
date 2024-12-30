@@ -532,3 +532,5 @@ app.py:
 
     supabase側への連携としてdatabase_urlはdb.XXXX.supabase.coとする
     XXXX.supabase.coとすると、IP4のみのアクセスとなり、SSL証明書のエラーが発生する
+
+    これでできるはず。
