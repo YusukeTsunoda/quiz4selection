@@ -19,7 +19,6 @@ import psutil
 import traceback
 
 # ロガーの設定
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize Flask app
