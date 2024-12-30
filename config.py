@@ -1,63 +1,113 @@
 import os
 from dotenv import load_dotenv
+from supabase import create_client
 import logging
-from supabase import create_client, Client
+import sys
+import json
 
 # ロガーの設定
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('config')
 
+# 環境変数の読み込み
 load_dotenv()
 
+# 環境変数の状態をログ出力
+logger.info(json.dumps({
+    'event': 'environment_check',
+    'vercel_env': os.environ.get('VERCEL_ENV', 'development'),
+    'database_url_set': bool(os.environ.get('DATABASE_URL')),
+    'local_database_url_set': bool(os.environ.get('LOCAL_DATABASE_URL')),
+    'supabase_url_set': bool(os.environ.get('SUPABASE_URL')),
+    'supabase_key_set': bool(os.environ.get('SUPABASE_KEY')),
+    'sqlalchemy_database_uri_set': bool(os.environ.get('SQLALCHEMY_DATABASE_URI'))
+}))
+
 class Config:
-    SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'your-secret-key')
-
-    # Supabase設定
-    SUPABASE_URL = os.getenv('SUPABASE_URL')
-    SUPABASE_KEY = os.getenv('SUPABASE_KEY')
-
-    # データベースURL (Supavisor)
-    DATABASE_URL = os.getenv('DATABASE_URL')
-    SUPAVISOR_URL = os.getenv('SUPAVISOR_URL')
-
-    # 本番環境（Vercel）かどうかを確認
-    IS_PRODUCTION = os.getenv('VERCEL_ENV') == 'production'
-
+    # 基本設定
+    SECRET_KEY = os.environ.get('FLASK_SECRET_KEY') or 'your-secret-key'
+    IS_PRODUCTION = os.environ.get('VERCEL_ENV') == 'production'
+    
     # データベース接続設定
-    if IS_PRODUCTION and SUPAVISOR_URL:
-        # 本番環境でSupavisorが設定されている場合はそちらを使用
-        SQLALCHEMY_DATABASE_URI = SUPAVISOR_URL
-        logger.info("Using Supavisor connection in production")
-    else:
-        # 開発環境または本番環境でもSupavisorが未設定の場合は通常のURLを使用
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    LOCAL_DATABASE_URL = os.environ.get('LOCAL_DATABASE_URL')
+    
+    # SQLAlchemy設定
+    if IS_PRODUCTION:
         SQLALCHEMY_DATABASE_URI = DATABASE_URL
         if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
             SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-        logger.info("Using development database connection")
-
+            logger.info('Converted postgres:// to postgresql:// in DATABASE_URL')
+    else:
+        SQLALCHEMY_DATABASE_URI = LOCAL_DATABASE_URL
+        logger.info('Using LOCAL_DATABASE_URL for development')
+    
+    # 環境変数の状態をログ出力
+    logger.info(json.dumps({
+        'event': 'database_config',
+        'is_production': IS_PRODUCTION,
+        'database_url': bool(DATABASE_URL),
+        'local_database_url': bool(LOCAL_DATABASE_URL),
+        'sqlalchemy_database_uri': bool(SQLALCHEMY_DATABASE_URI)
+    }))
+    
+    # データベースURIの状態をログ出力
+    logger.info(json.dumps({
+        'event': 'sqlalchemy_config',
+        'is_production': IS_PRODUCTION,
+        'database_uri_set': bool(SQLALCHEMY_DATABASE_URI)
+    }))
+    
+    if not SQLALCHEMY_DATABASE_URI:
+        error_msg = "Database URI is not set. Check your environment variables."
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+    
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-
-    # データベース接続オプション
     SQLALCHEMY_ENGINE_OPTIONS = {
-        "pool_size": 1,
-        "max_overflow": 0,
-        "connect_args": {
-            "sslmode": "require" if IS_PRODUCTION else "disable",  # 本番環境のみSSLを有効化
-            "connect_timeout": 30,
-            "application_name": "quiz_app"
+        'pool_size': 1,
+        'pool_timeout': 30,
+        'pool_recycle': 1800,
+        'pool_pre_ping': True,
+        'connect_args': {
+            'connect_timeout': 30,
+            'application_name': 'quiz_app',
+            'keepalives': 1,
+            'keepalives_idle': 30,
+            'keepalives_interval': 10,
+            'keepalives_count': 5,
+            'sslmode': 'prefer'
         }
     }
+    
+    # Supabase設定
+    SUPABASE_URL = os.environ.get('SUPABASE_URL')
+    SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
 
-    logger.info(f"SSL mode: {'enabled' if IS_PRODUCTION else 'disabled'}")
+    @staticmethod
+    def init_app(app):
+        pass
 
 # Supabaseクライアントの初期化
-try:
-    logger.info("Initializing Supabase client...")
-    supabase: Client = create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY)
-    logger.info("Supabase client initialized successfully")
-except Exception as e:
-    logger.error(f"Error initializing Supabase client: {e}", exc_info=True)
-    supabase = None
+def init_supabase():
+    try:
+        return create_client(
+            supabase_url=Config.SUPABASE_URL,
+            supabase_key=Config.SUPABASE_KEY
+        )
+    except Exception as e:
+        logger.error(f"Failed to initialize Supabase client: {e}")
+        return None
+
+# グローバルインスタンスの作成
+supabase = init_supabase()
+
+# データベース接続文字列の取得
+def get_db_connection():
+    return Config.SQLALCHEMY_DATABASE_URI
+
+db_connection = get_db_connection()

@@ -3,32 +3,28 @@
   <div class="progress mb-4">
     <div
       class="progress-fill"
-      style="width: {{ (question_number / total_questions) * 100 }}%"
+      style="width: {{ (current_question + 1) / total_questions * 100 }}%"
     ></div>
   </div>
 
   <div class="progress-info">
-    <span>問題 {{ question_number }}/{{ total_questions }}</span>
-    <span>正答数: {{ correct_answers }}問</span>
+    <span>問題 {{ current_question + 1 }}/{{ total_questions }}</span>
+    <span>正答数: {{ score }}問</span>
   </div>
 
   <div class="question-container">
-    <h2 class="question-text mb-4">{{ question.question }}</h2>
+    <h2 class="question-text mb-4">{{ question }}</h2>
 
-    <!-- ヒントボタンとヒント表示エリアを追加 -->
-    {% if question.hint %}
+    <!-- ヒントボタンと表示領域を追加 -->
     <div class="hint-container mb-4">
       <button id="hintButton" class="btn hint-button">
         <i class="fas fa-lightbulb"></i> ヒントを見る
       </button>
-      <div id="hintText" class="hint-text" style="display: none">
-        {{ question.hint }}
-      </div>
+      <div id="hintText" class="hint-text" style="display: none"></div>
     </div>
-    {% endif %}
 
-    <div class="options-container" data-correct="{{ question.correct }}">
-      {% for option in question.options %}
+    <div class="options-container" data-correct="{{ question_data.correct }}">
+      {% for option in options %}
       <div class="option mb-3 p-3 rounded" data-index="{{ loop.index0 }}">
         {{ option }}
       </div>
@@ -53,18 +49,27 @@
     let isAnswered = false;
     let isProcessing = false;
     const startTime = Date.now();
+    let questionData = {{ question_data | tojson | safe }};
 
     // ヒントボタンのイベントリスナー
     if (hintButton && hintText) {
       hintButton.addEventListener("click", function () {
-        if (hintText.style.display === "none") {
-          hintText.style.display = "block";
-          hintButton.innerHTML =
-            '<i class="fas fa-lightbulb"></i> ヒントを隠す';
+        const hint = questionData.hint;
+        if (hint) {
+          if (hintText.style.display === "none") {
+            hintText.textContent = hint;
+            hintText.style.display = "block";
+            hintButton.innerHTML = '<i class="fas fa-lightbulb"></i> ヒントを隠す';
+          } else {
+            hintText.style.display = "none";
+            hintButton.innerHTML = '<i class="fas fa-lightbulb"></i> ヒントを見る';
+          }
         } else {
-          hintText.style.display = "none";
-          hintButton.innerHTML =
-            '<i class="fas fa-lightbulb"></i> ヒントを見る';
+          hintText.textContent = 'このクイズにはヒントがありません。';
+          hintText.style.display = "block";
+          setTimeout(() => {
+            hintText.style.display = "none";
+          }, 3000);
         }
       });
     }
@@ -85,10 +90,6 @@
             const selectedIndex = this.dataset.index;
             const timeTaken = (Date.now() - startTime) / 1000;
 
-            // 回答処理とレスポンス確認のログ
-            console.log("Selected index:", selectedIndex);
-            console.log("Time taken:", timeTaken);
-
             const response = await fetch("/submit_answer", {
               method: "POST",
               headers: {
@@ -101,64 +102,41 @@
             });
 
             const result = await response.json();
-            console.log("Server response details:", {
-              success: result.success,
-              isCorrect: result.isCorrect,
-              currentScore: result.currentScore,
-              isLastQuestion: result.isLastQuestion,
-              redirectUrl: result.redirectUrl,
-            });
 
             if (result.success) {
               // 正解・不正解の表示
               const correctIndex = optionsContainer.dataset.correct;
-              console.log("Comparing indices:", {
-                selected: selectedIndex,
-                correct: correctIndex,
-                isCorrect: result.isCorrect,
-              });
-
               const selectedOption = this;
               const correctOption = options[correctIndex];
 
               // 正解/不正解のスタイル適用
               if (result.isCorrect) {
-                console.log("Marking as correct");
                 selectedOption.classList.add("correct");
               } else {
-                console.log("Marking as incorrect");
                 selectedOption.classList.add("incorrect");
                 correctOption.classList.add("correct");
               }
 
-              // スコア更新
-              const correctAnswersDisplay = document.querySelector(
-                ".progress-info span:last-child"
-              );
-              correctAnswersDisplay.textContent = `正答数: ${result.currentScore}問`;
-              console.log("Updated score display:", result.currentScore);
+              // 説明を表示
+              if (questionData.explanation) {
+                const explanationDiv = document.createElement('div');
+                explanationDiv.className = 'explanation alert alert-info mt-3';
+                explanationDiv.textContent = questionData.explanation;
+                optionsContainer.insertAdjacentElement('afterend', explanationDiv);
+              }
 
-              // 遷移処理の判断
-              console.log("Checking redirect conditions:", {
-                isLastQuestion: result.isLastQuestion,
-                hasRedirectUrl: !!result.redirectUrl,
-                redirectUrl: result.redirectUrl,
-              });
+              // ヒントボタンを無効化
+              if (hintButton) {
+                hintButton.disabled = true;
+              }
 
               // アニメーション表示のための遅延
-              await new Promise((resolve) => setTimeout(resolve, 800));
+              await new Promise((resolve) => setTimeout(resolve, 1500));
 
-              if (result.isLastQuestion && result.redirectUrl) {
-                console.log("Redirecting to result page:", result.redirectUrl);
+              if (result.isLastQuestion) {
                 window.location.href = result.redirectUrl;
-              } else if (!result.isLastQuestion) {
-                console.log("Moving to next question");
-                window.location.href = "/next_question";
               } else {
-                console.log("No redirect condition met - Debug info:", {
-                  isLastQuestion: result.isLastQuestion,
-                  redirectUrl: result.redirectUrl,
-                });
+                window.location.href = "/next_question";
               }
             } else {
               console.error("Error from server:", result.error);
@@ -170,7 +148,7 @@
           }
         },
         { once: true }
-      ); // イベントリスナーを1回だけ実行
+      );
     });
   });
 </script>
@@ -267,7 +245,7 @@
 
   .back-button-container {
     text-align: center;
-    margin-top: 40px; /* 選択肢との間隔を設定 */
+    margin-top: 40px;
   }
 
   .back-button {
@@ -293,15 +271,15 @@
     margin-right: 8px;
   }
 
-  /* ヒント関連のスタイルを追加 */
+  /* ヒント関連のスタイル */
   .hint-container {
     text-align: center;
     margin: 20px 0;
   }
 
   .hint-button {
-    background-color: #ffc107;
-    color: #000;
+    background-color: #17a2b8;
+    color: white;
     border: none;
     padding: 8px 20px;
     border-radius: 8px;
@@ -311,20 +289,29 @@
   }
 
   .hint-button:hover {
-    background-color: #ffb300;
+    background-color: #138496;
     transform: translateY(-2px);
   }
 
   .hint-text {
-    background-color: #fff3cd;
-    border: 1px solid #ffeeba;
-    color: #856404;
+    background-color: #cce5ff;
+    border: 1px solid #b8daff;
+    color: #004085;
     padding: 15px;
     border-radius: 8px;
     margin-top: 10px;
     font-size: 1rem;
     text-align: left;
     animation: fadeIn 0.3s ease;
+  }
+
+  .explanation {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #e2e3e5;
+    border: 1px solid #d6d8db;
+    border-radius: 8px;
+    color: #383d41;
   }
 
   @keyframes fadeIn {

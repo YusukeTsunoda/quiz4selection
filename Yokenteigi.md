@@ -529,6 +529,27 @@ app.py:
     ```
 
      ## 6. supabaseとvercelの連携
+DATABASE_URL:
 
-    supabase側への連携としてdatabase_urlはdb.XXXX.supabase.coとする
-    XXXX.supabase.coとすると、IP4のみのアクセスとなり、SSL証明書のエラーが発生する
+
+形式: postgresql://postgres:password@db.cujvnutaucgrhleclmpq.supabase.co:5432/postgres
+こちらはdb.をつける必要があります
+なぜなら、これは直接のデータベース接続文字列だからです
+
+
+SUPABASE_URL:
+
+
+形式: https://cujvnutaucgrhleclmpq.supabase.co
+こちらはdb.をつけません
+これはSupabaseのAPIエンドポイントを指定するためのURLだからです
+
+
+SQLALCHEMY_DATABASE_URI:
+
+
+形式: postgresql://postgres:password@db.cujvnutaucgrhleclmpq.supabase.co:5432/postgres
+こちらはdb.をつける必要があります
+SQLAlchemyは直接データベースに接続するので、DATABASE_URLと同じ形式を使用します
+
+    これでできるはず。
