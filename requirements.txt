@@ -5,6 +5,6 @@ python-dotenv==1.0.0
 psycopg2-binary==2.9.9
 flask-login==0.6.2
 Flask-SQLAlchemy==2.5.1
-SQLAlchemy==1.4.46
+SQLAlchemy==2.0.36
 Flask-Caching==2.3.0
 supabase
