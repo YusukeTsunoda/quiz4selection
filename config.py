@@ -92,6 +92,8 @@ class Config:
     def __init__(self):
         try:
             # データベースURLの設定
+            print(f"FLASK_ENV: {os.environ.get('FLASK_ENV')}")
+            print(f"VERCEL_ENV: {os.environ.get('VERCEL_ENV')}")
             if self.FLASK_ENV == 'development' or self.VERCEL_ENV == 'development':
                 logger.info("Using LOCAL_DATABASE_URL for development")
                 database_url = os.environ.get('LOCAL_DATABASE_URL')

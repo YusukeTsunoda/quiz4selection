@@ -9,7 +9,3 @@ SQLAlchemy==1.4.46
 flask-caching==2.0.2
 dnspython==2.7.0
 supabase==2.0.3
-httpx>=0.24.0,<0.26.0
-gotrue>=0.2.0
-websockets>=11.0,<13.0
-storage3>=0.6.1
