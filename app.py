@@ -378,56 +378,137 @@ def test_database_connection():
         logger.info("Starting database connection test...")
         start_time = time.time()
         
-        # DNS解決のテスト
-        db_host = app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1].split('/')[0].split(':')[0]
+        # 環境変数の確認
+        logger.info(json.dumps({
+            'event': 'environment_check',
+            'database_url': bool(os.environ.get('DATABASE_URL')),
+            'local_database_url': bool(os.environ.get('LOCAL_DATABASE_URL')),
+            'environment': os.environ.get('ENVIRONMENT', 'development'),
+            'sqlalchemy_database_uri': bool(app.config.get('SQLALCHEMY_DATABASE_URI')),
+            'timestamp': time.time()
+        }))
+
+        # データベースURIの解析
+        db_uri = app.config['SQLALCHEMY_DATABASE_URI']
         try:
+            # URIからホスト情報を抽出
+            uri_parts = db_uri.split('@')[1].split('/')
+            db_host = uri_parts[0].split(':')[0]
+            db_port = uri_parts[0].split(':')[1] if ':' in uri_parts[0] else '5432'
+            db_name = uri_parts[1].split('?')[0] if '?' in uri_parts[1] else uri_parts[1]
+            
+            logger.info(json.dumps({
+                'event': 'database_uri_parse',
+                'host': db_host,
+                'port': db_port,
+                'database': db_name,
+                'timestamp': time.time()
+            }))
+        except Exception as e:
+            logger.error(json.dumps({
+                'event': 'database_uri_parse_error',
+                'error': str(e),
+                'uri': db_uri.split('@')[1] if '@' in db_uri else 'invalid_uri',
+                'timestamp': time.time()
+            }))
+
+        # DNS解決のテスト（複数の方法で試行）
+        try:
+            # 方法1: socket.gethostbyname
             ip_address = socket.gethostbyname(db_host)
             logger.info(json.dumps({
-                'event': 'dns_resolution',
+                'event': 'dns_resolution_socket',
+                'method': 'gethostbyname',
                 'host': db_host,
                 'ip': ip_address,
                 'duration_ms': (time.time() - start_time) * 1000
+            }))
+            
+            # 方法2: socket.getaddrinfo
+            addr_info = socket.getaddrinfo(
+                db_host,
+                int(db_port),
+                socket.AF_UNSPEC,
+                socket.SOCK_STREAM
+            )
+            logger.info(json.dumps({
+                'event': 'dns_resolution_addrinfo',
+                'host': db_host,
+                'addresses': [{
+                    'family': 'IPv6' if addr[0] == socket.AF_INET6 else 'IPv4',
+                    'ip': addr[4][0],
+                    'port': addr[4][1]
+                } for addr in addr_info],
+                'timestamp': time.time()
             }))
         except socket.gaierror as e:
             logger.error(json.dumps({
                 'event': 'dns_resolution_error',
                 'host': db_host,
-                'error': str(e)
+                'error_code': e.errno,
+                'error_message': str(e),
+                'timestamp': time.time()
             }))
 
-        # TCP接続テスト
+        # TCP接続テスト（タイムアウト付き）
         try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(5)
-            start_connect = time.time()
-            sock.connect((db_host, 5432))
-            logger.info(json.dumps({
-                'event': 'tcp_connection',
-                'host': db_host,
-                'port': 5432,
-                'duration_ms': (time.time() - start_connect) * 1000
-            }))
-            sock.close()
-        except Exception as e:
+            for family, socktype, proto, canonname, sockaddr in socket.getaddrinfo(
+                db_host, int(db_port), socket.AF_UNSPEC, socket.SOCK_STREAM
+            ):
+                try:
+                    sock = socket.socket(family, socktype, proto)
+                    sock.settimeout(5)
+                    start_connect = time.time()
+                    sock.connect(sockaddr)
+                    logger.info(json.dumps({
+                        'event': 'tcp_connection_success',
+                        'host': db_host,
+                        'port': db_port,
+                        'ip': sockaddr[0],
+                        'family': 'IPv6' if family == socket.AF_INET6 else 'IPv4',
+                        'duration_ms': (time.time() - start_connect) * 1000,
+                        'timestamp': time.time()
+                    }))
+                    sock.close()
+                    break
+                except socket.error as e:
+                    logger.error(json.dumps({
+                        'event': 'tcp_connection_error',
+                        'host': db_host,
+                        'port': db_port,
+                        'ip': sockaddr[0],
+                        'family': 'IPv6' if family == socket.AF_INET6 else 'IPv4',
+                        'error_code': e.errno if hasattr(e, 'errno') else None,
+                        'error_message': str(e),
+                        'timestamp': time.time()
+                    }))
+        except socket.gaierror as e:
             logger.error(json.dumps({
-                'event': 'tcp_connection_error',
+                'event': 'tcp_connection_dns_error',
                 'host': db_host,
-                'port': 5432,
-                'error': str(e)
+                'port': db_port,
+                'error_code': e.errno,
+                'error_message': str(e),
+                'timestamp': time.time()
             }))
 
         # データベース接続テスト
         if check_db_connection():
             logger.info("Database connection test completed successfully")
+            return True
         else:
             logger.error("Database connection test failed")
+            return False
 
     except Exception as e:
         logger.error(json.dumps({
             'event': 'database_test_error',
-            'error': str(e),
-            'traceback': traceback.format_exc()
+            'error_type': type(e).__name__,
+            'error_message': str(e),
+            'traceback': traceback.format_exc(),
+            'timestamp': time.time()
         }))
+        return False
 
 # アプリケーションの初期化
 def init_app():
