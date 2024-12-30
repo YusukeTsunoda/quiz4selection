@@ -8,3 +8,4 @@ Flask-SQLAlchemy==3.1.1
 SQLAlchemy==2.0.36
 Flask-Caching==2.3.0
 supabase==2.10.0
+requests==2.32.3
