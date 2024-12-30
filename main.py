@@ -1,19 +1,26 @@
 import logging
-from app import app
+import sys
 import os
+from app import app, init_app
 
 if __name__ == "__main__":
-    # Configure logging
+    # ロギングの設定
     logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        stream=sys.stdout
     )
     logger = logging.getLogger(__name__)
-    
+
     try:
-        logger.info("Starting Flask application...")
+        # アプリケーションの初期化
+        with app.app_context():
+            init_app()
+            
+        # サーバーの起動
         port = int(os.environ.get('PORT', 5002))
-        app.run(host="0.0.0.0", port=port)
+        logger.info(f"Starting Flask application on port {port}...")
+        app.run(host="0.0.0.0", port=port, debug=True)
     except Exception as e:
         logger.error(f"Failed to start Flask application: {e}")
-        raise
+        sys.exit(1)

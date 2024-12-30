@@ -100,7 +100,8 @@ if os.environ.get('ENVIRONMENT') == 'production':
     if db_uri and db_uri.startswith('postgres://'):
         db_uri = db_uri.replace('postgres://', 'postgresql://', 1)
 else:
-    db_uri = os.environ.get('LOCAL_DATABASE_URL')
+    # ローカル開発環境用のデフォルト設定
+    db_uri = os.environ.get('LOCAL_DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/quiz_db')
 
 if not db_uri:
     raise ValueError("Database URI is not set")
@@ -119,17 +120,8 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'keepalives_idle': 30,
         'keepalives_interval': 10,
         'keepalives_count': 5,
-        'sslmode': 'require',
-        'ssl': True,
-        'ssl_min_protocol_version': 'TLSv1.2',
-        'options': '-c statement_timeout=5000',
-        'host_name': 'db.cujvnutaucgrhleclmpq.supabase.co',
-        'tcp_user_timeout': 10000,
-        'tcp_keepalives': 1,
-        'tcp_keepalive_time': 30,
-        'tcp_keepalive_intvl': 10,
-        'tcp_keepalive_cnt': 5,
-        'client_encoding': 'utf8'
+        'sslmode': 'prefer',  # 'require'から'prefer'に変更
+        'options': '-c statement_timeout=5000'
     }
 }
 
@@ -437,240 +429,46 @@ def test_database_connection():
             'traceback': traceback.format_exc()
         }))
 
-with app.app_context():
-    test_database_connection()
-    create_database_tables()
-
-# クイズデータの取得（キャッシュ付き）
-@cache.memoize(timeout=300)
-@log_performance
-def get_quiz_data(grade, category, subcategory, difficulty):
+# アプリケーションの初期化
+def init_app():
+    """アプリケーションの初期化処理"""
     try:
-        start_time = time.time()
-        request_id = str(uuid.uuid4())
+        # データベース接続テストを実行
+        if not test_database_connection():
+            logger.error("Database connection test failed during initialization")
+            if os.environ.get('ENVIRONMENT') != 'production':
+                # 開発環境では警告のみ
+                logger.warning("Continuing with application startup despite database connection failure")
+            else:
+                # 本番環境では起動を中止
+                raise RuntimeError("Database connection failed in production environment")
         
-        logger.info(json.dumps({
-            'event': 'quiz_data_fetch_start',
-            'request_id': request_id,
-            'grade': grade,
-            'category': category,
-            'subcategory': subcategory,
-            'difficulty': difficulty,
-            'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024,
-            'timestamp': start_time
-        }))
-        
-        # クイズデータの取得処理
-        data_fetch_start = time.time()
-        questions = questions_by_category.get(category, {}).get(str(grade), [])
-        data_fetch_end = time.time()
-        
-        logger.info(json.dumps({
-            'event': 'quiz_data_fetch_step',
-            'request_id': request_id,
-            'step': 'initial_data_fetch',
-            'duration_ms': (data_fetch_end - data_fetch_start) * 1000,
-            'questions_count': len(questions) if questions else 0,
-            'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024,
-            'timestamp': data_fetch_end
-        }))
-        
-        if not questions:
-            return None
-            
-        # 該当する問題をフィルタリング
-        filter_start = time.time()
-        filtered_questions = [q for q in questions if q.get('subcategory') == subcategory and q.get('difficulty') == difficulty]
-        filter_end = time.time()
-        
-        logger.info(json.dumps({
-            'event': 'quiz_data_fetch_step',
-            'request_id': request_id,
-            'step': 'filter_questions',
-            'duration_ms': (filter_end - filter_start) * 1000,
-            'filtered_count': len(filtered_questions),
-            'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024,
-            'timestamp': filter_end
-        }))
-        
-        if not filtered_questions:
-            return None
-
-        # 問題の統計情報を取得
-        stats_start = time.time()
-        question_stats = QuizAttempt.get_question_stats(grade, category, subcategory, difficulty)
-        stats_end = time.time()
-        
-        logger.info(json.dumps({
-            'event': 'quiz_data_fetch_step',
-            'request_id': request_id,
-            'step': 'get_question_stats',
-            'duration_ms': (stats_end - stats_start) * 1000,
-            'stats_count': len(question_stats),
-            'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024,
-            'timestamp': stats_end
-        }))
-        
-        # 問題を優先順位付けしてソート
-        sort_start = time.time()
-        prioritized = sorted(filtered_questions, 
-            key=lambda q: (
-                question_stats.get(q['question'], {'total': 0})['total'] > 0,
-                question_stats.get(q['question'], {'percentage': 100})['percentage'],
-                question_stats.get(q['question'], {'total': 0})['total']
-            )
-        )
-        selected_questions = prioritized[:10]
-        sort_end = time.time()
-        
-        logger.info(json.dumps({
-            'event': 'quiz_data_fetch_step',
-            'request_id': request_id,
-            'step': 'prioritize_and_select',
-            'duration_ms': (sort_end - sort_start) * 1000,
-            'selected_count': len(selected_questions),
-            'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024,
-            'timestamp': sort_end
-        }))
-        
-        # 選択肢のシャッフル
-        shuffle_start = time.time()
-        shuffled_questions = []
-        for q in selected_questions:
-            shuffled = q.copy()
-            options = [shuffled['correct_answer']] + shuffled['incorrect_answers']
-            random.shuffle(options)
-            shuffled['options'] = options
-            shuffled['correct_index'] = options.index(shuffled['correct_answer'])
-            shuffled_questions.append(shuffled)
-        shuffle_end = time.time()
-        
-        logger.info(json.dumps({
-            'event': 'quiz_data_fetch_step',
-            'request_id': request_id,
-            'step': 'shuffle_options',
-            'duration_ms': (shuffle_end - shuffle_start) * 1000,
-            'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024,
-            'timestamp': shuffle_end
-        }))
-        
-        end_time = time.time()
-        total_duration_ms = (end_time - start_time) * 1000
-        
-        logger.info(json.dumps({
-            'event': 'quiz_data_fetch_complete',
-            'request_id': request_id,
-            'grade': grade,
-            'category': category,
-            'subcategory': subcategory,
-            'difficulty': difficulty,
-            'num_questions': len(shuffled_questions),
-            'total_duration_ms': total_duration_ms,
-            'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024,
-            'timestamp': end_time
-        }))
-        
-        return shuffled_questions
+        # データベーステーブルの作成
+        if not create_database_tables():
+            logger.error("Failed to create database tables")
+            if os.environ.get('ENVIRONMENT') != 'production':
+                logger.warning("Continuing with application startup despite table creation failure")
+            else:
+                raise RuntimeError("Database table creation failed in production environment")
+                
+        logger.info("Application initialization completed successfully")
         
     except Exception as e:
-        error_time = time.time()
-        logger.error(json.dumps({
-            'event': 'quiz_data_fetch_error',
-            'request_id': request_id,
-            'grade': grade,
-            'category': category,
-            'subcategory': subcategory,
-            'difficulty': difficulty,
-            'error': str(e),
-            'error_type': type(e).__name__,
-            'stack_trace': traceback.format_exc(),
-            'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024,
-            'timestamp': error_time
-        }))
-        return None
+        logger.error(f"Application initialization failed: {e}")
+        if os.environ.get('ENVIRONMENT') == 'production':
+            raise
+        else:
+            logger.warning("Continuing with application startup despite initialization failure")
 
-@app.route('/')
-@cache.cached(timeout=300)
-def index():
-    return render_template('index.html')
-
-@app.route('/grade/<int:grade>/category/<category>/subcategory/<subcategory>/difficulty/<difficulty>')
-@log_performance
-def quiz_with_params(grade, category, subcategory, difficulty):
+# 直接実行時の処理
+if __name__ == '__main__':
+    # アプリケーションコンテキスト内での初期化
+    with app.app_context():
+        init_app()
+        
     try:
-        start_time = time.time()
-        request_id = str(uuid.uuid4())
-        
-        print(json.dumps({
-            'event': 'quiz_request_start',
-            'request_id': request_id,
-            'grade': grade,
-            'category': category,
-            'subcategory': subcategory,
-            'difficulty': difficulty,
-            'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024,
-            'timestamp': start_time
-        }))
-        
-        # クイズデータの取得（キャッシュ利用）
-        quiz_data = get_quiz_data(grade, category, subcategory, difficulty)
-        fetch_time = time.time()
-        
-        if quiz_data is None:
-            print(json.dumps({
-                'event': 'quiz_not_found',
-                'request_id': request_id,
-                'grade': grade,
-                'category': category,
-                'subcategory': subcategory,
-                'difficulty': difficulty,
-                'timestamp': time.time()
-            }))
-            return "Quiz not found", 404
-        
-        # テンプレートのレンダリング
-        render_start = time.time()
-        response = render_template('quiz.html',
-                                 quiz_data=quiz_data,
-                                 grade=grade,
-                                 category=category,
-                                 subcategory=subcategory,
-                                 difficulty=difficulty)
-        render_end = time.time()
-                                 
-        end_time = time.time()
-        total_duration_ms = (end_time - start_time) * 1000
-        
-        print(json.dumps({
-            'event': 'quiz_complete',
-            'request_id': request_id,
-            'grade': grade,
-            'category': category,
-            'subcategory': subcategory,
-            'difficulty': difficulty,
-            'fetch_duration_ms': (fetch_time - start_time) * 1000,
-            'render_duration_ms': (render_end - render_start) * 1000,
-            'total_duration_ms': total_duration_ms,
-            'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024,
-            'timestamp': end_time
-        }))
-        
-        return response
-        
+        port = int(os.environ.get('PORT', 5002))
+        app.run(host='0.0.0.0', port=port, debug=True)
     except Exception as e:
-        error_time = time.time()
-        print(json.dumps({
-            'event': 'quiz_error',
-            'request_id': request_id,
-            'grade': grade,
-            'category': category,
-            'subcategory': subcategory,
-            'difficulty': difficulty,
-            'error': str(e),
-            'error_type': type(e).__name__,
-            'stack_trace': traceback.format_exc(),
-            'duration_ms': (error_time - start_time) * 1000,
-            'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024,
-            'timestamp': error_time
-        }))
-        raise
+        logger.error(f"Failed to start application: {e}")
+        sys.exit(1)
