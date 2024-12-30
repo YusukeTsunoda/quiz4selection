@@ -3,6 +3,7 @@ import json
 import time
 import uuid
 import os
+import psutil
 
 def setup_logger(name, level=logging.INFO):
     """ロガーのセットアップ（標準出力のみ）"""
@@ -54,7 +55,7 @@ class NetworkLogger:
             'connection_id': connection_id,
             'host': host,
             'port': port,
-            'timestamp': time.time()
+            'timestamp': start_time
         }))
         
         return connection_id
@@ -104,23 +105,20 @@ network_logger = NetworkLogger()
 def log_system_metrics():
     """システムメトリクスのロギング"""
     try:
-        import psutil
-        
         metrics = {
             'event': 'system_metrics',
             'timestamp': time.time(),
             'metrics': {
                 'cpu': {
                     'percent': psutil.cpu_percent(interval=1),
-                    'count': psutil.cpu_count(),
-                    'freq': psutil.cpu_freq()._asdict() if psutil.cpu_freq() else None
+                    'count': psutil.cpu_count()
                 },
-                'memory': psutil.virtual_memory()._asdict(),
-                'disk': psutil.disk_usage('/')._asdict(),
-                'network': {
-                    'connections': len(psutil.net_connections()),
-                    'stats': {nic: stats._asdict() for nic, stats in psutil.net_if_stats().items()}
-                }
+                'memory': {
+                    'total': psutil.virtual_memory().total,
+                    'available': psutil.virtual_memory().available,
+                    'percent': psutil.virtual_memory().percent
+                },
+                'connections': len(psutil.net_connections())
             }
         }
         
@@ -129,6 +127,49 @@ def log_system_metrics():
     except Exception as e:
         system_logger.error(json.dumps({
             'event': 'system_metrics_error',
+            'error': str(e),
+            'timestamp': time.time()
+        }))
+
+def log_request_metrics(request_id, path, method, start_time):
+    """リクエストメトリクスのロギング"""
+    try:
+        duration = time.time() - start_time
+        metrics = {
+            'event': 'request_metrics',
+            'request_id': request_id,
+            'path': path,
+            'method': method,
+            'duration_ms': duration * 1000,
+            'timestamp': time.time()
+        }
+        
+        request_logger.info(json.dumps(metrics))
+        
+    except Exception as e:
+        request_logger.error(json.dumps({
+            'event': 'request_metrics_error',
+            'error': str(e),
+            'timestamp': time.time()
+        }))
+
+def log_database_metrics(query_id, query, start_time):
+    """データベースクエリメトリクスのロギング"""
+    try:
+        duration = time.time() - start_time
+        metrics = {
+            'event': 'database_metrics',
+            'query_id': query_id,
+            'query': query,
+            'duration_ms': duration * 1000,
+            'timestamp': time.time()
+        }
+        
+        db_logger.info(json.dumps(metrics))
+        
+    except Exception as e:
+        db_logger.error(json.dumps({
+            'event': 'database_metrics_error',
             'error': str(e),
             'timestamp': time.time()
         })) 

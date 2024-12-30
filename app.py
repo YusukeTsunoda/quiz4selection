@@ -12,8 +12,9 @@ from sqlalchemy import text, create_engine
 import socket
 import time
 from functools import wraps
-from utils.logging_utils import request_logger, db_logger, api_logger, system_logger, log_system_metrics
+from utils.logging_utils import request_logger, db_logger, api_logger, system_logger, log_system_metrics, network_logger
 import uuid
+from quiz_data import questions_by_category
 
 # ロガーの設定
 logging.basicConfig(level=logging.INFO)
@@ -23,356 +24,197 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# Initialize cache
-cache = Cache(app)
+# Initialize cache with larger timeout
+cache = Cache(app, config={
+    'CACHE_TYPE': 'simple',
+    'CACHE_DEFAULT_TIMEOUT': 300
+})
 
 # Initialize database
 db.init_app(app)
 migrate = Migrate(app, db)
 
-# リクエスト前のデータベース接続確認
+# リクエスト前のデータベース接続確認（キャッシュ付き）
+@cache.memoize(timeout=60)
+def check_db_connection():
+    try:
+        with db.session.begin():
+            db.session.execute(text("SELECT 1"))
+            return True
+    except Exception as e:
+        logger.error(f"Database connection error: {e}")
+        return False
+
 @app.before_request
 def before_request():
     start_time = time.time()
     g.request_start_time = start_time
-    logger.info(f"Starting request to {request.endpoint}")
     
-    # データベース接続の確認（タイムアウト付き）
-    try:
-        with db.session.begin():
-            db.session.execute(text("SELECT 1"))
-            logger.info("Database connection verified")
-    except Exception as e:
-        logger.error(f"Database connection error: {e}")
-        db.session.rollback()
+    # データベース接続の確認（キャッシュ利用）
+    if not check_db_connection():
         return "Database connection error", 500
+
+    # リクエストの開始をログ
+    request_logger.info(json.dumps({
+        'event': 'request_start',
+        'path': request.path,
+        'method': request.method,
+        'timestamp': start_time
+    }))
 
 # リクエスト後の処理
 @app.after_request
 def after_request(response):
     if hasattr(g, 'request_start_time'):
         total_time = time.time() - g.request_start_time
-        logger.info(f"Request to {request.endpoint} completed in {total_time:.2f} seconds")
         
-        # Vercelのタイムアウトに近づいている場合は警告
-        if total_time > 8:
-            logger.warning(f"Request time ({total_time:.2f}s) is approaching Vercel timeout")
+        # レスポンスのログ
+        request_logger.info(json.dumps({
+            'event': 'request_end',
+            'path': request.path,
+            'method': request.method,
+            'status_code': response.status_code,
+            'duration_ms': total_time * 1000,
+            'timestamp': time.time()
+        }))
+        
+        # 処理時間が長い場合は警告
+        if total_time > 5:
+            request_logger.warning(json.dumps({
+                'event': 'long_request_warning',
+                'path': request.path,
+                'method': request.method,
+                'duration_ms': total_time * 1000,
+                'timestamp': time.time()
+            }))
     
     return response
 
 # エラーハンドラー
 @app.errorhandler(504)
 def gateway_timeout(error):
-    logger.error(f"Gateway Timeout Error: {error}")
+    error_time = time.time()
+    request_logger.error(json.dumps({
+        'event': 'gateway_timeout',
+        'path': request.path,
+        'method': request.method,
+        'error': str(error),
+        'timestamp': error_time
+    }))
     return "Request timeout. Please try again.", 504
 
-# Create database tables
-with app.app_context():
+# データベーステーブルの作成（キャッシュ付き）
+@cache.memoize(timeout=3600)
+def create_database_tables():
     try:
         db.create_all()
         logger.info("Database tables created successfully")
+        return True
     except Exception as e:
         logger.error(f"Error creating database tables: {e}")
+        return False
 
-from quiz_data import questions_by_category
+with app.app_context():
+    create_database_tables()
 
-# カテゴリ名の日本語マッピング
-CATEGORY_NAMES = {
-    'japanese': '国語',
-    'math': '算数',
-    'science': '理科',
-    'society': '社会'
-}
-
-# サブカテゴリ名の日本語マッピング
-SUBCATEGORY_NAMES = {
-    # 国語
-    'kanji': '漢字',
-    'reading': '読解',
-    'grammar': '文法',
-    'writing': '作文',
-    # 算数
-    'calculation': '計算',
-    'figure': '図形',
-    'measurement': '測定',
-    'graph': 'グラフ',
-    # 理科
-    'physics': '物理',
-    'chemistry': '化学',
-    'biology': '生物',
-    'earth_science': '地学',
-    # 社会
-    'history': '歴史',
-    'geography': '地理',
-    'civics': '公民',
-    'current_events': '時事',
-    'prefectures': '都道府県'
-}
-
-# パフォーマンス計測用デコレータ
-def log_performance(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        request_id = str(uuid.uuid4())
-        start_time = time.time()
-        
-        # リクエスト開始時のシステムメトリクスを記録
-        log_system_metrics()
-        
-        # リクエストのロギング
-        request_logger.info(json.dumps({
-            'event': 'request_start',
-            'request_id': request_id,
-            'method': request.method,
-            'path': request.path,
-            'endpoint': request.endpoint,
-            'args': dict(request.args),
-            'headers': {k: v for k, v in request.headers.items() if k.lower() not in ['cookie', 'authorization']},
-            'timestamp': start_time
-        }))
-        
-        try:
-            # 処理の実行
-            response = f(*args, **kwargs)
-            end_time = time.time()
-            duration_ms = (end_time - start_time) * 1000
-            
-            # レスポンスのロギング
-            request_logger.info(json.dumps({
-                'event': 'request_end',
-                'request_id': request_id,
-                'status_code': response.status_code if hasattr(response, 'status_code') else 200,
-                'duration_ms': duration_ms,
-                'timestamp': end_time
-            }))
-            
-            # 処理時間が長い場合は警告
-            if duration_ms > 5000:  # 5秒以上
-                request_logger.warning(json.dumps({
-                    'event': 'long_request_warning',
-                    'request_id': request_id,
-                    'duration_ms': duration_ms,
-                    'endpoint': request.endpoint,
-                    'timestamp': end_time
-                }))
-            
-            # 終了時のシステムメトリクスを記録
-            log_system_metrics()
-            
-            return response
-            
-        except Exception as e:
-            end_time = time.time()
-            duration_ms = (end_time - start_time) * 1000
-            
-            # エラーのロギング
-            request_logger.error(json.dumps({
-                'event': 'request_error',
-                'request_id': request_id,
-                'error': str(e),
-                'error_type': type(e).__name__,
-                'duration_ms': duration_ms,
-                'endpoint': request.endpoint,
-                'timestamp': end_time
-            }))
-            
-            # エラー時のシステムメトリクスを記録
-            log_system_metrics()
-            
-            raise
-            
-    return decorated_function
-
-def get_shuffled_question(question):
-    """
-    問題の選択肢をランダムにシャッフルし、correct indexも更新する
-    """
-    # 元の選択肢と正解のインデックスを保持
-    original_options = question['options'].copy()
-    original_correct = question['correct']
-    
-    # 選択肢と正解のインデックスをペアにする
-    pairs = list(enumerate(original_options))
-    
-    # ペアをシャッフル
-    random.shuffle(pairs)
-    
-    # シャッフルされた選択肢と新しい正解のインデックスを取得
-    shuffled_indices, shuffled_options = zip(*pairs)
-    new_correct = shuffled_indices.index(original_correct)
-    
-    # 問題のコピーを作成し、シャッフルされた情報で更新
-    shuffled_question = question.copy()
-    shuffled_question['options'] = list(shuffled_options)
-    shuffled_question['correct'] = new_correct
-    
-    return shuffled_question
-
-def get_prioritized_questions(questions, grade, category, subcategory, difficulty):
-    """
-    優先順位付けされた問題を取得する
-    1. まだ回答していない問題
-    2. 正答率の低い問題
-    3. その他の問題
-    """
-    try:
-        total_questions = len(questions)
-        if total_questions == 0:
-            logger.error(f"No questions available in {category} - {subcategory} - {difficulty}")
-            return None
-            
-        # 問題の統計情報を取得
-        attempts = QuizAttempt.query.filter_by(
-            grade=grade,
-            category=category,
-            subcategory=subcategory,
-            difficulty=difficulty
-        ).all()
-        
-        # 問題を3つのグループに分類
-        unanswered_questions = []
-        low_accuracy_questions = []
-        other_questions = []
-        
-        # 問題ごとの正答率を計算
-        question_stats = {}
-        for attempt in attempts:
-            if not hasattr(attempt, 'quiz_history') or not attempt.quiz_history:
-                continue
-                
-            for history in attempt.quiz_history:
-                q_text = history.get('question', '')
-                if not q_text:
-                    continue
-                    
-                if q_text not in question_stats:
-                    question_stats[q_text] = {'correct': 0, 'total': 0}
-                    
-                question_stats[q_text]['total'] += 1
-                if history.get('is_correct', False):
-                    question_stats[q_text]['correct'] += 1
-        
-        # 問題を分類
-        for question in questions:
-            q_text = question['question']
-            if q_text not in question_stats:
-                # 未回答の問題
-                unanswered_questions.append(question)
-            else:
-                # 正答率に基づいて分類（50%未満を低正答率とする）
-                stats = question_stats[q_text]
-                accuracy = (stats['correct'] / stats['total'] * 100) if stats['total'] > 0 else 0
-                if accuracy < 50:
-                    low_accuracy_questions.append(question)
-                else:
-                    other_questions.append(question)
-        
-        # 各グループをシャッフル
-        random.shuffle(unanswered_questions)
-        random.shuffle(low_accuracy_questions)
-        random.shuffle(other_questions)
-        
-        # 優先順位に基づいて問題を選択
-        target_questions = min(10, total_questions)  # 最大10問
-        selected_questions = []
-        
-        # 1. まず未回答の問題を追加
-        remaining = target_questions
-        if unanswered_questions:
-            num_unanswered = min(len(unanswered_questions), remaining)
-            selected_questions.extend(unanswered_questions[:num_unanswered])
-            remaining -= num_unanswered
-            
-        # 2. 次に低正答率の問題を追加
-        if remaining > 0 and low_accuracy_questions:
-            num_low_accuracy = min(len(low_accuracy_questions), remaining)
-            selected_questions.extend(low_accuracy_questions[:num_low_accuracy])
-            remaining -= num_low_accuracy
-            
-        # 3. 最後にその他の問題を追加
-        if remaining > 0 and other_questions:
-            num_other = min(len(other_questions), remaining)
-            selected_questions.extend(other_questions[:num_other])
-            
-        return selected_questions
-        
-    except Exception as e:
-        logger.error(f"Error in get_prioritized_questions: {e}")
-        return None
-
-def log_request(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        request_id = str(uuid.uuid4())
-        start_time = time.time()
-        
-        # リクエストのロギング
-        request_logger.info(json.dumps({
-            'event': 'request_start',
-            'request_id': request_id,
-            'method': request.method,
-            'path': request.path,
-            'args': dict(request.args),
-            'headers': dict(request.headers),
-            'body': request.get_json(silent=True) if request.is_json else None
-        }))
-        
-        try:
-            response = f(*args, **kwargs)
-            end_time = time.time()
-            duration_ms = (end_time - start_time) * 1000
-            
-            # レスポンスのロギング
-            request_logger.info(json.dumps({
-                'event': 'request_end',
-                'request_id': request_id,
-                'status_code': response.status_code if hasattr(response, 'status_code') else 200,
-                'duration_ms': duration_ms
-            }))
-            
-            return response
-            
-        except Exception as e:
-            end_time = time.time()
-            duration_ms = (end_time - start_time) * 1000
-            
-            # エラーのロギング
-            request_logger.error(json.dumps({
-                'event': 'request_error',
-                'request_id': request_id,
-                'error': str(e),
-                'duration_ms': duration_ms
-            }))
-            
-            raise
-            
-    return decorated_function
-
-@app.route('/')
-@log_performance
-def index():
-    return render_template('index.html')
-
-@app.route('/grade/<int:grade>/category/<category>/subcategory/<subcategory>/difficulty/<difficulty>')
-@log_performance
-def quiz_with_params(grade, category, subcategory, difficulty):
+# クイズデータの取得（キャッシュ付き）
+@cache.memoize(timeout=300)
+def get_quiz_data(grade, category, subcategory, difficulty):
     try:
         start_time = time.time()
         
-        # クイズデータの取得
-        quiz_data = get_quiz_data(grade, category, subcategory, difficulty)
-        fetch_time = time.time()
-        
-        # クイズデータ取得の所要時間をロギング
+        # データ取得開始のログ
         db_logger.info(json.dumps({
-            'event': 'quiz_data_fetch',
+            'event': 'quiz_data_fetch_start',
             'grade': grade,
             'category': category,
             'subcategory': subcategory,
             'difficulty': difficulty,
-            'duration_ms': (fetch_time - start_time) * 1000,
-            'timestamp': fetch_time
+            'timestamp': start_time
         }))
+        
+        # クイズデータの取得処理
+        questions = questions_by_category.get(category, {}).get(str(grade), [])
+        if not questions:
+            return None
+            
+        # 該当する問題をフィルタリング
+        filtered_questions = [q for q in questions if q.get('subcategory') == subcategory and q.get('difficulty') == difficulty]
+        if not filtered_questions:
+            return None
+
+        # 問題の統計情報を取得して優先順位付け
+        question_stats = QuizAttempt.get_question_stats(grade, category, subcategory, difficulty)
+        
+        # 問題を優先順位付けしてソート（未出題 > 正答率が低い > 出題回数が少ない）
+        prioritized = sorted(filtered_questions, 
+            key=lambda q: (
+                question_stats.get(q['question'], {'total': 0})['total'] > 0,  # 未出題を優先
+                question_stats.get(q['question'], {'percentage': 100})['percentage'],  # 正答率が低いものを優先
+                question_stats.get(q['question'], {'total': 0})['total']  # 出題回数が少ないものを優先
+            )
+        )
+        
+        # 上位10問を選択
+        selected_questions = prioritized[:10]
+        
+        # 選択肢のシャッフル
+        shuffled_questions = []
+        for q in selected_questions:
+            shuffled = q.copy()
+            options = [shuffled['correct_answer']] + shuffled['incorrect_answers']
+            random.shuffle(options)
+            shuffled['options'] = options
+            shuffled['correct_index'] = options.index(shuffled['correct_answer'])
+            shuffled_questions.append(shuffled)
+        
+        end_time = time.time()
+        duration_ms = (end_time - start_time) * 1000
+        
+        # データ取得完了のログ
+        db_logger.info(json.dumps({
+            'event': 'quiz_data_fetch_complete',
+            'grade': grade,
+            'category': category,
+            'subcategory': subcategory,
+            'difficulty': difficulty,
+            'num_questions': len(shuffled_questions),
+            'duration_ms': duration_ms,
+            'timestamp': end_time
+        }))
+        
+        return shuffled_questions
+        
+    except Exception as e:
+        error_time = time.time()
+        db_logger.error(json.dumps({
+            'event': 'quiz_data_fetch_error',
+            'grade': grade,
+            'category': category,
+            'subcategory': subcategory,
+            'difficulty': difficulty,
+            'error': str(e),
+            'error_type': type(e).__name__,
+            'timestamp': error_time
+        }))
+        return None
+
+@app.route('/')
+@cache.cached(timeout=300)
+def index():
+    return render_template('index.html')
+
+@app.route('/grade/<int:grade>/category/<category>/subcategory/<subcategory>/difficulty/<difficulty>')
+def quiz_with_params(grade, category, subcategory, difficulty):
+    try:
+        start_time = time.time()
+        
+        # システムメトリクスの記録
+        log_system_metrics()
+        
+        # クイズデータの取得（キャッシュ利用）
+        quiz_data = get_quiz_data(grade, category, subcategory, difficulty)
+        fetch_time = time.time()
         
         if quiz_data is None:
             request_logger.error(json.dumps({
@@ -385,23 +227,27 @@ def quiz_with_params(grade, category, subcategory, difficulty):
             }))
             return "Quiz not found", 404
         
-        # テンプレートのレンダリング時間を計測
-        render_start = time.time()
+        # テンプレートのレンダリング
         response = render_template('quiz.html',
                                  quiz_data=quiz_data,
                                  grade=grade,
                                  category=category,
                                  subcategory=subcategory,
                                  difficulty=difficulty)
-        render_time = time.time()
+                                 
+        end_time = time.time()
+        total_duration_ms = (end_time - start_time) * 1000
         
-        # レンダリング時間のロギング
+        # 完了ログ
         request_logger.info(json.dumps({
-            'event': 'template_render',
-            'template': 'quiz.html',
-            'duration_ms': (render_time - render_start) * 1000,
-            'total_duration_ms': (render_time - start_time) * 1000,
-            'timestamp': render_time
+            'event': 'quiz_complete',
+            'grade': grade,
+            'category': category,
+            'subcategory': subcategory,
+            'difficulty': difficulty,
+            'fetch_duration_ms': (fetch_time - start_time) * 1000,
+            'total_duration_ms': total_duration_ms,
+            'timestamp': end_time
         }))
         
         return response
@@ -420,562 +266,3 @@ def quiz_with_params(grade, category, subcategory, difficulty):
             'timestamp': error_time
         }))
         raise
-
-@app.route('/')
-def select_grade():
-    return render_template('grade_select.html')
-
-@app.route('/grade/<int:grade>/category')
-def select_category(grade):
-    return render_template('category_select.html', grade=grade)
-
-@app.route('/grade/<int:grade>/category/<category>/subcategory')
-def select_subcategory(grade, category):
-    subcategories = get_subcategories(grade, category)
-    return render_template('subcategory_select.html',
-                         grade=grade,
-                         category=category,
-                         category_name=CATEGORY_NAMES[category],
-                         subcategories=subcategories,
-                         subcategory_names=SUBCATEGORY_NAMES)
-
-@app.route('/grade/<int:grade>/category/<category>/subcategory/<subcategory>/difficulty')
-def select_difficulty(grade, category, subcategory):
-    """難易度選択画面を表示する"""
-    try:
-        logger.info(f"Entering select_difficulty with grade={grade}, category={category}, subcategory={subcategory}")
-        
-        # 問題データの存在確認
-        file_path = f'quiz_data/grade_{grade}/{category}.json'
-        logger.info(f"Checking file: {file_path}")
-        
-        if not os.path.exists(file_path):
-            logger.error(f"File not found: {file_path}")
-            flash('問題データが見つかりません。', 'error')
-            return redirect(url_for('select_grade'))
-
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            logger.info(f"Loaded data keys: {list(data.keys())}")
-            
-            if subcategory not in data:
-                logger.error(f"Subcategory {subcategory} not found in data")
-                flash('選択されたカテゴリーの問題が見つかりません。', 'error')
-                return redirect(url_for('select_grade'))
-            
-            logger.info(f"Found subcategory {subcategory} in data")
-            logger.info(f"Available difficulties in {subcategory}: {list(data[subcategory].keys())}")
-
-        # 各難易度のクイズ統計を取得
-        stats = {}
-        for difficulty in ['easy', 'medium', 'hard']:
-            logger.info(f"Getting stats for difficulty: {difficulty}")
-            stats[difficulty] = QuizAttempt.get_stats(grade, category, subcategory, difficulty)
-            logger.info(f"Stats for {difficulty}: {stats[difficulty]}")
-            
-        logger.info("Preparing to render template with context:")
-        logger.info(f"grade: {grade}")
-        logger.info(f"category: {category}")
-        logger.info(f"subcategory: {subcategory}")
-        logger.info(f"category_name: {CATEGORY_NAMES.get(category)}")
-        logger.info(f"subcategory_name: {SUBCATEGORY_NAMES.get(subcategory)}")
-        logger.info(f"stats: {stats}")
-        
-        return render_template('difficulty_select.html',
-                             grade=grade,
-                             category=category,
-                             subcategory=subcategory,
-                             stats=stats,
-                             category_name=CATEGORY_NAMES[category],
-                             subcategory_name=SUBCATEGORY_NAMES[subcategory])
-    except Exception as e:
-        logger.error(f"Error in select_difficulty: {e}")
-        logger.exception("Full traceback:")
-        flash('難易度選択画面の表示中にエラーが発生しました。', 'error')
-        return redirect(url_for('select_grade'))
-
-def get_questions(grade, category, subcategory, difficulty):
-    """指定された件に基づいて問題を取得する"""
-    try:
-        logger.info(f"Getting questions for grade={grade}, category={category}, subcategory={subcategory}, difficulty={difficulty}")
-        
-        # 問題データを取得
-        questions, error = get_quiz_data(grade, category, subcategory, difficulty)
-        if error:
-            logger.error(f"Error getting quiz data: {error}")
-            return []
-        if not questions:
-            logger.error("No questions returned from get_quiz_data")
-            return []
-            
-        logger.info(f"Retrieved {len(questions)} questions from quiz data")
-            
-        # 問題をランダムに選択し、10問を選択
-        if len(questions) > 10:
-            selected_questions = random.sample(questions, 10)
-            logger.info(f"Selected 10 random questions from {len(questions)} available questions")
-        else:
-            selected_questions = questions
-            logger.info(f"Using all {len(questions)} available questions")
-        
-        return selected_questions
-    except Exception as e:
-        logger.error(f"Error in get_questions: {e}")
-        logger.exception("Full traceback:")
-        return []
-
-@app.route('/start_quiz/<int:grade>/<category>/<subcategory>/<difficulty>')
-@log_performance
-def start_quiz(grade, category, subcategory, difficulty):
-    """クイズを開始する"""
-    try:
-        # セッションをクリア
-        session['current_question'] = 0
-        session['score'] = 0
-        session['quiz_history'] = []
-        
-        # 選択された情報をセッションに保存
-        session['grade'] = grade
-        session['category'] = category
-        session['subcategory'] = subcategory
-        session['difficulty'] = difficulty
-        
-        # 問題データを取得
-        questions, error = get_quiz_data(grade, category, subcategory, difficulty)
-        
-        if error or not questions:
-            logger.error(f"Error getting quiz data: {error}")
-            flash(error or '問題の取得に失敗しました', 'error')
-            return redirect(url_for('select_difficulty'))
-            
-        # 問題をセッションに保存
-        session['questions'] = questions
-        
-        # 最初の問題を表示
-        current_question = 0
-        question_data = questions[current_question]
-        
-        return render_template('quiz.html',
-                             question=question_data['question'],
-                             options=question_data['options'],
-                             current_question=current_question,
-                             total_questions=len(questions),
-                             question_data=question_data)
-                             
-    except Exception as e:
-        logger.error(f"Error in start_quiz: {e}")
-        logger.exception("Full traceback:")
-        flash('クイズの開始に失敗しました', 'error')
-        return redirect(url_for('select_difficulty'))
-
-def get_subcategories(grade, category):
-    """定された学年とカテゴリのサブカテゴリを取得"""
-    # カテゴリに応じたサブカテゴリのマッピング
-    category_subcategories = {
-        'japanese': ['kanji', 'reading', 'grammar', 'writing'],
-        'math': ['calculation', 'figure', 'measurement', 'graph'],
-        'science': ['physics', 'chemistry', 'biology', 'earth_science'],
-        'society': ['history', 'geography', 'civics', 'current_events', 'prefectures']
-    }
-    return category_subcategories.get(category, [])
-
-@cache.memoize(timeout=300)  # 5分間キャッシュ
-def get_quiz_data(grade, category, subcategory, difficulty):
-    """クイズデータを取得する関数"""
-    try:
-        file_path = f'quiz_data/grade_{grade}/{category}.json'
-        logger.info(f"Loading quiz data from: {file_path}")
-        
-        # ファイルの存在確認
-        if not os.path.exists(file_path):
-            logger.error(f"Quiz data file not found: {file_path}")
-            return None, "問題データファイルが見つかりません"
-        
-        # ファイルの読み込みをタイムアウト付きで実行
-        start_time = time.time()
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                load_time = time.time() - start_time
-                logger.info(f"JSON data loaded in {load_time:.2f} seconds")
-                
-                # 処理時間が長すぎる場合は警告
-                if load_time > 1.0:  # 1秒以上かかる場合
-                    logger.warning(f"Slow file loading detected: {load_time:.2f} seconds")
-                
-                logger.info(f"Available subcategories: {list(data.keys())}")
-                
-                # サブカテゴリの確認
-                if subcategory not in data:
-                    logger.error(f"Subcategory {subcategory} not found in data")
-                    return None, "選択されたサブカテゴリーの問題が見つかりません"
-                
-                logger.info(f"Found subcategory {subcategory}")
-                logger.info(f"Available difficulties: {list(data[subcategory].keys())}")
-                
-                # 難易度の確認
-                if difficulty not in data[subcategory]:
-                    logger.error(f"Difficulty {difficulty} not found in {subcategory}")
-                    return None, "選択された難易度の問題が見つかりません"
-                
-                all_questions = data[subcategory][difficulty]
-                if not all_questions:
-                    logger.error(f"No questions found for {category}/{subcategory}/{difficulty}")
-                    return None, "問題が見つかりません"
-                
-                # 利用可能な問題数を確認
-                num_questions = len(all_questions)
-                target_questions = min(10, num_questions)  # 10問または利用可能な全問題数の少ない方
-                
-                logger.info(f"Total available questions: {num_questions}")
-                logger.info(f"Target number of questions: {target_questions}")
-                
-                # 問題をランダムに選択（処理時間を計測）
-                select_start = time.time()
-                selected_questions = random.sample(all_questions, target_questions)
-                select_time = time.time() - select_start
-                logger.info(f"Question selection completed in {select_time:.2f} seconds")
-                
-                # 各問題の選択肢をシャッフル（処理時間を計測）
-                shuffle_start = time.time()
-                shuffled_questions = [get_shuffled_question(q) for q in selected_questions]
-                shuffle_time = time.time() - shuffle_start
-                logger.info(f"Question shuffling completed in {shuffle_time:.2f} seconds")
-                
-                total_time = time.time() - start_time
-                logger.info(f"Total processing time: {total_time:.2f} seconds")
-                
-                # 処理時間が長すぎる場合は警告
-                if total_time > 3.0:  # 3秒以上かかる場合
-                    logger.warning(f"Slow quiz data processing detected: {total_time:.2f} seconds")
-                
-                return shuffled_questions, None
-                
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error in {file_path}: {e}")
-            return None, "問題データの形式が正しくありません"
-            
-    except Exception as e:
-        logger.error(f"Error in get_quiz_data: {e}")
-        logger.exception("Full traceback:")
-        return None, "問題データの読み込み中にエラーが発生しました"
-
-@app.route('/submit_answer', methods=['POST'])
-@log_performance
-def submit_answer():
-    start_time = time.time()
-    try:
-        data = request.get_json()
-        selected_index = data.get('selected')
-        time_taken = data.get('time_taken', 0)
-        
-        current_question = session.get('current_question', 0)
-        questions = session.get('questions', [])
-        current_score = session.get('score', 0)
-        quiz_history = session.get('quiz_history', [])
-        
-        # セッションデータの検証
-        if not questions or current_question >= len(questions):
-            logger.error("Invalid session data or question index")
-            return jsonify({'success': False, 'error': '無効なセッションデータです'})
-        
-        # 処理時間のチェック
-        if time.time() - start_time > 8:
-            logger.warning("Processing time approaching timeout")
-            return jsonify({'success': False, 'error': '処理時間が長すぎます'})
-        
-        question = questions[current_question]
-        correct_index = question['correct']
-        
-        # 回答の検証
-        is_correct = str(selected_index) == str(correct_index)
-        is_last_question = current_question >= len(questions) - 1
-        
-        # スコアの更新
-        if is_correct:
-            current_score += 1
-            session['score'] = current_score
-        
-        # 履歴の保存
-        quiz_history.append({
-            'question': question['question'],
-            'selected_option': question['options'][int(selected_index)],
-            'correct_option': question['options'][int(correct_index)],
-            'is_correct': is_correct,
-            'time_taken': time_taken
-        })
-        session['quiz_history'] = quiz_history
-        
-        # 最後の問題の場合、QuizAttemptを保存
-        if is_last_question:
-            try:
-                # データベース操作をタイムアウト付きで実行
-                with db.session.begin():
-                    quiz_attempt = QuizAttempt(
-                        grade=session.get('grade'),
-                        category=session.get('category'),
-                        subcategory=session.get('subcategory'),
-                        difficulty=session.get('difficulty'),
-                        score=current_score,
-                        total_questions=len(questions),
-                        quiz_history=quiz_history
-                    )
-                    db.session.add(quiz_attempt)
-                    db.session.commit()
-                    logger.info(f"Quiz attempt saved - Final score: {current_score}/{len(questions)}")
-            except Exception as e:
-                logger.error(f"Error saving quiz attempt: {e}")
-                db.session.rollback()
-                # データベースエラーでも結果は表示できるようにする
-                return jsonify({
-                    'success': True,
-                    'isCorrect': is_correct,
-                    'currentScore': current_score,
-                    'isLastQuestion': is_last_question,
-                    'redirectUrl': '/result',
-                    'warning': 'スコアの保存に失敗しました'
-                })
-        
-        # レスポンスデータの準備
-        response_data = {
-            'success': True,
-            'isCorrect': is_correct,
-            'currentScore': current_score,
-            'isLastQuestion': is_last_question
-        }
-        
-        if is_last_question:
-            response_data['redirectUrl'] = '/result'
-        else:
-            session['current_question'] = current_question + 1
-        
-        # 処理時間の警告
-        total_time = time.time() - start_time
-        if total_time > 5:
-            logger.warning(f"Slow response time in submit_answer: {total_time:.2f} seconds")
-        
-        return jsonify(response_data)
-            
-    except Exception as e:
-        logger.error(f"Error in submit_answer: {e}")
-        return jsonify({
-            'success': False,
-            'error': '予期せぬエラーが発生しました',
-            'details': str(e)
-        })
-
-@app.route('/next_question', methods=['GET'])
-@log_performance
-def next_question():
-    """次の問題を表示する"""
-    try:
-        questions = session.get('questions', [])
-        current_question = session.get('current_question', 0)
-        quiz_history = session.get('quiz_history', [])
-        score = session.get('score', 0)
-        
-        logger.info(f"Current question index: {current_question}")
-        logger.info(f"Total questions: {len(questions)}")
-        logger.info(f"Quiz history entries: {len(quiz_history)}")
-        
-        # 全問題が終了した場合
-        if current_question >= len(questions):
-            logger.info("Quiz completed, redirecting to result page")
-            return redirect(url_for('result'))
-        
-        # 現在の問題を表示
-        question_data = questions[current_question]
-        logger.info(f"Showing question {current_question + 1}")
-        
-        return render_template('quiz.html',
-                            question=question_data['question'],
-                            options=question_data['options'],
-                            current_question=current_question,
-                            total_questions=len(questions),
-                            score=score,
-                            question_data=question_data)
-                            
-    except Exception as e:
-        logger.error(f"Error in next_question route: {e}")
-        logger.exception("Full traceback:")
-        return redirect(url_for('select_grade'))
-
-@app.route('/dashboard')
-@log_performance
-@cache.memoize(timeout=300)  # 5分間キャッシュ
-def dashboard():
-    try:
-        # 全学年の進捗を取得
-        progress = {}
-        for grade in range(1, 7):
-            progress[grade] = {}
-            for category, category_name in CATEGORY_NAMES.items():
-                progress[grade][category] = {
-                    'name': category_name,
-                    'subcategories': {}
-                }
-                # カテゴリごとのサブカテゴリを取得
-                subcategories = get_subcategories(grade, category)
-                for subcategory in subcategories:
-                    progress[grade][category]['subcategories'][subcategory] = {
-                        'name': SUBCATEGORY_NAMES[subcategory],
-                        'levels': {}
-                    }
-                    for difficulty in ['easy', 'medium', 'hard']:
-                        try:
-                            # クエリの最適化：必要な情報のみを取得
-                            with db.session.begin():
-                                attempts = db.session.query(
-                                    QuizAttempt.score,
-                                    QuizAttempt.total_questions
-                                ).filter_by(
-                                    grade=grade,
-                                    category=category,
-                                    subcategory=subcategory,
-                                    difficulty=difficulty
-                                ).all()
-                            
-                            if not attempts:
-                                stats = {
-                                    'attempts': 0,
-                                    'avg_score': 0,
-                                    'highest_score': 0
-                                }
-                            else:
-                                scores = [attempt.score / attempt.total_questions * 100 for attempt in attempts]
-                                stats = {
-                                    'attempts': len(attempts),
-                                    'avg_score': sum(scores) / len(scores),
-                                    'highest_score': max(scores)
-                                }
-                            progress[grade][category]['subcategories'][subcategory]['levels'][difficulty] = stats
-                        except Exception as e:
-                            logger.error(f"Error processing {grade}年生 - {category} - {subcategory} - {difficulty}: {e}")
-                            progress[grade][category]['subcategories'][subcategory]['levels'][difficulty] = {
-                                'attempts': 0,
-                                'avg_score': 0,
-                                'highest_score': 0
-                            }
-        
-        return render_template('dashboard.html', 
-                             progress=progress,
-                             difficulty_names={'easy': 'かんたん', 'medium': 'ふつう', 'hard': 'むずかしい'})
-    except Exception as e:
-        logger.error(f"Error in dashboard route: {e}")
-        return "An error occurred", 500
-
-@app.route('/quiz_history/<int:grade>/<category>/<subcategory>/<difficulty>')
-@log_performance
-@cache.memoize(timeout=300)  # 5分間キャッシュ
-def quiz_history(grade, category, subcategory, difficulty):
-    logger.info(f"Accessing quiz_history for grade={grade}, category={category}, subcategory={subcategory}, difficulty={difficulty}")
-
-    try:
-        # データベース接続テスト（タイムアウト付き）
-        with db.session.begin():
-            result = db.session.execute(text("SELECT 1"))
-            logger.info("Database connection test successful")
-
-        # 通常の試行履歴を取得（タイムアウト付き）
-        with db.session.begin():
-            attempts = QuizAttempt.query.filter_by(
-                grade=grade,
-                category=category,
-                subcategory=subcategory,
-                difficulty=difficulty
-            ).order_by(QuizAttempt.timestamp.desc()).limit(50).all()  # 最新50件に制限
-            logger.info(f"Retrieved {len(attempts)} quiz attempts")
-        
-        # 問題別の統計情報を取得（タイムアウト付き）
-        with db.session.begin():
-            question_stats = QuizAttempt.get_question_stats(grade, category, subcategory, difficulty)
-        
-        return render_template('quiz_history.html',
-                             grade=grade,
-                             category=category,
-                             category_name=CATEGORY_NAMES[category],
-                             subcategory=subcategory,
-                             subcategory_name=SUBCATEGORY_NAMES[subcategory],
-                             difficulty=difficulty,
-                             difficulty_name={'easy': 'かんたん', 'medium': 'ふつう', 'hard': 'むずかしい'}[difficulty],
-                             attempts=attempts,
-                             question_stats=question_stats)
-    except Exception as e:
-        logger.error(f"Error in quiz_history: {e}", exc_info=True)
-        db.session.rollback()
-        return "An error occurred", 500
-
-@app.route('/question_history/<int:grade>/<category>/<subcategory>/<difficulty>/<path:question_text>')
-def question_history(grade, category, subcategory, difficulty, question_text):
-    try:
-        history = QuizAttempt.get_question_history(grade, category, subcategory, difficulty, question_text)
-        return jsonify(history)
-    except Exception as e:
-        logger.error(f"Error in question_history route: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/result')
-def result():
-    """クイズ結果を表示する"""
-    try:
-        # セッションから必要な情報を取得
-        score = session.get('score', 0)
-        total_questions = len(session.get('questions', []))
-        quiz_history = session.get('quiz_history', [])
-        
-        if not quiz_history:
-            logger.error("No quiz history found")
-            return redirect(url_for('select_grade'))
-            
-        logger.info(f"Showing result page - Score: {score}/{total_questions}")
-        
-        return render_template('result.html',
-                             correct_answers=score,
-                             total_questions=total_questions,
-                             quiz_history=quiz_history)
-                             
-    except Exception as e:
-        logger.error(f"Error in result route: {e}")
-        return redirect(url_for('select_grade'))
-
-@app.route('/show_question')
-def show_question():
-    """現在の問題を表示する"""
-    try:
-        questions = session.get('questions', [])
-        current_question = session.get('current_question', 0)
-        
-        logger.info(f"Showing question {current_question + 1} of {len(questions)}")
-        
-        if not questions or current_question >= len(questions):
-            logger.error("No questions available or current question index out of range")
-            return redirect(url_for('select_grade'))
-            
-        return render_template('quiz.html',
-                            question=questions[current_question],
-                            question_number=current_question + 1,
-                            total_questions=len(questions),
-                            correct_answers=session.get('score', 0))
-                            
-    except Exception as e:
-        logger.error(f"Error in show_question: {e}")
-        logger.exception("Full traceback:")
-        return redirect(url_for('select_grade'))
-
-@app.route('/quiz')
-def quiz():
-    # セッションから現在の問題情報を取得
-    current_question = session.get('current_question', 0)
-    questions = session.get('questions', [])
-    
-    if not questions or current_question >= len(questions):
-        return redirect(url_for('select_grade'))
-    
-    question_data = questions[current_question]
-    
-    return render_template('quiz.html',
-                         question=question_data['question'],
-                         options=question_data['options'],
-                         current_question=current_question,
-                         total_questions=len(questions),
-                         question_data=question_data)  # ヒントと説明を含む全データを渡す
