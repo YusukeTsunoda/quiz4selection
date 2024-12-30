@@ -1,10 +1,6 @@
 import os
 import logging
 import json
-from dotenv import load_dotenv
-
-# .envファイルを読み込む
-load_dotenv()
 
 # ロガーの設定
 logger = logging.getLogger(__name__)
@@ -19,7 +15,9 @@ class Config:
     FLASK_ENV = os.environ.get('FLASK_ENV', 'development')
     VERCEL_ENV = os.environ.get('VERCEL_ENV')
     
-
+    # データベース設定
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
     
     def __init__(self):
         # 環境変数の状態をログ出力
