@@ -168,26 +168,30 @@ def get_supabase_client():
             try:
                 logger.info(f"Initializing Supabase client (attempt {retry_count + 1}/{max_retries})...")
                 
-                # 接続オプションを追加
-                options = {
-                    'postgrest_client_timeout': 30,
-                    'storage_client_timeout': 30,
-                    'realtime_client_timeout': 30,
-                    'use_simple_client': True  # シンプルなクライアントを使用
-                }
-                
+                # 新しい形式でのクライアント初期化
                 _supabase_instance = create_client(
                     Config.SUPABASE_URL,
                     Config.SUPABASE_KEY,
-                    options=options
+                    {
+                        'db': {
+                            'schema': 'public'
+                        },
+                        'auth': {
+                            'autoRefreshToken': True,
+                            'persistSession': True
+                        }
+                    }
                 )
                 
                 # 軽量な接続テスト
                 try:
-                    _supabase_instance.auth.get_session()
-                    logger.info("Connection test successful")
+                    # データベース接続テスト
+                    data = _supabase_instance.table('quiz_attempts').select("count").limit(1).execute()
+                    logger.info("Database connection test successful")
                 except Exception as e:
-                    logger.warning(f"Auth test failed, but continuing: {e}")
+                    logger.warning(f"Database test failed: {e}")
+                    # エラーを再度発生させて、リトライロジックを働かせる
+                    raise
                 
                 _last_connection_time = current_time
                 end_time = time.time()
