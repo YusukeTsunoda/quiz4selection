@@ -122,9 +122,33 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'sslmode': 'require',
         'ssl': True,
         'ssl_min_protocol_version': 'TLSv1.2',
-        'options': '-c statement_timeout=5000'
+        'options': '-c statement_timeout=5000',
+        'host_name': 'db.cujvnutaucgrhleclmpq.supabase.co',
+        'tcp_user_timeout': 10000,
+        'tcp_keepalives': 1,
+        'tcp_keepalive_time': 30,
+        'tcp_keepalive_intvl': 10,
+        'tcp_keepalive_cnt': 5,
+        'client_encoding': 'utf8'
     }
 }
+
+# IPv4を優先的に使用するための設定
+import socket
+original_getaddrinfo = socket.getaddrinfo
+
+def getaddrinfo_ipv4_first(*args, **kwargs):
+    """IPv4アドレスを優先的に返すようにgetaddrinfoをラップ"""
+    responses = original_getaddrinfo(*args, **kwargs)
+    if responses:
+        # IPv4とIPv6のアドレスを分離
+        ipv4_responses = [resp for resp in responses if resp[0] == socket.AF_INET]
+        ipv6_responses = [resp for resp in responses if resp[0] == socket.AF_INET6]
+        # IPv4を先頭に配置
+        return ipv4_responses + ipv6_responses
+    return responses
+
+socket.getaddrinfo = getaddrinfo_ipv4_first
 
 # SQLAlchemyのイベントリスナーを設定
 @event.listens_for(Engine, "before_cursor_execute")
@@ -170,14 +194,14 @@ def check_db_connection():
             addrinfo = socket.getaddrinfo(
                 db_host,
                 5432,
-                socket.AF_UNSPEC,  # IPv4/IPv6両方を試行
+                socket.AF_INET,  # IPv4のみを使用
                 socket.SOCK_STREAM
             )
             logger.error(json.dumps({
                 'event': 'address_resolution',
                 'host': db_host,
                 'resolved_addresses': [{
-                    'family': 'IPv6' if addr[0] == socket.AF_INET6 else 'IPv4',
+                    'family': 'IPv4',
                     'ip': addr[4][0],
                     'port': addr[4][1]
                 } for addr in addrinfo],
@@ -190,6 +214,7 @@ def check_db_connection():
                 'error': str(e),
                 'timestamp': time.time()
             }))
+            return False
         
         # 接続試行の詳細ログ
         logger.error(json.dumps({
@@ -202,7 +227,7 @@ def check_db_connection():
                 'socket_options': {
                     'keepalive': app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'].get('keepalives'),
                     'keepalive_idle': app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'].get('keepalives_idle'),
-                    'ip_version': 'auto'
+                    'ip_version': 'IPv4'
                 }
             },
             'timestamp': time.time()
