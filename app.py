@@ -1,6 +1,7 @@
 import os
 import random
 import logging
+import sys
 from flask import Flask, render_template, session, request, jsonify, flash, redirect, url_for, g
 from flask_caching import Cache
 from extensions import db
@@ -12,23 +13,39 @@ from sqlalchemy import text, create_engine
 import socket
 import time
 from functools import wraps
-from utils.logging_utils import request_logger, db_logger, api_logger, system_logger, log_system_metrics, network_logger
 import uuid
 from quiz_data import questions_by_category
 import psutil
 import traceback
 
 # ロガーの設定
-logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout  # 標準出力に出力
+)
+logger = logging.getLogger('quiz_app')
+logger.setLevel(logging.INFO)
+
+# 既存のハンドラをクリア
+for handler in logger.handlers:
+    logger.removeHandler(handler)
+
+# 標準出力へのハンドラを追加
+stdout_handler = logging.StreamHandler(sys.stdout)
+stdout_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+stdout_handler.setFormatter(formatter)
+logger.addHandler(stdout_handler)
 
 def log_performance(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         start_time = time.time()
-        start_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB単位
+        start_memory = psutil.Process().memory_info().rss / 1024 / 1024
         
         request_id = str(uuid.uuid4())
-        logger.info(json.dumps({
+        print(json.dumps({  # printを使用して直接標準出力に出力
             'event': 'function_start',
             'function': func.__name__,
             'request_id': request_id,
@@ -44,7 +61,7 @@ def log_performance(func):
             duration_ms = (end_time - start_time) * 1000
             memory_diff = end_memory - start_memory
             
-            logger.info(json.dumps({
+            print(json.dumps({  # printを使用して直接標準出力に出力
                 'event': 'function_end',
                 'function': func.__name__,
                 'request_id': request_id,
@@ -54,21 +71,11 @@ def log_performance(func):
                 'timestamp': end_time
             }))
             
-            # 処理時間が長い場合は警告
-            if duration_ms > 5000:  # 5秒以上
-                logger.warning(json.dumps({
-                    'event': 'long_execution_warning',
-                    'function': func.__name__,
-                    'request_id': request_id,
-                    'duration_ms': duration_ms,
-                    'timestamp': end_time
-                }))
-            
             return result
             
         except Exception as e:
             end_time = time.time()
-            logger.error(json.dumps({
+            print(json.dumps({  # printを使用して直接標準出力に出力
                 'event': 'function_error',
                 'function': func.__name__,
                 'request_id': request_id,
@@ -345,20 +352,31 @@ def index():
     return render_template('index.html')
 
 @app.route('/grade/<int:grade>/category/<category>/subcategory/<subcategory>/difficulty/<difficulty>')
+@log_performance
 def quiz_with_params(grade, category, subcategory, difficulty):
     try:
         start_time = time.time()
+        request_id = str(uuid.uuid4())
         
-        # システムメトリクスの記録
-        log_system_metrics()
+        print(json.dumps({
+            'event': 'quiz_request_start',
+            'request_id': request_id,
+            'grade': grade,
+            'category': category,
+            'subcategory': subcategory,
+            'difficulty': difficulty,
+            'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024,
+            'timestamp': start_time
+        }))
         
         # クイズデータの取得（キャッシュ利用）
         quiz_data = get_quiz_data(grade, category, subcategory, difficulty)
         fetch_time = time.time()
         
         if quiz_data is None:
-            request_logger.error(json.dumps({
+            print(json.dumps({
                 'event': 'quiz_not_found',
+                'request_id': request_id,
                 'grade': grade,
                 'category': category,
                 'subcategory': subcategory,
@@ -368,25 +386,29 @@ def quiz_with_params(grade, category, subcategory, difficulty):
             return "Quiz not found", 404
         
         # テンプレートのレンダリング
+        render_start = time.time()
         response = render_template('quiz.html',
                                  quiz_data=quiz_data,
                                  grade=grade,
                                  category=category,
                                  subcategory=subcategory,
                                  difficulty=difficulty)
+        render_end = time.time()
                                  
         end_time = time.time()
         total_duration_ms = (end_time - start_time) * 1000
         
-        # 完了ログ
-        request_logger.info(json.dumps({
+        print(json.dumps({
             'event': 'quiz_complete',
+            'request_id': request_id,
             'grade': grade,
             'category': category,
             'subcategory': subcategory,
             'difficulty': difficulty,
             'fetch_duration_ms': (fetch_time - start_time) * 1000,
+            'render_duration_ms': (render_end - render_start) * 1000,
             'total_duration_ms': total_duration_ms,
+            'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024,
             'timestamp': end_time
         }))
         
@@ -394,15 +416,18 @@ def quiz_with_params(grade, category, subcategory, difficulty):
         
     except Exception as e:
         error_time = time.time()
-        request_logger.error(json.dumps({
+        print(json.dumps({
             'event': 'quiz_error',
+            'request_id': request_id,
             'grade': grade,
             'category': category,
             'subcategory': subcategory,
             'difficulty': difficulty,
             'error': str(e),
             'error_type': type(e).__name__,
+            'stack_trace': traceback.format_exc(),
             'duration_ms': (error_time - start_time) * 1000,
+            'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024,
             'timestamp': error_time
         }))
         raise
