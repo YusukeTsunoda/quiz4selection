@@ -198,17 +198,6 @@ def before_request():
     g.request_start_time = start_time
     g.request_id = str(uuid.uuid4())
     
-    # リクエスト情報のログ
-    logger.info(json.dumps({
-        'event': 'request_start',
-        'request_id': g.request_id,
-        'path': request.path,
-        'method': request.method,
-        'headers': dict(request.headers),
-        'remote_addr': request.remote_addr,
-        'timestamp': start_time
-    }))
-    
     # データベース接続情報のログ
     db_uri = app.config['SQLALCHEMY_DATABASE_URI']
     masked_uri = db_uri.split('@')[1] if '@' in db_uri else 'masked'
@@ -245,6 +234,11 @@ def before_request():
         logger.error(json.dumps({
             'event': 'database_connection_failed',
             'request_id': g.request_id,
+            'error_details': {
+                'host': db_host,
+                'port': 5432,
+                'engine_options': app.config['SQLALCHEMY_ENGINE_OPTIONS']
+            },
             'timestamp': time.time()
         }))
         return "Database connection error", 500
@@ -254,20 +248,20 @@ def after_request(response):
     if hasattr(g, 'request_start_time'):
         duration = time.time() - g.request_start_time
         
-        # レスポンス情報のログ
-        logger.info(json.dumps({
-            'event': 'request_complete',
-            'request_id': getattr(g, 'request_id', 'unknown'),
-            'path': request.path,
-            'method': request.method,
-            'status_code': response.status_code,
-            'duration_ms': duration * 1000,
-            'response_headers': dict(response.headers),
-            'timestamp': time.time()
-        }))
+        # エラーレスポンスの場合のみログを出力
+        if response.status_code >= 400:
+            logger.error(json.dumps({
+                'event': 'error_response',
+                'request_id': getattr(g, 'request_id', 'unknown'),
+                'path': request.path,
+                'method': request.method,
+                'status_code': response.status_code,
+                'duration_ms': duration * 1000,
+                'timestamp': time.time()
+            }))
         
         # 処理時間が長い場合の警告
-        if duration > 5:  # 5秒以上
+        if duration > 5:
             logger.warning(json.dumps({
                 'event': 'long_request_warning',
                 'request_id': getattr(g, 'request_id', 'unknown'),
@@ -290,6 +284,14 @@ def gateway_timeout(error):
         'error': str(error),
         'database_uri': app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1] if '@' in app.config['SQLALCHEMY_DATABASE_URI'] else 'masked',
         'engine_options': app.config['SQLALCHEMY_ENGINE_OPTIONS'],
+        'connection_error_details': {
+            'host': app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1].split('/')[0].split(':')[0],
+            'port': 5432,
+            'timeout_settings': {
+                'connect_timeout': app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'].get('connect_timeout'),
+                'pool_timeout': app.config['SQLALCHEMY_ENGINE_OPTIONS'].get('pool_timeout')
+            }
+        },
         'timestamp': error_time
     }))
     return "Gateway Timeout - The server took too long to respond", 504
@@ -304,6 +306,10 @@ def handle_exception(e):
         'path': request.path,
         'method': request.method,
         'traceback': traceback.format_exc(),
+        'database_config': {
+            'host': app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1].split('/')[0].split(':')[0],
+            'engine_options': app.config['SQLALCHEMY_ENGINE_OPTIONS']
+        },
         'timestamp': time.time()
     }))
     return "An internal error occurred", 500
