@@ -300,7 +300,7 @@ def index():
 
 @app.route('/grade/<int:grade>/category/<category>/subcategory/<subcategory>/difficulty/<difficulty>')
 @log_request
-def quiz(grade, category, subcategory, difficulty):
+def quiz_with_params(grade, category, subcategory, difficulty):
     try:
         # クイズデータの取得開始時間を記録
         start_time = time.time()
