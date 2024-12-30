@@ -158,18 +158,32 @@ def get_supabase_client():
         while retry_count < max_retries:
             try:
                 logger.info(f"Initializing Supabase client (attempt {retry_count + 1}/{max_retries})...")
-                _supabase_instance = create_client(
-                    Config.SUPABASE_URL,
-                    Config.SUPABASE_KEY,
-                    options={
-                        'timeout': 30,  # 30秒タイムアウト
+                # オプションを修正
+                options = {
+                    'db': {
+                        'schema': 'public',
+                        'timeout': 30000  # ミリ秒単位
+                    },
+                    'auth': {
+                        'autoRefreshToken': True,
+                        'persistSession': True
+                    },
+                    'global': {
                         'headers': {
                             'X-Client-Info': 'quiz_app'
                         }
                     }
+                }
+                
+                _supabase_instance = create_client(
+                    Config.SUPABASE_URL,
+                    Config.SUPABASE_KEY,
+                    options=options
                 )
+                
                 # 接続テスト
-                _supabase_instance.table('quiz_attempts').select('count').limit(1).execute()
+                test_result = _supabase_instance.table('quiz_attempts').select('count').limit(1).execute()
+                logger.info("Connection test successful")
                 
                 _last_connection_time = current_time
                 end_time = time.time()
