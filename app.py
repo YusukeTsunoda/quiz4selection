@@ -6,6 +6,10 @@ import logging
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from models import db, QuizAttempt
 from config import Config
+from dotenv import load_dotenv
+
+# .envファイルを読み込む
+load_dotenv()
 
 # ロガーの設定
 logger = logging.getLogger(__name__)
