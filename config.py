@@ -158,27 +158,11 @@ def get_supabase_client():
         while retry_count < max_retries:
             try:
                 logger.info(f"Initializing Supabase client (attempt {retry_count + 1}/{max_retries})...")
-                # オプションを修正
-                options = {
-                    'db': {
-                        'schema': 'public',
-                        'timeout': 30000  # ミリ秒単位
-                    },
-                    'auth': {
-                        'autoRefreshToken': True,
-                        'persistSession': True
-                    },
-                    'global': {
-                        'headers': {
-                            'X-Client-Info': 'quiz_app'
-                        }
-                    }
-                }
                 
+                # シンプルな初期化
                 _supabase_instance = create_client(
                     Config.SUPABASE_URL,
-                    Config.SUPABASE_KEY,
-                    options=options
+                    Config.SUPABASE_KEY
                 )
                 
                 # 接続テスト
