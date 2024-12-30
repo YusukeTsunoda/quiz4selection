@@ -163,13 +163,47 @@ migrate = Migrate(app, db)
 @log_performance
 def check_db_connection():
     try:
+        db_host = app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1].split('/')[0].split(':')[0]
+        
+        # IPv4/IPv6アドレス解決の詳細ログ
+        try:
+            addrinfo = socket.getaddrinfo(
+                db_host,
+                5432,
+                socket.AF_UNSPEC,  # IPv4/IPv6両方を試行
+                socket.SOCK_STREAM
+            )
+            logger.error(json.dumps({
+                'event': 'address_resolution',
+                'host': db_host,
+                'resolved_addresses': [{
+                    'family': 'IPv6' if addr[0] == socket.AF_INET6 else 'IPv4',
+                    'ip': addr[4][0],
+                    'port': addr[4][1]
+                } for addr in addrinfo],
+                'timestamp': time.time()
+            }))
+        except socket.gaierror as e:
+            logger.error(json.dumps({
+                'event': 'address_resolution_error',
+                'host': db_host,
+                'error': str(e),
+                'timestamp': time.time()
+            }))
+        
+        # 接続試行の詳細ログ
         logger.error(json.dumps({
             'event': 'db_connection_attempt',
             'connection_details': {
-                'host': app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1].split('/')[0].split(':')[0],
+                'host': db_host,
                 'port': 5432,
                 'ssl_mode': app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'].get('sslmode'),
-                'timeout': app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'].get('connect_timeout')
+                'timeout': app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'].get('connect_timeout'),
+                'socket_options': {
+                    'keepalive': app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'].get('keepalives'),
+                    'keepalive_idle': app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'].get('keepalives_idle'),
+                    'ip_version': 'auto'
+                }
             },
             'timestamp': time.time()
         }))
@@ -192,9 +226,10 @@ def check_db_connection():
             'error_message': str(e),
             'traceback': traceback.format_exc(),
             'connection_details': {
-                'host': app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1].split('/')[0].split(':')[0],
+                'host': db_host,
                 'port': 5432,
-                'engine_options': app.config['SQLALCHEMY_ENGINE_OPTIONS']
+                'engine_options': app.config['SQLALCHEMY_ENGINE_OPTIONS'],
+                'socket_error': str(e) if isinstance(e, socket.error) else None
             },
             'timestamp': time.time()
         }))
