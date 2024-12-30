@@ -18,10 +18,12 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
 
 # 環境に応じた設定の読み込み
-if os.environ.get('FLASK_ENV') == 'development' or os.environ.get('VERCEL_ENV') == 'development':
+if os.environ.get('FLASK_ENV') == 'development' or os.environ.get(
+        'VERCEL_ENV') == 'development':
     # 開発環境の設定
     logger.info("Loading development configuration...")
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('LOCAL_DATABASE_URL')
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
+        'LOCAL_DATABASE_URL')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['DEVELOPMENT'] = True
     app.config['DEBUG'] = True
@@ -29,10 +31,13 @@ else:
     # 本番環境の設定
     logger.info("Loading production configuration...")
     # Supabase URLの確認
-    if not os.environ.get('SUPABASE_URL') or not os.environ.get('SUPABASE_KEY'):
-        logger.error("Supabase credentials are not set in production environment")
-        raise ValueError("SUPABASE_URL and SUPABASE_KEY are required in production")
-    
+    if not os.environ.get(
+            'SUPABASE_URL') or not os.environ.get('SUPABASE_KEY'):
+        logger.error(
+            "Supabase credentials are not set in production environment")
+        raise ValueError(
+            "SUPABASE_URL and SUPABASE_KEY are required in production")
+
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['DEVELOPMENT'] = False
@@ -72,6 +77,7 @@ SUBCATEGORY_NAMES = {
     'prefectures': '都道府県'
 }
 
+
 def init_app():
     """アプリケーションの初期化"""
     with app.app_context():
@@ -83,32 +89,36 @@ def init_app():
             logger.error(f'Error creating database tables: {e}')
             sys.exit(1)
 
+
 def get_shuffled_question(question):
     """問題の選択肢をシャッフルする"""
     shuffled = question.copy()
     options = shuffled['options'].copy()
     correct = shuffled['correct']
-    
+
     # 選択肢をシャッフル
     indices = list(range(len(options)))
     random.shuffle(indices)
-    
+
     # 選択肢を並び替え
     shuffled['options'] = [options[i] for i in indices]
     # 正解のインデックスも更新
     shuffled['correct'] = indices.index(correct)
-    
+
     return shuffled
+
 
 @app.route('/')
 def index():
     """ルートページのハンドラ"""
     return redirect(url_for('grade_select'))
 
+
 @app.route('/grade_select')
 def grade_select():
     """学年選択ページを表示"""
     return render_template('grade_select.html')
+
 
 @app.route('/grade/<int:grade>/category')
 def select_category(grade):
@@ -116,30 +126,33 @@ def select_category(grade):
     if grade < 1 or grade > 6:
         flash('無効な学年が選択されました')
         return redirect(url_for('grade_select'))
-    
+
     return render_template('category_select.html', grade=grade)
+
 
 @app.route('/grade/<int:grade>/category/<category>/subcategory')
 def select_subcategory(grade, category):
     """サブカテゴリー選択ページを表示"""
     subcategories = get_subcategories(grade, category)
     return render_template('subcategory_select.html',
-                         grade=grade,
-                         category=category,
-                         category_name=CATEGORY_NAMES[category],
-                         subcategories=subcategories,
-                         subcategory_names=SUBCATEGORY_NAMES)
+                           grade=grade,
+                           category=category,
+                           category_name=CATEGORY_NAMES[category],
+                           subcategories=subcategories,
+                           subcategory_names=SUBCATEGORY_NAMES)
+
 
 @app.route('/grade/<int:grade>/category/<category>/subcategory/<subcategory>/difficulty')
 def select_difficulty(grade, category, subcategory):
     """難易度選択画面を表示する"""
     try:
-        logger.info(f"Entering select_difficulty with grade={grade}, category={category}, subcategory={subcategory}")
-        
+        logger.info(
+            f"Entering select_difficulty with grade={grade}, category={category}, subcategory={subcategory}")
+
         # 問題データの存在確認
         file_path = f'quiz_data/grade_{grade}/{category}.json'
         logger.info(f"Checking file: {file_path}")
-        
+
         if not os.path.exists(file_path):
             logger.error(f"File not found: {file_path}")
             flash('問題データが見つかりません。', 'error')
@@ -148,22 +161,26 @@ def select_difficulty(grade, category, subcategory):
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             logger.info(f"Loaded data keys: {list(data.keys())}")
-            
+
             if subcategory not in data:
                 logger.error(f"Subcategory {subcategory} not found in data")
                 flash('選択されたカテゴリーの問題が見つかりません。', 'error')
                 return redirect(url_for('grade_select'))
-            
+
             logger.info(f"Found subcategory {subcategory} in data")
-            logger.info(f"Available difficulties in {subcategory}: {list(data[subcategory].keys())}")
+            logger.info(
+                f"Available difficulties in {subcategory}: {
+                    list(
+                        data[subcategory].keys())}")
 
         # 各難易度のクイズ統計を取得
         stats = {}
         for difficulty in ['easy', 'medium', 'hard']:
             logger.info(f"Getting stats for difficulty: {difficulty}")
-            stats[difficulty] = QuizAttempt.get_stats(grade, category, subcategory, difficulty)
+            stats[difficulty] = QuizAttempt.get_stats(
+                grade, category, subcategory, difficulty)
             logger.info(f"Stats for {difficulty}: {stats[difficulty]}")
-            
+
         logger.info("Preparing to render template with context:")
         logger.info(f"grade: {grade}")
         logger.info(f"category: {category}")
@@ -171,19 +188,20 @@ def select_difficulty(grade, category, subcategory):
         logger.info(f"category_name: {CATEGORY_NAMES.get(category)}")
         logger.info(f"subcategory_name: {SUBCATEGORY_NAMES.get(subcategory)}")
         logger.info(f"stats: {stats}")
-        
+
         return render_template('difficulty_select.html',
-                             grade=grade,
-                             category=category,
-                             subcategory=subcategory,
-                             stats=stats,
-                             category_name=CATEGORY_NAMES[category],
-                             subcategory_name=SUBCATEGORY_NAMES[subcategory])
+                               grade=grade,
+                               category=category,
+                               subcategory=subcategory,
+                               stats=stats,
+                               category_name=CATEGORY_NAMES[category],
+                               subcategory_name=SUBCATEGORY_NAMES[subcategory])
     except Exception as e:
         logger.error(f"Error in select_difficulty: {e}")
         logger.exception("Full traceback:")
         flash('難易度選択画面の表示中にエラーが発生しました。', 'error')
         return redirect(url_for('grade_select'))
+
 
 @app.route('/start_quiz/<int:grade>/<category>/<subcategory>/<difficulty>')
 def start_quiz(grade, category, subcategory, difficulty):
@@ -195,23 +213,27 @@ def start_quiz(grade, category, subcategory, difficulty):
         logger.info(f"Category: {category}")
         logger.info(f"Subcategory: {subcategory}")
         logger.info(f"Difficulty: {difficulty}")
-        
+
         # セッションをクリア
         session.clear()
         logger.info("Session cleared")
-        
+
         # 問題を取得
         questions = get_questions(grade, category, subcategory, difficulty)
-        logger.info(f"Retrieved {len(questions) if questions else 0} questions")
-        
+        logger.info(
+            f"Retrieved {
+                len(questions) if questions else 0} questions")
+
         if not questions:
             logger.error("No questions retrieved")
             flash('問題の取得に失敗しました。', 'error')
-            return redirect(url_for('select_difficulty', grade=grade, category=category, subcategory=subcategory))
-            
+            return redirect(url_for('select_difficulty', grade=grade,
+                            category=category, subcategory=subcategory))
+
         logger.info(f"Starting quiz with {len(questions)} questions")
-        logger.info(f"Question categories: {category}, {subcategory}, {difficulty}")
-            
+        logger.info(
+            f"Question categories: {category}, {subcategory}, {difficulty}")
+
         # セッションに情報を保存
         session['questions'] = questions
         session['current_question'] = 0
@@ -222,23 +244,25 @@ def start_quiz(grade, category, subcategory, difficulty):
         session['subcategory'] = subcategory
         session['difficulty'] = difficulty
         logger.info("Session data saved")
-        
+
         # 最初の問題を表示
         logger.info("Rendering first question")
         first_question = questions[0]
         return render_template('quiz.html',
-                            question=first_question['question'],
-                            options=first_question['options'],
-                            question_data=first_question,
-                            current_question=0,
-                            total_questions=len(questions),
-                            score=0)
-        
+                               question=first_question['question'],
+                               options=first_question['options'],
+                               question_data=first_question,
+                               current_question=0,
+                               total_questions=len(questions),
+                               score=0)
+
     except Exception as e:
         logger.error(f"Error in start_quiz: {e}")
         logger.exception("Full traceback:")
         flash('クイズの開始中にエラーが発生しました。', 'error')
-        return redirect(url_for('select_difficulty', grade=grade, category=category, subcategory=subcategory))
+        return redirect(url_for('select_difficulty', grade=grade,
+                        category=category, subcategory=subcategory))
+
 
 @app.route('/submit_answer', methods=['POST'])
 def submit_answer():
@@ -246,38 +270,47 @@ def submit_answer():
         data = request.get_json()
         selected_index = data.get('selected')
         time_taken = data.get('time_taken', 0)
-        
+
         current_question = session.get('current_question', 0)
         questions = session.get('questions', [])
         current_score = session.get('score', 0)
         quiz_history = session.get('quiz_history', [])
-        
+
         # 受信データのログ
-        logger.info(f"Received answer - Selected Index: {selected_index}, Type: {type(selected_index)}")
-        logger.info(f"Current Question State - Number: {current_question + 1}, Total: {len(questions)}")
-        
+        logger.info(
+            f"Received answer - Selected Index: {selected_index}, Type: {type(selected_index)}")
+        logger.info(
+            f"Current Question State - Number: {current_question + 1}, Total: {len(questions)}")
+
         if current_question >= len(questions):
             logger.error("Question index out of range")
             return jsonify({'success': False, 'error': '問題が見つかりません'})
-            
+
         question = questions[current_question]
         correct_index = question['correct']
-        
+
         # インデックスの比較前の型と値を確認
-        logger.info(f"Comparing indices - Selected: {selected_index} ({type(selected_index)}), Correct: {correct_index} ({type(correct_index)})")
+        logger.info(
+            f"Comparing indices - Selected: {selected_index} ({
+                type(selected_index)}), Correct: {correct_index} ({
+                type(correct_index)})")
         is_correct = str(selected_index) == str(correct_index)
         logger.info(f"Answer is correct: {is_correct}")
-        
+
         # 最後の問題かどうかを確認
         is_last_question = current_question >= len(questions) - 1
-        logger.info(f"Question check - Current: {current_question + 1}, Total: {len(questions)}, Is Last: {is_last_question}")
-        
+        logger.info(
+            f"Question check - Current: {
+                current_question +
+                1}, Total: {
+                len(questions)}, Is Last: {is_last_question}")
+
         # スコアの更新
         if is_correct:
             current_score += 1
             session['score'] = current_score
             logger.info(f"Score updated - New score: {current_score}")
-            
+
         # 履歴の保存
         quiz_history.append({
             'question': question['question'],
@@ -287,8 +320,9 @@ def submit_answer():
             'time_taken': time_taken
         })
         session['quiz_history'] = quiz_history
-        logger.info(f"Quiz history updated - Total entries: {len(quiz_history)}")
-        
+        logger.info(
+            f"Quiz history updated - Total entries: {len(quiz_history)}")
+
         # 最後の問題の場合、QuizAttemptを保存
         if is_last_question:
             try:
@@ -303,11 +337,12 @@ def submit_answer():
                 )
                 db.session.add(quiz_attempt)
                 db.session.commit()
-                logger.info(f"Quiz attempt saved - Final score: {current_score}/{len(questions)}")
+                logger.info(
+                    f"Quiz attempt saved - Final score: {current_score}/{len(questions)}")
             except Exception as e:
                 logger.error(f"Error saving quiz attempt: {e}")
                 db.session.rollback()
-        
+
         # レスポンスデータの準備
         response_data = {
             'success': True,
@@ -315,26 +350,28 @@ def submit_answer():
             'currentScore': current_score,
             'isLastQuestion': is_last_question
         }
-        
+
         # 最後の問題の場合、リダイレクトURLを設定
         if is_last_question:
             try:
                 response_data['redirectUrl'] = '/result'
-                logger.info(f"Last question - Setting redirect URL: {response_data['redirectUrl']}")
+                logger.info(
+                    f"Last question - Setting redirect URL: {response_data['redirectUrl']}")
             except Exception as e:
                 logger.error(f"Error setting redirect URL: {e}")
         else:
             # 次の問題のインデックスを更新（最後の問題でない場合のみ）
             session['current_question'] = current_question + 1
             logger.info(f"Next question index set to: {current_question + 1}")
-        
+
         # 最終レスポンスの内容を確認
         logger.info(f"Sending response: {response_data}")
         return jsonify(response_data)
-            
+
     except Exception as e:
         logger.error(f"Error in submit_answer: {e}")
         return jsonify({'success': False, 'error': str(e)})
+
 
 @app.route('/next_question', methods=['GET'])
 def next_question():
@@ -343,32 +380,33 @@ def next_question():
         questions = session.get('questions', [])
         current_question = session.get('current_question', 0)
         quiz_history = session.get('quiz_history', [])
-        
+
         logger.info(f"Current question index: {current_question}")
         logger.info(f"Total questions: {len(questions)}")
         logger.info(f"Quiz history entries: {len(quiz_history)}")
-        
+
         # 全問題が終了した場合
         if current_question >= len(questions):
             logger.info("Quiz completed, redirecting to result page")
             return redirect(url_for('result'))
-        
+
         # 現在の問題を表示
         logger.info(f"Showing question {current_question + 1}")
         question_data = questions[current_question]
-        
+
         return render_template('quiz.html',
-                            question=question_data['question'],
-                            options=question_data['options'],
-                            question_data=question_data,
-                            current_question=current_question,
-                            total_questions=len(questions),
-                            score=session.get('score', 0))
-                            
+                               question=question_data['question'],
+                               options=question_data['options'],
+                               question_data=question_data,
+                               current_question=current_question,
+                               total_questions=len(questions),
+                               score=session.get('score', 0))
+
     except Exception as e:
         logger.error(f"Error in next_question route: {e}")
         logger.exception("Full traceback:")
         return redirect(url_for('grade_select'))
+
 
 @app.route('/dashboard')
 def dashboard():
@@ -376,10 +414,10 @@ def dashboard():
     try:
         # 進捗データの初期化
         progress = {grade: {} for grade in range(1, 7)}
-        
+
         # クイズの試行履歴を取得
         quiz_attempts = QuizAttempt.query.order_by(QuizAttempt.id.desc()).all()
-        
+
         # 各学年、カテゴリー、サブカテゴリーごとの進捗を集計
         for grade in range(1, 7):
             for category in CATEGORY_NAMES.keys():
@@ -388,7 +426,7 @@ def dashboard():
                         'name': CATEGORY_NAMES[category],
                         'subcategories': {}
                     }
-                
+
                 for subcategory in get_subcategories(grade, category):
                     if subcategory not in progress[grade][category]['subcategories']:
                         progress[grade][category]['subcategories'][subcategory] = {
@@ -399,7 +437,7 @@ def dashboard():
                                 'hard': {'attempts': 0, 'avg_score': 0, 'highest_score': 0}
                             }
                         }
-        
+
         # 試行履歴から統計を計算
         for attempt in quiz_attempts:
             grade = attempt.grade
@@ -407,36 +445,38 @@ def dashboard():
             subcategory = attempt.subcategory
             difficulty = attempt.difficulty
             score_percentage = (attempt.score / attempt.total_questions) * 100
-            
+
             stats = progress[grade][category]['subcategories'][subcategory]['levels'][difficulty]
             stats['attempts'] += 1
-            
+
             # 平均スコアの更新
             stats['avg_score'] = (
-                (stats['avg_score'] * (stats['attempts'] - 1) + score_percentage) 
+                (stats['avg_score'] * (stats['attempts'] - 1) + score_percentage)
                 / stats['attempts']
             )
-            
+
             # 最高スコアの更新
-            stats['highest_score'] = max(stats['highest_score'], score_percentage)
-        
+            stats['highest_score'] = max(
+                stats['highest_score'], score_percentage)
+
         # 難易度の日本語名
         difficulty_names = {
             'easy': '初級',
             'medium': '中級',
             'hard': '上級'
         }
-        
+
         return render_template('dashboard.html',
-                             progress=progress,
-                             difficulty_names=difficulty_names,
-                             quiz_attempts=quiz_attempts)
-                             
+                               progress=progress,
+                               difficulty_names=difficulty_names,
+                               quiz_attempts=quiz_attempts)
+
     except Exception as e:
         logger.error(f"Error in dashboard route: {e}")
         logger.exception("Full traceback:")
         flash('ダッシュボードの表示中にエラーが発生しました。', 'error')
         return redirect(url_for('grade_select'))
+
 
 @app.route('/result')
 def result():
@@ -446,21 +486,22 @@ def result():
         score = session.get('score', 0)
         total_questions = len(session.get('questions', []))
         quiz_history = session.get('quiz_history', [])
-        
+
         if not quiz_history:
             logger.error("No quiz history found")
             return redirect(url_for('grade_select'))
-            
+
         logger.info(f"Showing result page - Score: {score}/{total_questions}")
-        
+
         return render_template('result.html',
-                             correct_answers=score,
-                             total_questions=total_questions,
-                             quiz_history=quiz_history)
-                             
+                               correct_answers=score,
+                               total_questions=total_questions,
+                               quiz_history=quiz_history)
+
     except Exception as e:
         logger.error(f"Error in result route: {e}")
         return redirect(url_for('grade_select'))
+
 
 def get_subcategories(grade, category):
     """指定された学年とカテゴリのサブカテゴリを取得"""
@@ -473,90 +514,104 @@ def get_subcategories(grade, category):
     }
     return category_subcategories.get(category, [])
 
+
 def get_questions(grade, category, subcategory, difficulty):
     """指定された条件に基づいて問題を取得する"""
     try:
-        logger.info(f"Getting questions for grade={grade}, category={category}, subcategory={subcategory}, difficulty={difficulty}")
-        
+        logger.info(
+            f"Getting questions for grade={grade}, category={category}, subcategory={subcategory}, difficulty={difficulty}")
+
         # 問題データを取得
-        questions, error = get_quiz_data(grade, category, subcategory, difficulty)
+        questions, error = get_quiz_data(
+            grade, category, subcategory, difficulty)
         if error:
             logger.error(f"Error getting quiz data: {error}")
             return []
         if not questions:
             logger.error("No questions returned from get_quiz_data")
             return []
-            
+
         logger.info(f"Retrieved {len(questions)} questions from quiz data")
-            
+
         # 問題をランダムに選択し、10問を選択
         if len(questions) > 10:
             selected_questions = random.sample(questions, 10)
-            logger.info(f"Selected 10 random questions from {len(questions)} available questions")
+            logger.info(
+                f"Selected 10 random questions from {
+                    len(questions)} available questions")
         else:
             selected_questions = questions
             logger.info(f"Using all {len(questions)} available questions")
-        
+
         return selected_questions
     except Exception as e:
         logger.error(f"Error in get_questions: {e}")
         logger.exception("Full traceback:")
         return []
 
+
 def get_quiz_data(grade, category, subcategory, difficulty):
     """クイズデータを取得する関数"""
     try:
         file_path = f'quiz_data/grade_{grade}/{category}.json'
         logger.info(f"Loading quiz data from: {file_path}")
-        
+
         # ファイルの存在確認
         if not os.path.exists(file_path):
             logger.error(f"Quiz data file not found: {file_path}")
             return None, "問題データファイルが見つかりません"
-            
+
         # ファイルの読み込み
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             logger.info(f"Successfully loaded JSON data")
             logger.info(f"Available subcategories: {list(data.keys())}")
-            
+
             # サブカテゴリの確認
             if subcategory not in data:
                 logger.error(f"Subcategory {subcategory} not found in data")
                 return None, "選択されたサブカテゴリーの問題が見つかりません"
-                
+
             logger.info(f"Found subcategory {subcategory}")
-            logger.info(f"Available difficulties: {list(data[subcategory].keys())}")
-                
+            logger.info(
+                f"Available difficulties: {
+                    list(
+                        data[subcategory].keys())}")
+
             # 難易度の確認
             if difficulty not in data[subcategory]:
-                logger.error(f"Difficulty {difficulty} not found in {subcategory}")
+                logger.error(
+                    f"Difficulty {difficulty} not found in {subcategory}")
                 return None, "選択された難易度の問題が見つかりません"
-                
+
             all_questions = data[subcategory][difficulty]
             if not all_questions:
-                logger.error(f"No questions found for {category}/{subcategory}/{difficulty}")
+                logger.error(
+                    f"No questions found for {category}/{subcategory}/{difficulty}")
                 return None, "問題が見つかりません"
-            
+
             # 利用可能な問題数を確認
             num_questions = len(all_questions)
             target_questions = min(10, num_questions)  # 10問または利用可能な全問題数の少ない方
-            
+
             logger.info(f"Total available questions: {num_questions}")
             logger.info(f"Target number of questions: {target_questions}")
-            
+
             # 問題をランダムに選択
             selected_questions = random.sample(all_questions, target_questions)
-            
+
             # 各問題の選択肢をシャッフル
-            shuffled_questions = [get_shuffled_question(q) for q in selected_questions]
-            
-            logger.info(f"Successfully loaded and shuffled {len(shuffled_questions)} questions")
+            shuffled_questions = [
+                get_shuffled_question(q) for q in selected_questions]
+
+            logger.info(
+                f"Successfully loaded and shuffled {
+                    len(shuffled_questions)} questions")
             for i, q in enumerate(shuffled_questions):
-                logger.info(f"Question {i+1} correct index: {q['correct']}")
-            
+                logger.info(f"Question {i + 1} correct index: {q['correct']}")
+
             return shuffled_questions, None
-            
+
     except json.JSONDecodeError as e:
         logger.error(f"JSON decode error in {file_path}: {e}")
         return None, "問題データの形式が正しくありません"
@@ -564,6 +619,7 @@ def get_quiz_data(grade, category, subcategory, difficulty):
         logger.error(f"Error in get_quiz_data: {e}")
         logger.exception("Full traceback:")
         return None, "問題データの読み込み中にエラーが発生しました"
+
 
 @app.route('/quiz_history/<int:grade>/<category>/<subcategory>/<difficulty>')
 def quiz_history(grade, category, subcategory, difficulty):
@@ -589,14 +645,14 @@ def quiz_history(grade, category, subcategory, difficulty):
                             'correct': 0,
                             'percentage': 0
                         }
-                    
+
                     question_stats[q_text]['total'] += 1
                     if question['is_correct']:
                         question_stats[q_text]['correct'] += 1
-                    
+
                     # 正答率を更新
                     question_stats[q_text]['percentage'] = (
-                        question_stats[q_text]['correct'] / 
+                        question_stats[q_text]['correct'] /
                         question_stats[q_text]['total'] * 100
                     )
 
@@ -608,13 +664,13 @@ def quiz_history(grade, category, subcategory, difficulty):
         }.get(difficulty, difficulty)
 
         return render_template('quiz_history.html',
-                             attempts=attempts,
-                             grade=grade,
-                             category_name=CATEGORY_NAMES[category],
-                             subcategory_name=SUBCATEGORY_NAMES[subcategory],
-                             difficulty_name=difficulty_name,
-                             question_stats=question_stats)
-                             
+                               attempts=attempts,
+                               grade=grade,
+                               category_name=CATEGORY_NAMES[category],
+                               subcategory_name=SUBCATEGORY_NAMES[subcategory],
+                               difficulty_name=difficulty_name,
+                               question_stats=question_stats)
+
     except Exception as e:
         logger.error(f"Error in quiz_history route: {e}")
         logger.exception("Full traceback:")
