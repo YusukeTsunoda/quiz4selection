@@ -355,11 +355,15 @@ def next_question():
         
         # 現在の問題を表示
         logger.info(f"Showing question {current_question + 1}")
+        question_data = questions[current_question]
+        
         return render_template('quiz.html',
-                            question=questions[current_question],
-                            question_number=current_question + 1,
+                            question=question_data['question'],
+                            options=question_data['options'],
+                            question_data=question_data,
+                            current_question=current_question,
                             total_questions=len(questions),
-                            correct_answers=session.get('score', 0))
+                            score=session.get('score', 0))
                             
     except Exception as e:
         logger.error(f"Error in next_question route: {e}")
