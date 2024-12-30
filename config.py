@@ -34,24 +34,26 @@ class Config:
     # データベース接続設定
     DATABASE_URL = os.environ.get('DATABASE_URL')
     LOCAL_DATABASE_URL = os.environ.get('LOCAL_DATABASE_URL')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI')
     
     # 環境変数の状態をログ出力
     logger.info(json.dumps({
         'event': 'database_config',
         'environment': ENVIRONMENT,
         'database_url': bool(DATABASE_URL),
-        'local_database_url': bool(LOCAL_DATABASE_URL)
+        'local_database_url': bool(LOCAL_DATABASE_URL),
+        'sqlalchemy_database_uri': bool(SQLALCHEMY_DATABASE_URI)
     }))
     
     # SQLAlchemy設定
-    if ENVIRONMENT == 'production':
-        SQLALCHEMY_DATABASE_URI = DATABASE_URL
-        if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
-            SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-            logger.info('Converted postgres:// to postgresql:// in DATABASE_URL')
-    else:
-        SQLALCHEMY_DATABASE_URI = LOCAL_DATABASE_URL
-        logger.info('Using LOCAL_DATABASE_URL for development')
+    #if ENVIRONMENT == 'production':
+    #    SQLALCHEMY_DATABASE_URI = DATABASE_URL
+    #    if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
+    #        SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+    #        logger.info('Converted postgres:// to postgresql:// in DATABASE_URL')
+    #else:
+    #    SQLALCHEMY_DATABASE_URI = LOCAL_DATABASE_URL
+    #    logger.info('Using LOCAL_DATABASE_URL for development')
     
     # データベースURIの状態をログ出力
     logger.info(json.dumps({
