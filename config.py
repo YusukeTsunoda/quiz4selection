@@ -19,46 +19,46 @@ load_dotenv()
 # 環境変数の状態をログ出力
 logger.info(json.dumps({
     'event': 'environment_check',
-    'environment': os.environ.get('ENVIRONMENT', 'development'),
+    'vercel_env': os.environ.get('VERCEL_ENV', 'development'),
     'database_url_set': bool(os.environ.get('DATABASE_URL')),
     'local_database_url_set': bool(os.environ.get('LOCAL_DATABASE_URL')),
     'supabase_url_set': bool(os.environ.get('SUPABASE_URL')),
-    'supabase_key_set': bool(os.environ.get('SUPABASE_KEY'))
+    'supabase_key_set': bool(os.environ.get('SUPABASE_KEY')),
+    'sqlalchemy_database_uri_set': bool(os.environ.get('SQLALCHEMY_DATABASE_URI'))
 }))
 
 class Config:
     # 基本設定
     SECRET_KEY = os.environ.get('FLASK_SECRET_KEY') or 'your-secret-key'
-    ENVIRONMENT = os.environ.get('ENVIRONMENT', 'development')
+    IS_PRODUCTION = os.environ.get('VERCEL_ENV') == 'production'
     
     # データベース接続設定
     DATABASE_URL = os.environ.get('DATABASE_URL')
     LOCAL_DATABASE_URL = os.environ.get('LOCAL_DATABASE_URL')
-    SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI')
+    
+    # SQLAlchemy設定
+    if IS_PRODUCTION:
+        SQLALCHEMY_DATABASE_URI = DATABASE_URL
+        if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
+            SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+            logger.info('Converted postgres:// to postgresql:// in DATABASE_URL')
+    else:
+        SQLALCHEMY_DATABASE_URI = LOCAL_DATABASE_URL
+        logger.info('Using LOCAL_DATABASE_URL for development')
     
     # 環境変数の状態をログ出力
     logger.info(json.dumps({
         'event': 'database_config',
-        'environment': ENVIRONMENT,
+        'is_production': IS_PRODUCTION,
         'database_url': bool(DATABASE_URL),
         'local_database_url': bool(LOCAL_DATABASE_URL),
         'sqlalchemy_database_uri': bool(SQLALCHEMY_DATABASE_URI)
     }))
     
-    # SQLAlchemy設定
-    #if ENVIRONMENT == 'production':
-    #    SQLALCHEMY_DATABASE_URI = DATABASE_URL
-    #    if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
-    #        SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-    #        logger.info('Converted postgres:// to postgresql:// in DATABASE_URL')
-    #else:
-    #    SQLALCHEMY_DATABASE_URI = LOCAL_DATABASE_URL
-    #    logger.info('Using LOCAL_DATABASE_URL for development')
-    
     # データベースURIの状態をログ出力
     logger.info(json.dumps({
         'event': 'sqlalchemy_config',
-        'environment': ENVIRONMENT,
+        'is_production': IS_PRODUCTION,
         'database_uri_set': bool(SQLALCHEMY_DATABASE_URI)
     }))
     
