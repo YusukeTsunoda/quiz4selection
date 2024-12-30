@@ -69,30 +69,25 @@ class Config:
     SUPABASE_URL = os.getenv('SUPABASE_URL')
     SUPABASE_KEY = os.getenv('SUPABASE_KEY')
     DATABASE_URL = os.getenv('DATABASE_URL')
-    SUPAVISOR_URL = os.getenv('SUPAVISOR_URL')
     LOCAL_DATABASE_URL = os.getenv('LOCAL_DATABASE_URL', 'postgresql://localhost/quiz_app')
 
     # クエリタイムアウトの設定
-    QUERY_TIMEOUT = 10  # 秒
-    STATEMENT_TIMEOUT = 10000  # ミリ秒
+    QUERY_TIMEOUT = 30  # 秒
+    STATEMENT_TIMEOUT = 30000  # ミリ秒
 
     # データベース接続設定
     if IS_PRODUCTION:
-        if SUPAVISOR_URL:
-            SQLALCHEMY_DATABASE_URI = SUPAVISOR_URL
-            logger.info("Using Supavisor connection in production")
-        else:
-            SQLALCHEMY_DATABASE_URI = DATABASE_URL
-            if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
-                SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-            logger.info("Using Supabase direct connection in production")
-            # 接続文字列のデバッグ（パスワードは隠す）
-            debug_uri = SQLALCHEMY_DATABASE_URI
-            if debug_uri:
-                parts = debug_uri.split('@')
-                if len(parts) > 1:
-                    masked_uri = f"{parts[0].split(':')[0]}:****@{parts[1]}"
-                    logger.info(f"Database URI format: {masked_uri}")
+        SQLALCHEMY_DATABASE_URI = DATABASE_URL
+        if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
+            SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+        logger.info("Using Supabase direct connection in production")
+        # 接続文字列のデバッグ（パスワードは隠す）
+        debug_uri = SQLALCHEMY_DATABASE_URI
+        if debug_uri:
+            parts = debug_uri.split('@')
+            if len(parts) > 1:
+                masked_uri = f"{parts[0].split(':')[0]}:****@{parts[1]}"
+                logger.info(f"Database URI format: {masked_uri}")
     else:
         SQLALCHEMY_DATABASE_URI = LOCAL_DATABASE_URL
         logger.info("Using local database connection")
@@ -104,30 +99,32 @@ class Config:
         "pool_size": 1 if IS_PRODUCTION else 5,
         "max_overflow": 0,
         "connect_args": {
-            "sslmode": "verify-full" if IS_PRODUCTION else "disable",
-            "connect_timeout": 10,
+            "sslmode": "require" if IS_PRODUCTION else "disable",
+            "connect_timeout": 30,  # タイムアウトを30秒に延長
             "application_name": "quiz_app",
             "keepalives": 1,
             "keepalives_idle": 30,
             "keepalives_interval": 10,
             "keepalives_count": 5,
             "options": f"-c statement_timeout={STATEMENT_TIMEOUT}",
-            "tcp_user_timeout": 10000,  # 10秒
-            "client_encoding": 'utf8'
+            "tcp_user_timeout": 30000,  # 30秒
+            "client_encoding": 'utf8',
+            "target_session_attrs": "read-write"  # 読み書き可能なセッションを確保
         },
         "pool_pre_ping": True,
         "pool_recycle": 60,
-        "pool_timeout": 10,
+        "pool_timeout": 30,  # プールタイムアウトも30秒に延長
         "execution_options": {
-            "timeout": QUERY_TIMEOUT
+            "timeout": 30  # クエリタイムアウトも30秒に延長
         }
     }
 
     # SSL設定のログ出力
     if IS_PRODUCTION:
         logger.info(f"SSL Mode: {SQLALCHEMY_ENGINE_OPTIONS['connect_args']['sslmode']}")
-        logger.info("TCP User Timeout: 10 seconds")
-        logger.info("Client Encoding: utf8")
+        logger.info(f"TCP User Timeout: {SQLALCHEMY_ENGINE_OPTIONS['connect_args']['tcp_user_timeout']} milliseconds")
+        logger.info(f"Client Encoding: {SQLALCHEMY_ENGINE_OPTIONS['connect_args']['client_encoding']}")
+        logger.info(f"Target Session Attrs: {SQLALCHEMY_ENGINE_OPTIONS['connect_args']['target_session_attrs']}")
 
     # キャッシュ設定
     CACHE_TYPE = "simple"
@@ -154,15 +151,39 @@ def get_supabase_client():
 
     if _supabase_instance is None:
         start_time = time.time()
-        try:
-            logger.info("Initializing Supabase client...")
-            _supabase_instance = create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY)
-            _last_connection_time = current_time
-            end_time = time.time()
-            logger.info(f"Supabase client initialized successfully in {end_time - start_time:.2f} seconds")
-        except Exception as e:
-            logger.error(f"Error initializing Supabase client: {e}", exc_info=True)
-            return None
+        retry_count = 0
+        max_retries = 3
+        retry_delay = 2  # 秒
+
+        while retry_count < max_retries:
+            try:
+                logger.info(f"Initializing Supabase client (attempt {retry_count + 1}/{max_retries})...")
+                _supabase_instance = create_client(
+                    Config.SUPABASE_URL,
+                    Config.SUPABASE_KEY,
+                    options={
+                        'timeout': 30,  # 30秒タイムアウト
+                        'headers': {
+                            'X-Client-Info': 'quiz_app'
+                        }
+                    }
+                )
+                # 接続テスト
+                _supabase_instance.table('quiz_attempts').select('count').limit(1).execute()
+                
+                _last_connection_time = current_time
+                end_time = time.time()
+                logger.info(f"Supabase client initialized and tested successfully in {end_time - start_time:.2f} seconds")
+                break
+            except Exception as e:
+                retry_count += 1
+                logger.error(f"Error initializing Supabase client (attempt {retry_count}/{max_retries}): {e}")
+                if retry_count < max_retries:
+                    logger.info(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                else:
+                    logger.error("Failed to initialize Supabase client after all retries")
+                    return None
 
     return _supabase_instance
 
