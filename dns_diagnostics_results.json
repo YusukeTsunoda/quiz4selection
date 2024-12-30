@@ -1,0 +1,34 @@
+{
+  "timestamp": "2024-12-30T19:09:19.844779",
+  "tests": {
+    "basic_dns": {
+      "status": "error",
+      "error": "[Errno 8] nodename nor servname provided, or not known"
+    },
+    "dns_servers": [
+      "fe80::1487:6aff:fe66:af64%en0",
+      "172.20.10.1"
+    ],
+    "dns_records": {
+      "status": "error",
+      "error": "The DNS response does not contain an answer to the question: db.cujvnutaucgrhleclmpq.supabase.co. IN A"
+    },
+    "connectivity": {
+      "status": "success",
+      "message": "Successfully connected to db.cujvnutaucgrhleclmpq.supabase.co:5432"
+    },
+    "ssl": {
+      "status": "error",
+      "error": "[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1000)"
+    },
+    "ping": {
+      "status": "error",
+      "output": ""
+    }
+  },
+  "system_info": {
+    "platform": "Darwin",
+    "platform_version": "Darwin Kernel Version 24.1.0: Thu Oct 10 21:05:14 PDT 2024; root:xnu-11215.41.3~2/RELEASE_ARM64_T8103",
+    "python_version": "3.12.1"
+  }
+}
