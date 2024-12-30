@@ -26,8 +26,8 @@ class Config:
             'vercel_env': os.environ.get('VERCEL_ENV'),
             'database_url_set': bool(os.environ.get('DATABASE_URL')),
             'local_database_url_set': bool(os.environ.get('LOCAL_DATABASE_URL')),
-            'supabase_url_set': bool(os.environ.get('SUPABASE_URL')),
-            'supabase_key_set': bool(os.environ.get('SUPABASE_KEY')),
+            'supabase_url_set': bool(os.environ.get('NEXT_PUBLIC_SUPABASE_URL')),
+            'supabase_key_set': bool(os.environ.get('NEXT_PUBLIC_SUPABASE_ANON_KEY')),
             'sqlalchemy_database_uri_set': bool(hasattr(self, 'SQLALCHEMY_DATABASE_URI'))
         }))
         
@@ -65,11 +65,11 @@ class Config:
 # Supabaseクライアントの初期化
 try:
     logger.info("Initializing Supabase client...")
-    if os.environ.get('SUPABASE_URL') and os.environ.get('SUPABASE_KEY'):
+    if os.environ.get('NEXT_PUBLIC_SUPABASE_URL') and os.environ.get('NEXT_PUBLIC_SUPABASE_ANON_KEY'):
         from supabase import create_client
         supabase = create_client(
-            os.environ.get('SUPABASE_URL'),
-            os.environ.get('SUPABASE_KEY')
+            os.environ.get('NEXT_PUBLIC_SUPABASE_URL'),
+            os.environ.get('NEXT_PUBLIC_SUPABASE_ANON_KEY')
         )
     else:
         logger.error("Failed to initialize Supabase client: supabase_url is required")

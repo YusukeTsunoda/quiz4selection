@@ -36,11 +36,11 @@ else:
     logger.info("Loading production configuration...")
     # Supabase URLの確認
     if not os.environ.get(
-            'SUPABASE_URL') or not os.environ.get('SUPABASE_KEY'):
+            'NEXT_PUBLIC_SUPABASE_URL') or not os.environ.get('NEXT_PUBLIC_SUPABASE_ANON_KEY'):
         logger.error(
             "Supabase credentials are not set in production environment")
         raise ValueError(
-            "SUPABASE_URL and SUPABASE_KEY are required in production")
+            "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required in production")
 
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
