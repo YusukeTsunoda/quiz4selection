@@ -19,6 +19,12 @@ import psutil
 import traceback
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+import logging
+from logging.config import dictConfig
+from models import db, User, QuizAttempt
+from config import Config
 
 # ロガーの設定
 logging.basicConfig(
@@ -583,3 +589,193 @@ def grade_select():
     学年選択ページを表示
     """
     return render_template('grade_select.html')
+
+@app.route('/grade/<int:grade>/category')
+def select_category(grade):
+    """
+    カテゴリー選択ページを表示
+    """
+    if grade < 1 or grade > 6:
+        flash('Invalid grade selected')
+        return redirect(url_for('grade_select'))
+    
+    return render_template('category_select.html', grade=grade)
+
+@app.route('/dashboard')
+def dashboard():
+    """
+    学習成績ダッシュボードを表示
+    """
+    # クイズの試行履歴を取得
+    quiz_attempts = QuizAttempt.query.order_by(QuizAttempt.id.desc()).all()
+    return render_template('dashboard.html', quiz_attempts=quiz_attempts)
+
+@app.route('/grade/<int:grade>/category/<category>/subcategory')
+def select_subcategory(grade, category):
+    """
+    サブカテゴリー選択ページを表示
+    """
+    if grade < 1 or grade > 6:
+        flash('Invalid grade selected')
+        return redirect(url_for('grade_select'))
+    
+    if category not in ['japanese', 'math', 'science', 'society']:
+        flash('Invalid category selected')
+        return redirect(url_for('select_category', grade=grade))
+    
+    return render_template('subcategory_select.html', grade=grade, category=category)
+
+@app.route('/grade/<int:grade>/category/<category>/subcategory/<subcategory>/difficulty')
+def select_difficulty(grade, category, subcategory):
+    """
+    難易度選択ページを表示
+    """
+    if grade < 1 or grade > 6:
+        flash('Invalid grade selected')
+        return redirect(url_for('grade_select'))
+    
+    if category not in ['japanese', 'math', 'science', 'society']:
+        flash('Invalid category selected')
+        return redirect(url_for('select_category', grade=grade))
+    
+    return render_template('difficulty_select.html', 
+                         grade=grade, 
+                         category=category, 
+                         subcategory=subcategory)
+
+@app.route('/grade/<int:grade>/category/<category>/subcategory/<subcategory>/difficulty/<difficulty>/start')
+def start_quiz(grade, category, subcategory, difficulty):
+    """
+    クイズを開始
+    """
+    if grade < 1 or grade > 6:
+        flash('Invalid grade selected')
+        return redirect(url_for('grade_select'))
+    
+    if category not in ['japanese', 'math', 'science', 'society']:
+        flash('Invalid category selected')
+        return redirect(url_for('select_category', grade=grade))
+    
+    if difficulty not in ['easy', 'medium', 'hard']:
+        flash('Invalid difficulty selected')
+        return redirect(url_for('select_difficulty', grade=grade, category=category, subcategory=subcategory))
+    
+    # クイズデータを読み込む
+    quiz_file = f'quiz_data/grade{grade}/{category}.json'
+    try:
+        with open(quiz_file, 'r', encoding='utf-8') as f:
+            quiz_data = json.load(f)
+    except FileNotFoundError:
+        flash('Quiz data not found')
+        return redirect(url_for('grade_select'))
+    
+    # 選択された条件に合うクイズをフィルタリング
+    filtered_questions = [q for q in quiz_data 
+                        if q['subcategory'] == subcategory and 
+                           q['difficulty'] == difficulty]
+    
+    if not filtered_questions:
+        flash('No questions available for selected criteria')
+        return redirect(url_for('select_difficulty', 
+                              grade=grade, 
+                              category=category, 
+                              subcategory=subcategory))
+    
+    # クイズをシャッフル
+    random.shuffle(filtered_questions)
+    
+    # セッションにクイズ情報を保存
+    session['questions'] = filtered_questions
+    session['current_question'] = 0
+    session['score'] = 0
+    session['grade'] = grade
+    session['category'] = category
+    session['subcategory'] = subcategory
+    session['difficulty'] = difficulty
+    
+    return redirect(url_for('show_question'))
+
+@app.route('/question')
+def show_question():
+    """
+    問題を表示
+    """
+    if 'questions' not in session:
+        flash('No quiz in progress')
+        return redirect(url_for('grade_select'))
+    
+    current = session.get('current_question', 0)
+    questions = session.get('questions', [])
+    
+    if current >= len(questions):
+        # クイズ終了時の処理
+        score = session.get('score', 0)
+        total_questions = len(questions)
+        grade = session.get('grade')
+        category = session.get('category')
+        subcategory = session.get('subcategory')
+        difficulty = session.get('difficulty')
+        
+        # 結果をデータベースに保存
+        quiz_attempt = QuizAttempt(
+            score=score,
+            total_questions=total_questions,
+            grade=grade,
+            category=category,
+            subcategory=subcategory,
+            difficulty=difficulty
+        )
+        db.session.add(quiz_attempt)
+        db.session.commit()
+        
+        # セッションをクリア
+        session.pop('questions', None)
+        session.pop('current_question', None)
+        session.pop('score', None)
+        session.pop('grade', None)
+        session.pop('category', None)
+        session.pop('subcategory', None)
+        session.pop('difficulty', None)
+        
+        return render_template('result.html', 
+                             score=score, 
+                             total_questions=total_questions)
+    
+    question_data = questions[current]
+    return render_template('quiz.html',
+                         current_question=current,
+                         total_questions=len(questions),
+                         score=session.get('score', 0),
+                         question=question_data['question_text'],
+                         options=question_data['choices'],
+                         question_data=question_data)
+
+@app.route('/answer', methods=['POST'])
+def submit_answer():
+    """
+    回答を処理
+    """
+    if 'questions' not in session:
+        flash('No quiz in progress')
+        return redirect(url_for('grade_select'))
+    
+    current = session.get('current_question', 0)
+    questions = session.get('questions', [])
+    
+    if current >= len(questions):
+        return redirect(url_for('show_question'))
+    
+    # 回答を取得
+    answer = request.form.get('answer')
+    correct_answer = questions[current]['correct_answer']
+    
+    # 正誤判定
+    if answer == correct_answer:
+        session['score'] = session.get('score', 0) + 1
+        flash('Correct!', 'success')
+    else:
+        flash(f'Incorrect. The correct answer was: {correct_answer}', 'error')
+    
+    # 次の問題へ
+    session['current_question'] = current + 1
+    return redirect(url_for('show_question'))

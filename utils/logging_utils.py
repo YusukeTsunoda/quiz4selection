@@ -6,7 +6,7 @@ import os
 import psutil
 
 def setup_logger(name, level=logging.INFO):
-    """ロガーのセットアップ（標準出力のみ）"""
+    """ロガーのセットアップ（ファイル出力のみ）"""
     logger = logging.getLogger(name)
     
     # すでに設定済みの場合は既存のロガーを返す
@@ -20,10 +20,22 @@ def setup_logger(name, level=logging.INFO):
         '%(asctime)s [%(name)s] %(levelname)s: %(message)s'
     )
 
-    # 標準出力へのハンドラを追加
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    # ログディレクトリの作成
+    log_dir = 'logs'
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+
+    # 通常のログはファイルにのみ出力
+    file_handler = logging.FileHandler(os.path.join(log_dir, f'{name}.log'))
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.INFO)
+    logger.addHandler(file_handler)
+
+    # エラーログは標準出力とファイルの両方に出力
+    error_handler = logging.StreamHandler()
+    error_handler.setFormatter(formatter)
+    error_handler.setLevel(logging.ERROR)
+    logger.addHandler(error_handler)
 
     return logger
 
