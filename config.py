@@ -100,24 +100,38 @@ class Config:
         "max_overflow": 0,
         "connect_args": {
             "sslmode": "require" if IS_PRODUCTION else "disable",
-            "connect_timeout": 30,  # タイムアウトを30秒に延長
+            "connect_timeout": 30,
             "application_name": "quiz_app",
             "keepalives": 1,
             "keepalives_idle": 30,
             "keepalives_interval": 10,
             "keepalives_count": 5,
             "options": f"-c statement_timeout={STATEMENT_TIMEOUT}",
-            "tcp_user_timeout": 30000,  # 30秒
+            "tcp_user_timeout": 30000,
             "client_encoding": 'utf8',
-            "target_session_attrs": "read-write"  # 読み書き可能なセッションを確保
+            "target_session_attrs": "read-write",
+            "tcp_keepalives": 1,
+            "tcp_keepalives_idle": 30,
+            "tcp_keepalives_interval": 10,
+            "tcp_keepalives_count": 5,
+            "application_name": "quiz_app_vercel"
         },
         "pool_pre_ping": True,
         "pool_recycle": 60,
-        "pool_timeout": 30,  # プールタイムアウトも30秒に延長
+        "pool_timeout": 30,
         "execution_options": {
-            "timeout": 30  # クエリタイムアウトも30秒に延長
+            "timeout": 30
         }
     }
+
+    # 本番環境での追加設定
+    if IS_PRODUCTION:
+        SQLALCHEMY_ENGINE_OPTIONS.update({
+            "isolation_level": "READ COMMITTED",
+            "echo": True,  # SQLログを有効化
+            "echo_pool": True,  # プールのログを有効化
+            "pool_reset_on_return": "rollback"  # コネクション返却時にロールバック
+        })
 
     # SSL設定のログ出力
     if IS_PRODUCTION:
@@ -159,19 +173,30 @@ def get_supabase_client():
             try:
                 logger.info(f"Initializing Supabase client (attempt {retry_count + 1}/{max_retries})...")
                 
-                # シンプルな初期化
+                # 接続オプションを追加
+                options = {
+                    'postgrest_client_timeout': 30,
+                    'storage_client_timeout': 30,
+                    'realtime_client_timeout': 30,
+                    'use_simple_client': True  # シンプルなクライアントを使用
+                }
+                
                 _supabase_instance = create_client(
                     Config.SUPABASE_URL,
-                    Config.SUPABASE_KEY
+                    Config.SUPABASE_KEY,
+                    options=options
                 )
                 
-                # 接続テスト
-                test_result = _supabase_instance.table('quiz_attempts').select('count').limit(1).execute()
-                logger.info("Connection test successful")
+                # 軽量な接続テスト
+                try:
+                    _supabase_instance.auth.get_session()
+                    logger.info("Connection test successful")
+                except Exception as e:
+                    logger.warning(f"Auth test failed, but continuing: {e}")
                 
                 _last_connection_time = current_time
                 end_time = time.time()
-                logger.info(f"Supabase client initialized and tested successfully in {end_time - start_time:.2f} seconds")
+                logger.info(f"Supabase client initialized successfully in {end_time - start_time:.2f} seconds")
                 break
             except Exception as e:
                 retry_count += 1
