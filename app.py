@@ -97,7 +97,7 @@ app = Flask(__name__)
 # データベースURLの設定
 if os.environ.get('VERCEL_ENV') == 'development':
     # 開発環境ではローカルデータベースを使用
-    db_uri = os.environ.get('LOCAL_DATABASE_URL', 'postgresql://postgres:postgres@localhost:6543/quiz_db')
+    db_uri = os.environ.get('LOCAL_DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/quiz_db')
     logger.info("Using LOCAL_DATABASE_URL for development")
 else:
     # 本番環境ではDATABASE_URLを使用
@@ -200,7 +200,7 @@ def check_db_connection():
         try:
             addrinfo = socket.getaddrinfo(
                 db_host,
-                6543,
+                5432,
                 socket.AF_INET,  # IPv4のみを使用
                 socket.SOCK_STREAM
             )
@@ -228,7 +228,7 @@ def check_db_connection():
             'event': 'db_connection_attempt',
             'connection_details': {
                 'host': db_host,
-                'port': 6543,
+                'port': 5432,
                 'ssl_mode': app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'].get('sslmode'),
                 'timeout': app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'].get('connect_timeout'),
                 'socket_options': {
@@ -259,7 +259,7 @@ def check_db_connection():
             'traceback': traceback.format_exc(),
             'connection_details': {
                 'host': db_host,
-                'port': 6543,
+                'port': 5432,
                 'engine_options': app.config['SQLALCHEMY_ENGINE_OPTIONS'],
                 'socket_error': str(e) if isinstance(e, socket.error) else None
             },
@@ -298,7 +298,7 @@ def before_request():
             'request_id': g.request_id,
             'error_details': {
                 'host': db_host,
-                'port': 6543,
+                'port': 5432,
                 'engine_options': app.config['SQLALCHEMY_ENGINE_OPTIONS']
             },
             'timestamp': time.time()
@@ -348,7 +348,7 @@ def gateway_timeout(error):
         'engine_options': app.config['SQLALCHEMY_ENGINE_OPTIONS'],
         'connection_error_details': {
             'host': app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1].split('/')[0].split(':')[0],
-            'port': 6543,
+            'port': 5432,
             'timeout_settings': {
                 'connect_timeout': app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'].get('connect_timeout'),
                 'pool_timeout': app.config['SQLALCHEMY_ENGINE_OPTIONS'].get('pool_timeout')
@@ -409,7 +409,7 @@ def test_database_connection():
             # URIからホスト情報を抽出
             uri_parts = db_uri.split('@')[1].split('/')
             db_host = uri_parts[0].split(':')[0]
-            db_port = uri_parts[0].split(':')[1] if ':' in uri_parts[0] else '6543'
+            db_port = uri_parts[0].split(':')[1] if ':' in uri_parts[0] else '5432'
             db_name = uri_parts[1].split('?')[0] if '?' in uri_parts[1] else uri_parts[1]
             
             logger.info(json.dumps({
