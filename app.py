@@ -163,12 +163,14 @@ migrate = Migrate(app, db)
 @log_performance
 def check_db_connection():
     try:
-        logger.info(json.dumps({
+        logger.error(json.dumps({
             'event': 'db_connection_attempt',
-            'db_uri': app.config['SQLALCHEMY_DATABASE_URI'].replace(
-                app.config['SQLALCHEMY_DATABASE_URI'].split('@')[0],
-                '***SECRET***'
-            ),
+            'connection_details': {
+                'host': app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1].split('/')[0].split(':')[0],
+                'port': 5432,
+                'ssl_mode': app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'].get('sslmode'),
+                'timeout': app.config['SQLALCHEMY_ENGINE_OPTIONS']['connect_args'].get('connect_timeout')
+            },
             'timestamp': time.time()
         }))
         
@@ -186,50 +188,43 @@ def check_db_connection():
     except Exception as e:
         logger.error(json.dumps({
             'event': 'db_connection_error',
-            'error': str(e),
+            'error_type': type(e).__name__,
+            'error_message': str(e),
             'traceback': traceback.format_exc(),
+            'connection_details': {
+                'host': app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1].split('/')[0].split(':')[0],
+                'port': 5432,
+                'engine_options': app.config['SQLALCHEMY_ENGINE_OPTIONS']
+            },
             'timestamp': time.time()
         }))
         return False
 
 @app.before_request
 def before_request():
-    start_time = time.time()
-    g.request_start_time = start_time
+    g.request_start_time = time.time()
     g.request_id = str(uuid.uuid4())
     
-    # データベース接続情報のログ
-    db_uri = app.config['SQLALCHEMY_DATABASE_URI']
-    masked_uri = db_uri.split('@')[1] if '@' in db_uri else 'masked'
-    logger.info(json.dumps({
-        'event': 'database_config',
-        'request_id': g.request_id,
-        'host': masked_uri.split('/')[0],
-        'engine_options': app.config['SQLALCHEMY_ENGINE_OPTIONS'],
-        'timestamp': time.time()
-    }))
-    
-    # DNS解決のテスト
     try:
         db_host = app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1].split('/')[0].split(':')[0]
         ip_address = socket.gethostbyname(db_host)
-        logger.info(json.dumps({
-            'event': 'dns_resolution',
+        logger.error(json.dumps({
+            'event': 'connection_check',
             'request_id': g.request_id,
-            'host': db_host,
-            'ip': ip_address,
+            'dns_resolution': {
+                'host': db_host,
+                'resolved_ip': ip_address
+            },
             'timestamp': time.time()
         }))
     except Exception as e:
         logger.error(json.dumps({
             'event': 'dns_resolution_error',
             'request_id': g.request_id,
-            'host': db_host,
             'error': str(e),
             'timestamp': time.time()
         }))
     
-    # データベース接続テスト
     if not check_db_connection():
         logger.error(json.dumps({
             'event': 'database_connection_failed',
@@ -296,13 +291,13 @@ def gateway_timeout(error):
     }))
     return "Gateway Timeout - The server took too long to respond", 504
 
-@app.errorhandler(Exception)
-def handle_exception(e):
+@app.errorhandler(500)
+def internal_server_error(error):
     logger.error(json.dumps({
-        'event': 'unhandled_exception',
+        'event': 'internal_server_error',
         'request_id': getattr(g, 'request_id', 'unknown'),
-        'error_type': type(e).__name__,
-        'error': str(e),
+        'error_type': type(error).__name__,
+        'error_message': str(error),
         'path': request.path,
         'method': request.method,
         'traceback': traceback.format_exc(),
@@ -312,7 +307,7 @@ def handle_exception(e):
         },
         'timestamp': time.time()
     }))
-    return "An internal error occurred", 500
+    return "Internal Server Error", 500
 
 # データベーステーブルの作成（キャッシュ付き）
 @cache.memoize(timeout=3600)
