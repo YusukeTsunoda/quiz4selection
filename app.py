@@ -91,9 +91,31 @@ def log_performance(func):
 
 # Initialize Flask app
 app = Flask(__name__)
+
+# データベースURLの設定
+if os.environ.get('ENVIRONMENT') == 'production':
+    db_uri = os.environ.get('DATABASE_URL')
+    if db_uri and db_uri.startswith('postgres://'):
+        db_uri = db_uri.replace('postgres://', 'postgresql://', 1)
+else:
+    db_uri = os.environ.get('LOCAL_DATABASE_URL')
+
+if not db_uri:
+    raise ValueError("Database URI is not set")
+
+app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_size': 1,
+    'pool_timeout': 30,
+    'pool_recycle': 1800,
+    'pool_pre_ping': True
+}
+
+# 残りの設定を読み込む
 app.config.from_object(Config)
 
-# Initialize cache with larger timeout
+# Initialize cache
 cache = Cache(app, config={
     'CACHE_TYPE': 'simple',
     'CACHE_DEFAULT_TIMEOUT': 300
