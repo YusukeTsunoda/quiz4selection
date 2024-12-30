@@ -118,7 +118,11 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'keepalives': 1,
         'keepalives_idle': 30,
         'keepalives_interval': 10,
-        'keepalives_count': 5
+        'keepalives_count': 5,
+        'sslmode': 'require',
+        'ssl': True,
+        'ssl_min_protocol_version': 'TLSv1.2',
+        'options': '-c statement_timeout=5000'
     }
 }
 
