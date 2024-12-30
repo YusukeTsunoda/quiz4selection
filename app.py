@@ -3,10 +3,11 @@ import sys
 import json
 import random
 import logging
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, g
 from models import db, QuizAttempt
-from config import Config
+from config import Config, test_database_connection
 from dotenv import load_dotenv
+from sqlalchemy.exc import SQLAlchemyError
 
 # .envファイルを読み込む
 load_dotenv()
@@ -21,37 +22,69 @@ app = Flask(__name__)
 # シークレットキーの設定
 app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key')
 
-# 環境に応じた設定の読み込み
-if os.environ.get('FLASK_ENV') == 'development' or os.environ.get(
-        'VERCEL_ENV') == 'development':
-    # 開発環境の設定
-    logger.info("Loading development configuration...")
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
-        'LOCAL_DATABASE_URL')
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['DEVELOPMENT'] = True
-    app.config['DEBUG'] = True
-else:
-    # 本番環境の設定
-    logger.info("Loading production configuration...")
-    # Supabase URLの確認
-    if not os.environ.get(
-            'NEXT_PUBLIC_SUPABASE_URL') or not os.environ.get('NEXT_PUBLIC_SUPABASE_ANON_KEY'):
-        logger.error(
-            "Supabase credentials are not set in production environment")
-        raise ValueError(
-            "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required in production")
-
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['DEVELOPMENT'] = False
-    app.config['DEBUG'] = False
-
-# その他の共通設定
-app.config.from_object(Config)
+# 設定の読み込み
+try:
+    app.config.from_object(Config())
+    logger.info("Application configuration loaded successfully")
+except Exception as e:
+    logger.error(f"Failed to load application configuration: {e}")
+    sys.exit(1)
 
 # データベースの初期化
-db.init_app(app)
+try:
+    db.init_app(app)
+    with app.app_context():
+        # データベース接続のテスト
+        if not test_database_connection(app):
+            logger.error("Database connection test failed")
+            sys.exit(1)
+        
+        # データベーステーブルの作成
+        db.create_all()
+        logger.info("Database initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize database: {e}")
+    sys.exit(1)
+
+# データベース接続エラーハンドリング
+def get_db():
+    """データベース接続を取得する関数"""
+    try:
+        if not hasattr(g, 'db_conn'):
+            g.db_conn = db.engine.connect()
+        return g.db_conn
+    except Exception as e:
+        logger.error(f"Database connection error: {e}")
+        raise
+
+@app.teardown_appcontext
+def close_db(error):
+    """データベース接続を閉じる関数"""
+    db_conn = getattr(g, 'db_conn', None)
+    if db_conn is not None:
+        db_conn.close()
+
+def init_app():
+    """アプリケーションの初期化"""
+    with app.app_context():
+        try:
+            # データベースの作成
+            db.create_all()
+            # 接続テスト
+            with get_db() as conn:
+                conn.execute('SELECT 1')
+            logger.info('Database connection successful')
+        except Exception as e:
+            logger.error(f'Database initialization error: {e}')
+            sys.exit(1)
+
+# 各ルートでのデータベースエラーハンドリング
+@app.errorhandler(SQLAlchemyError)
+def handle_db_error(error):
+    """データベースエラーのハンドリング"""
+    logger.error(f"Database error occurred: {error}")
+    db.session.rollback()
+    return "データベースエラーが発生しました。しばらく待ってから再試行してください。", 500
 
 # カテゴリーと科目の定義
 CATEGORY_NAMES = {
@@ -81,48 +114,32 @@ SUBCATEGORY_NAMES = {
     'prefectures': '都道府県'
 }
 
-
-def init_app():
-    """アプリケーションの初期化"""
-    with app.app_context():
-        try:
-            # データベースの作成
-            db.create_all()
-            logger.info('Database tables created successfully')
-        except Exception as e:
-            logger.error(f'Error creating database tables: {e}')
-            sys.exit(1)
-
-
 def get_shuffled_question(question):
     """問題の選択肢をシャッフルする"""
     shuffled = question.copy()
     options = shuffled['options'].copy()
     correct = shuffled['correct']
-
+    
     # 選択肢をシャッフル
     indices = list(range(len(options)))
     random.shuffle(indices)
-
+    
     # 選択肢を並び替え
     shuffled['options'] = [options[i] for i in indices]
     # 正解のインデックスも更新
     shuffled['correct'] = indices.index(correct)
-
+    
     return shuffled
-
 
 @app.route('/')
 def index():
     """ルートページのハンドラ"""
     return redirect(url_for('grade_select'))
 
-
 @app.route('/grade_select')
 def grade_select():
     """学年選択ページを表示"""
     return render_template('grade_select.html')
-
 
 @app.route('/grade/<int:grade>/category')
 def select_category(grade):
@@ -130,9 +147,8 @@ def select_category(grade):
     if grade < 1 or grade > 6:
         flash('無効な学年が選択されました')
         return redirect(url_for('grade_select'))
-
+    
     return render_template('category_select.html', grade=grade)
-
 
 @app.route('/grade/<int:grade>/category/<category>/subcategory')
 def select_subcategory(grade, category):
@@ -145,13 +161,11 @@ def select_subcategory(grade, category):
                            subcategories=subcategories,
                            subcategory_names=SUBCATEGORY_NAMES)
 
-
 @app.route('/grade/<int:grade>/category/<category>/subcategory/<subcategory>/difficulty')
 def select_difficulty(grade, category, subcategory):
     """難易度選択画面を表示する"""
     try:
-        logger.info(
-            f"Entering select_difficulty with grade={grade}, category={category}, subcategory={subcategory}")
+        logger.info(f"Entering select_difficulty with grade={grade}, category={category}, subcategory={subcategory}")
 
         # 問題データの存在確認
         file_path = f'quiz_data/grade_{grade}/{category}.json'
@@ -172,17 +186,13 @@ def select_difficulty(grade, category, subcategory):
                 return redirect(url_for('grade_select'))
 
             logger.info(f"Found subcategory {subcategory} in data")
-            logger.info(
-                f"Available difficulties in {subcategory}: {
-                    list(
-                        data[subcategory].keys())}")
+            logger.info(f"Available difficulties in {subcategory}: {list(data[subcategory].keys())}")
 
         # 各難易度のクイズ統計を取得
         stats = {}
         for difficulty in ['easy', 'medium', 'hard']:
             logger.info(f"Getting stats for difficulty: {difficulty}")
-            stats[difficulty] = QuizAttempt.get_stats(
-                grade, category, subcategory, difficulty)
+            stats[difficulty] = QuizAttempt.get_stats(grade, category, subcategory, difficulty)
             logger.info(f"Stats for {difficulty}: {stats[difficulty]}")
 
         logger.info("Preparing to render template with context:")
@@ -194,12 +204,12 @@ def select_difficulty(grade, category, subcategory):
         logger.info(f"stats: {stats}")
 
         return render_template('difficulty_select.html',
-                               grade=grade,
-                               category=category,
-                               subcategory=subcategory,
-                               stats=stats,
-                               category_name=CATEGORY_NAMES[category],
-                               subcategory_name=SUBCATEGORY_NAMES[subcategory])
+                            grade=grade,
+                            category=category,
+                            subcategory=subcategory,
+                            stats=stats,
+                            category_name=CATEGORY_NAMES[category],
+                            subcategory_name=SUBCATEGORY_NAMES[subcategory])
     except Exception as e:
         logger.error(f"Error in select_difficulty: {e}")
         logger.exception("Full traceback:")
@@ -224,9 +234,7 @@ def start_quiz(grade, category, subcategory, difficulty):
 
         # 問題を取得
         questions = get_questions(grade, category, subcategory, difficulty)
-        logger.info(
-            f"Retrieved {
-                len(questions) if questions else 0} questions")
+        logger.info(f"Retrieved {len(questions) if questions else 0} questions")
 
         if not questions:
             logger.error("No questions retrieved")
@@ -235,8 +243,7 @@ def start_quiz(grade, category, subcategory, difficulty):
                             category=category, subcategory=subcategory))
 
         logger.info(f"Starting quiz with {len(questions)} questions")
-        logger.info(
-            f"Question categories: {category}, {subcategory}, {difficulty}")
+        logger.info(f"Question categories: {category}, {subcategory}, {difficulty}")
 
         # セッションに情報を保存
         session['questions'] = questions
@@ -253,12 +260,12 @@ def start_quiz(grade, category, subcategory, difficulty):
         logger.info("Rendering first question")
         first_question = questions[0]
         return render_template('quiz.html',
-                               question=first_question['question'],
-                               options=first_question['options'],
-                               question_data=first_question,
-                               current_question=0,
-                               total_questions=len(questions),
-                               score=0)
+                            question=first_question['question'],
+                            options=first_question['options'],
+                            question_data=first_question,
+                            current_question=0,
+                            total_questions=len(questions),
+                            score=0)
 
     except Exception as e:
         logger.error(f"Error in start_quiz: {e}")
@@ -480,7 +487,7 @@ def dashboard():
         logger.exception("Full traceback:")
         flash('ダッシュボードの表示中にエラーが発生しました。', 'error')
         return redirect(url_for('grade_select'))
-
+    
 
 @app.route('/result')
 def result():
@@ -499,7 +506,7 @@ def result():
 
         return render_template('result.html',
                                correct_answers=score,
-                               total_questions=total_questions,
+            total_questions=total_questions,
                                quiz_history=quiz_history)
 
     except Exception as e:
