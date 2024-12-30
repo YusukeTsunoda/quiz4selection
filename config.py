@@ -19,20 +19,6 @@ class Config:
     FLASK_ENV = os.environ.get('FLASK_ENV', 'development')
     VERCEL_ENV = os.environ.get('VERCEL_ENV')
     
-    # データベース設定
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get('LOCAL_DATABASE_URL')  # 開発環境用のデフォルト値
-
-    # 環境に応じたデータベース接続オプション
-    if FLASK_ENV == 'development' or VERCEL_ENV == 'development':
-        SQLALCHEMY_ENGINE_OPTIONS = {}  # 開発環境ではSSLを無効化
-    else:
-        SQLALCHEMY_ENGINE_OPTIONS = {  # 本番環境ではSSLを要求
-            'connect_args': {
-                'sslmode': 'require',
-                'connect_timeout': 30
-            }
-        }
 
     
     def __init__(self):
