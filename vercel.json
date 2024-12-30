@@ -2,19 +2,22 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/*.py",
+      "src": "app.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "src": "/(.*)",
+      "dest": "app.py"
     }
   ],
   "functions": {
     "api/*.py": {
       "maxDuration": 60
     }
+  },
+  "env": {
+    "PYTHONPATH": "."   
   }
 }
