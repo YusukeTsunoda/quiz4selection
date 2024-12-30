@@ -1,200 +1,139 @@
-import os
-import sys
-import socket
-import dns.resolver
-import psycopg2
-import urllib.parse
-import logging
+import subprocess
 import json
-import ssl
+import socket
+import platform
 from datetime import datetime
-from typing import Dict, Any, Optional
+import logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class VercelDatabaseDiagnostic:
-    def __init__(self):
+class MacDNSDiagnostics:
+    def __init__(self, host="db.cujvnutaucgrhleclmpq.supabase.co", port=5432):
+        self.host = host
+        self.port = port
         self.results = {
             "timestamp": datetime.now().isoformat(),
-            "environment": {},
-            "dns_check": {},
-            "connection_details": {},
-            "postgres_check": {},
-            "overall_status": "pending"
+            "system_info": self._get_system_info(),
+            "tests": {}
         }
-        
-    def check_environment(self) -> None:
-        """環境変数とVercel固有の設定を確認"""
-        logger.info("環境変数の確認を開始")
-        
-        # 重要な環境変数の存在確認
-        env_vars = [
-            'POSTGRES_URL',
-            'POSTGRES_PRISMA_URL',
-            'POSTGRES_URL_NON_POOLING',
-            'SUPABASE_URL',
-            'SUPABASE_KEY',
-            'NEXT_PUBLIC_SUPABASE_URL',
-            'NEXT_PUBLIC_SUPABASE_ANON_KEY'
-        ]
-        
-        for var in env_vars:
-            value = os.getenv(var)
-            # 機密情報を隠しつつ存在確認
-            self.results["environment"][var] = {
-                "exists": value is not None,
-                "length": len(value) if value else 0
-            }
-        
-        logger.info("環境変数チェック完了")
 
-    def get_connection_details(self) -> Optional[Dict[str, Any]]:
-        """接続情報を取得"""
+    def _get_system_info(self):
+        return {
+            "os": platform.system(),
+            "os_version": platform.mac_ver()[0],
+            "hostname": socket.gethostname()
+        }
+
+    def _run_command(self, command):
         try:
-            # 環境変数からデータベースURLを取得
-            database_url = os.environ.get('DATABASE_URL')
-            if not database_url:
-                self.results["error"] = "DATABASE_URL is not set"
-                return None
-
-            # URLをパースして接続情報を抽出
-            from urllib.parse import urlparse
-            parsed = urlparse(database_url)
-            
-            # ホスト名からプロジェクト参照を抽出
-            host = parsed.hostname
-            if not host:
-                self.results["error"] = "Invalid DATABASE_URL format"
-                return None
-
-            connection_info = {
-                "host": host,  # ホスト名をそのまま使用
-                "port": parsed.port or 5432,
-                "database": parsed.path.lstrip('/'),
-                "user": parsed.username,
-                "password": parsed.password
-            }
-
-            self.results["connection_details"] = {
-                "host": connection_info["host"],
-                "port": connection_info["port"],
-                "database": connection_info["database"],
-                "has_password": bool(connection_info["password"])
-            }
-
-            return connection_info
-            
-        except Exception as e:
-            self.results["error"] = f"Failed to parse connection details: {str(e)}"
-            return None
-
-    def check_dns(self, hostname: str) -> None:
-        """DNSの解決をテスト"""
-        logger.info(f"DNS解決の確認を開始: {hostname}")
-        
-        try:
-            answers = dns.resolver.resolve(hostname, 'A')
-            self.results["dns_check"] = {
-                "success": True,
-                "ip_addresses": [str(rdata) for rdata in answers],
-                "resolver": str(dns.resolver.get_default_resolver().nameservers[0])
+            result = subprocess.run(command, capture_output=True, text=True, shell=True)
+            return {
+                "success": result.returncode == 0,
+                "output": result.stdout,
+                "error": result.stderr if result.stderr else None
             }
         except Exception as e:
-            self.results["dns_check"] = {
+            return {
                 "success": False,
                 "error": str(e)
             }
 
-    def check_postgres_connection(self, connection_info: Dict[str, Any]) -> None:
-        """PostgreSQL接続テスト"""
-        logger.info("PostgreSQL接続の確認を開始")
-        
+    def check_dns_cache(self):
+        """DNSキャッシュの状態を確認"""
+        logger.info("Checking DNS cache...")
+        command = "sudo dscacheutil -statistics"
+        self.results["tests"]["dns_cache"] = self._run_command(command)
+
+    def check_dns_servers(self):
+        """現在のDNSサーバー設定を確認"""
+        logger.info("Checking DNS servers...")
+        command = "networksetup -getdnsservers Wi-Fi"
+        self.results["tests"]["dns_servers"] = self._run_command(command)
+
+    def check_host_resolution(self):
+        """ホスト名の解決をテスト"""
+        logger.info(f"Testing host resolution for {self.host}...")
         try:
-            # 接続文字列を構築
-            conn_str = (
-                f"postgresql://{connection_info['user']}:{connection_info['password']}"
-                f"@{connection_info['host']}:{connection_info['port']}"
-                f"/{connection_info['database']}?sslmode=require"
-            )
-            
-            # 接続を試行
-            conn = psycopg2.connect(
-                host=connection_info['host'],
-                port=connection_info['port'],
-                dbname=connection_info['database'],
-                user=connection_info['user'],
-                password=connection_info['password'],
-                connect_timeout=10,
-                sslmode='require'
-            )
-            
-            # バージョン確認
-            with conn.cursor() as cur:
-                cur.execute('SELECT version();')
-                version = cur.fetchone()[0]
-            
-            conn.close()
-            
-            self.results["postgres_check"] = {
+            ip = socket.gethostbyname(self.host)
+            self.results["tests"]["host_resolution"] = {
                 "success": True,
-                "version": version
+                "ip": ip
             }
-            
-        except Exception as e:
-            self.results["postgres_check"] = {
+        except socket.gaierror as e:
+            self.results["tests"]["host_resolution"] = {
                 "success": False,
                 "error": str(e)
             }
 
-    def run_diagnostics(self) -> Dict[str, Any]:
-        """すべての診断を実行"""
-        logger.info("診断を開始")
+    def check_network_interface(self):
+        """ネットワークインターフェースの状態を確認"""
+        logger.info("Checking network interface...")
+        command = "networksetup -getinfo Wi-Fi"
+        self.results["tests"]["network_interface"] = self._run_command(command)
+
+    def run_dig(self):
+        """digコマンドでDNS解決をテスト"""
+        logger.info(f"Running dig for {self.host}...")
+        command = f"dig {self.host} +short"
+        self.results["tests"]["dig"] = self._run_command(command)
+
+    def check_connectivity(self):
+        """基本的な接続テスト"""
+        logger.info(f"Testing connectivity to {self.host}:{self.port}...")
+        try:
+            socket.create_connection((self.host, self.port), timeout=5)
+            self.results["tests"]["connectivity"] = {
+                "success": True,
+                "message": f"Successfully connected to {self.host}:{self.port}"
+            }
+        except Exception as e:
+            self.results["tests"]["connectivity"] = {
+                "success": False,
+                "error": str(e)
+            }
+
+    def run_scutil_dns(self):
+        """scutilでDNS設定を確認"""
+        logger.info("Checking DNS configuration with scutil...")
+        command = "scutil --dns"
+        self.results["tests"]["scutil_dns"] = self._run_command(command)
+
+    def run_all_tests(self):
+        """全てのテストを実行"""
+        logger.info("Starting all diagnostics tests...")
         
-        # 環境変数の確認
-        self.check_environment()
-        
-        # 接続情報の取得
-        connection_info = self.get_connection_details()
-        if not connection_info:
-            self.results["overall_status"] = "failed"
-            return self.results
-            
-        # 各種チェックの実行
-        self.check_dns(connection_info["host"])
-        self.check_postgres_connection(connection_info)
-        
-        # 総合的な状態の評価
-        all_checks = [
-            self.results["dns_check"].get("success", False),
-            self.results["postgres_check"].get("success", False)
-        ]
-        
-        self.results["overall_status"] = "success" if all(all_checks) else "failed"
+        self.check_dns_cache()
+        self.check_dns_servers()
+        self.check_host_resolution()
+        self.check_network_interface()
+        self.run_dig()
+        self.check_connectivity()
+        self.run_scutil_dns()
         
         return self.results
 
+    def save_results(self, filename="mac_dns_diagnostics.json"):
+        """結果をJSONファイルに保存"""
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(self.results, f, indent=2, ensure_ascii=False)
+        logger.info(f"Results saved to {filename}")
+
+    def print_summary(self):
+        """テスト結果のサマリーを表示"""
+        print("\n=== DNS Diagnostics Summary ===")
+        for test_name, test_result in self.results["tests"].items():
+            success = test_result.get("success", False)
+            status = "✅ SUCCESS" if success else "❌ FAILED"
+            print(f"{test_name}: {status}")
+            if not success and "error" in test_result:
+                print(f"  Error: {test_result['error']}")
+
 def main():
-    diagnostic = VercelDatabaseDiagnostic()
-    results = diagnostic.run_diagnostics()
-    
-    print("\n=== 診断結果 ===")
-    print(json.dumps(results, indent=2, ensure_ascii=False))
-    
-    # 問題が見つかった場合の推奨事項
-    if results["overall_status"] == "failed":
-        print("\n=== 推奨される対処方法 ===")
-        if not results["dns_check"].get("success"):
-            print("- DNSの設定を確認してください")
-            print("  - Supabaseのプロジェクト設定でホスト名が正しいか確認")
-        if not results["postgres_check"].get("success"):
-            print("- PostgreSQL接続の問題を確認してください")
-            print("  - Supabaseのダッシュボードで接続情報を確認")
-            print("  - データベースパスワードが正しいか確認")
-            print("  - ネットワーク設定とIPの制限を確認")
+    diagnostics = MacDNSDiagnostics()
+    diagnostics.run_all_tests()
+    diagnostics.save_results()
+    diagnostics.print_summary()
 
 if __name__ == "__main__":
     main()
