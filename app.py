@@ -1,4 +1,5 @@
 import os
+import sys
 import random
 import logging
 import sys
@@ -100,6 +101,34 @@ def log_performance(func):
 
 # Initialize Flask app
 app = Flask(__name__)
+
+# カテゴリーと科目の日本語名マッピング
+CATEGORY_NAMES = {
+    'japanese': '国語',
+    'math': '算数',
+    'science': '理科',
+    'society': '社会'
+}
+
+SUBCATEGORY_NAMES = {
+    'kanji': '漢字',
+    'reading': '読解',
+    'grammar': '文法',
+    'writing': '作文',
+    'calculation': '計算',
+    'figure': '図形',
+    'measurement': '測定',
+    'graph': 'グラフ',
+    'physics': '物理',
+    'chemistry': '化学',
+    'biology': '生物',
+    'earth_science': '地学',
+    'history': '歴史',
+    'geography': '地理',
+    'civics': '公民',
+    'current_events': '時事',
+    'prefectures': '都道府県'
+}
 
 # データベースURLの設定
 if os.environ.get('VERCEL_ENV') == 'development':
@@ -619,7 +648,6 @@ def select_category(grade):
     
     return render_template('category_select.html', grade=grade)
 
-<<<<<<< HEAD
 @app.route('/grade/<int:grade>/category/<category>/subcategory')
 def select_subcategory(grade, category):
     subcategories = get_subcategories(grade, category)
@@ -966,8 +994,6 @@ def next_question():
         logger.exception("Full traceback:")
         return redirect(url_for('select_grade'))
 
-=======
->>>>>>> 681de6ad92a5180cf7f6948754ec9bd5293c7a94
 @app.route('/dashboard')
 def dashboard():
     """
@@ -1117,7 +1143,6 @@ def show_question():
                          options=question_data['choices'],
                          question_data=question_data)
 
-<<<<<<< HEAD
 @app.route('/question_history/<int:grade>/<category>/<subcategory>/<difficulty>/<path:question_text>')
 def question_history(grade, category, subcategory, difficulty, question_text):
     try:
@@ -1174,34 +1199,20 @@ def show_question():
         logger.error(f"Error in show_question: {e}")
         logger.exception("Full traceback:")
         return redirect(url_for('select_grade'))
-=======
-@app.route('/answer', methods=['POST'])
-def submit_answer():
-    """
-    回答を処理
-    """
-    if 'questions' not in session:
-        flash('No quiz in progress')
-        return redirect(url_for('grade_select'))
+
+def get_shuffled_question(question):
+    """問題の選択肢をシャッフルする"""
+    shuffled = question.copy()
+    options = shuffled['options'].copy()
+    correct = shuffled['correct']
     
-    current = session.get('current_question', 0)
-    questions = session.get('questions', [])
+    # 選択肢をシャッフル
+    indices = list(range(len(options)))
+    random.shuffle(indices)
     
-    if current >= len(questions):
-        return redirect(url_for('show_question'))
+    # 選択肢を並び替え
+    shuffled['options'] = [options[i] for i in indices]
+    # 正解のインデックスも更新
+    shuffled['correct'] = indices.index(correct)
     
-    # 回答を取得
-    answer = request.form.get('answer')
-    correct_answer = questions[current]['correct_answer']
-    
-    # 正誤判定
-    if answer == correct_answer:
-        session['score'] = session.get('score', 0) + 1
-        flash('Correct!', 'success')
-    else:
-        flash(f'Incorrect. The correct answer was: {correct_answer}', 'error')
-    
-    # 次の問題へ
-    session['current_question'] = current + 1
-    return redirect(url_for('show_question'))
->>>>>>> 681de6ad92a5180cf7f6948754ec9bd5293c7a94
+    return shuffled
