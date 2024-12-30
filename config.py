@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 import logging
 from supabase import create_client, Client
+import json
 
 # ロガーの設定
 logging.basicConfig(
@@ -14,47 +15,82 @@ load_dotenv()
 
 class Config:
     SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'your-secret-key')
+    
+    # 環境の確認
+    VERCEL_ENV = os.getenv('VERCEL_ENV')
+    FLASK_ENV = os.getenv('FLASK_ENV')
+    IS_DEVELOPMENT = FLASK_ENV == 'development' or VERCEL_ENV == 'development'
+    
+    # 環境変数の状態をログ出力
+    logger.info(json.dumps({
+        "event": "environment_check",
+        "vercel_env": VERCEL_ENV,
+        "database_url_set": bool(os.getenv('DATABASE_URL')),
+        "local_database_url_set": bool(os.getenv('LOCAL_DATABASE_URL')),
+        "supabase_url_set": bool(os.getenv('SUPABASE_URL')),
+        "supabase_key_set": bool(os.getenv('SUPABASE_KEY')),
+        "sqlalchemy_database_uri_set": bool(os.getenv('SQLALCHEMY_DATABASE_URI'))
+    }))
 
     # Supabase設定
     SUPABASE_URL = os.getenv('SUPABASE_URL')
     SUPABASE_KEY = os.getenv('SUPABASE_KEY')
 
-    # データベースURL (Supavisor)
-    DATABASE_URL = os.getenv('DATABASE_URL')
-    SUPAVISOR_URL = os.getenv('SUPAVISOR_URL')
-
-    # 本番環境（Vercel）かどうかを確認
-    IS_PRODUCTION = os.getenv('VERCEL_ENV') == 'production'
-
     # データベース接続設定
-    if IS_PRODUCTION and SUPAVISOR_URL:
-        # 本番環境でSupavisorが設定されている場合はそちらを使用
-        SQLALCHEMY_DATABASE_URI = SUPAVISOR_URL
-        logger.info("Using Supavisor connection in production")
+    if IS_DEVELOPMENT:
+        # 開発環境ではローカルデータベースを使用
+        SQLALCHEMY_DATABASE_URI = os.getenv('LOCAL_DATABASE_URL')
+        logger.info("Using LOCAL_DATABASE_URL for development")
     else:
-        # 開発環境または本番環境でもSupavisorが未設定の場合は通常のURLを使用
-        SQLALCHEMY_DATABASE_URI = DATABASE_URL
-        if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
-            SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+        # 本番環境ではDATABASE_URLを使用
+        SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')
+        if SQLALCHEMY_DATABASE_URI and SQLALCHEMY_DATABASE_URI.startswith('postgres://'):
+            SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace('postgres://', 'postgresql://', 1)
+    
+    # 環境設定のログ出力
+    logger.info(json.dumps({
+        "event": "database_config",
+        "is_production": not IS_DEVELOPMENT,
+        "database_url": bool(os.getenv('DATABASE_URL')),
+        "local_database_url": bool(os.getenv('LOCAL_DATABASE_URL')),
+        "sqlalchemy_database_uri": bool(SQLALCHEMY_DATABASE_URI)
+    }))
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    # SQLAlchemy設定のログ出力
+    logger.info(json.dumps({
+        "event": "sqlalchemy_config",
+        "is_production": not IS_DEVELOPMENT,
+        "database_uri_set": bool(SQLALCHEMY_DATABASE_URI)
+    }))
 
     # データベース接続オプション
     SQLALCHEMY_ENGINE_OPTIONS = {
         "pool_size": 1,
-        "max_overflow": 0,
+        "pool_timeout": 30,
+        "pool_recycle": 1800,
+        "pool_pre_ping": True,
         "connect_args": {
-            "sslmode": "require",  # SSL接続は必須
             "connect_timeout": 30,
-            "application_name": "quiz_app"
+            "application_name": "quiz_app",
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 5,
+            "sslmode": "prefer"
         }
     }
 
-# Supabaseクライアントの初期化
+# Supabaseクライアントの初期化（オプショナル）
 try:
     logger.info("Initializing Supabase client...")
-    supabase: Client = create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY)
-    logger.info("Supabase client initialized successfully")
+    if Config.SUPABASE_URL and Config.SUPABASE_KEY:
+        supabase: Client = create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY)
+        logger.info("Supabase client initialized successfully")
+    else:
+        logger.error("Failed to initialize Supabase client: supabase_url is required")
+        supabase = None
 except Exception as e:
-    logger.error(f"Error initializing Supabase client: {e}", exc_info=True)
+    logger.error(f"Error initializing Supabase client: {e}")
     supabase = None

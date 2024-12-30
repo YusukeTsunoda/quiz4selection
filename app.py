@@ -183,7 +183,18 @@ def get_prioritized_questions(questions, grade, category, subcategory, difficult
         return None
 
 @app.route('/')
-def select_grade():
+def index():
+    """
+    ルートページのハンドラ
+    学年選択ページにリダイレクト
+    """
+    return redirect(url_for('grade_select'))
+
+@app.route('/grade_select')
+def grade_select():
+    """
+    学年選択ページを表示
+    """
     return render_template('grade_select.html')
 
 @app.route('/grade/<int:grade>/category')
@@ -213,7 +224,7 @@ def select_difficulty(grade, category, subcategory):
         if not os.path.exists(file_path):
             logger.error(f"File not found: {file_path}")
             flash('問題データが見つかりません。', 'error')
-            return redirect(url_for('select_grade'))
+            return redirect(url_for('grade_select'))
 
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -222,7 +233,7 @@ def select_difficulty(grade, category, subcategory):
             if subcategory not in data:
                 logger.error(f"Subcategory {subcategory} not found in data")
                 flash('選択されたカテゴリーの問題が見つかりません。', 'error')
-                return redirect(url_for('select_grade'))
+                return redirect(url_for('grade_select'))
             
             logger.info(f"Found subcategory {subcategory} in data")
             logger.info(f"Available difficulties in {subcategory}: {list(data[subcategory].keys())}")
@@ -647,7 +658,7 @@ def result():
         
         if not quiz_history:
             logger.error("No quiz history found")
-            return redirect(url_for('select_grade'))
+            return redirect(url_for('grade_select'))
             
         logger.info(f"Showing result page - Score: {score}/{total_questions}")
         
@@ -671,7 +682,7 @@ def show_question():
         
         if not questions or current_question >= len(questions):
             logger.error("No questions available or current question index out of range")
-            return redirect(url_for('select_grade'))
+            return redirect(url_for('grade_select'))
             
         return render_template('quiz.html',
                             question=questions[current_question],
