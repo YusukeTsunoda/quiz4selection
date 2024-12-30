@@ -198,64 +198,99 @@ def before_request():
     g.request_start_time = start_time
     g.request_id = str(uuid.uuid4())
     
-    # システムメトリクスの記録
-    memory_info = psutil.Process().memory_info()
+    # リクエスト情報のログ
     logger.info(json.dumps({
         'event': 'request_start',
         'request_id': g.request_id,
         'path': request.path,
         'method': request.method,
-        'memory_rss_mb': memory_info.rss / 1024 / 1024,
-        'memory_vms_mb': memory_info.vms / 1024 / 1024,
-        'cpu_percent': psutil.cpu_percent(),
+        'headers': dict(request.headers),
+        'remote_addr': request.remote_addr,
         'timestamp': start_time
     }))
     
-    # データベース接続の確認
+    # データベース接続情報のログ
+    db_uri = app.config['SQLALCHEMY_DATABASE_URI']
+    masked_uri = db_uri.split('@')[1] if '@' in db_uri else 'masked'
+    logger.info(json.dumps({
+        'event': 'database_config',
+        'request_id': g.request_id,
+        'host': masked_uri.split('/')[0],
+        'engine_options': app.config['SQLALCHEMY_ENGINE_OPTIONS'],
+        'timestamp': time.time()
+    }))
+    
+    # DNS解決のテスト
+    try:
+        db_host = app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1].split('/')[0].split(':')[0]
+        ip_address = socket.gethostbyname(db_host)
+        logger.info(json.dumps({
+            'event': 'dns_resolution',
+            'request_id': g.request_id,
+            'host': db_host,
+            'ip': ip_address,
+            'timestamp': time.time()
+        }))
+    except Exception as e:
+        logger.error(json.dumps({
+            'event': 'dns_resolution_error',
+            'request_id': g.request_id,
+            'host': db_host,
+            'error': str(e),
+            'timestamp': time.time()
+        }))
+    
+    # データベース接続テスト
     if not check_db_connection():
+        logger.error(json.dumps({
+            'event': 'database_connection_failed',
+            'request_id': g.request_id,
+            'timestamp': time.time()
+        }))
         return "Database connection error", 500
 
 @app.after_request
 def after_request(response):
     if hasattr(g, 'request_start_time'):
-        end_time = time.time()
-        duration_ms = (end_time - g.request_start_time) * 1000
+        duration = time.time() - g.request_start_time
         
-        memory_info = psutil.Process().memory_info()
+        # レスポンス情報のログ
         logger.info(json.dumps({
-            'event': 'request_end',
+            'event': 'request_complete',
             'request_id': getattr(g, 'request_id', 'unknown'),
             'path': request.path,
             'method': request.method,
             'status_code': response.status_code,
-            'duration_ms': duration_ms,
-            'memory_rss_mb': memory_info.rss / 1024 / 1024,
-            'memory_vms_mb': memory_info.vms / 1024 / 1024,
-            'cpu_percent': psutil.cpu_percent(),
-            'timestamp': end_time
+            'duration_ms': duration * 1000,
+            'response_headers': dict(response.headers),
+            'timestamp': time.time()
         }))
         
-        # 処理時間が長い場合は警告
-        if duration_ms > 5000:  # 5秒以上
+        # 処理時間が長い場合の警告
+        if duration > 5:  # 5秒以上
             logger.warning(json.dumps({
                 'event': 'long_request_warning',
                 'request_id': getattr(g, 'request_id', 'unknown'),
                 'path': request.path,
                 'method': request.method,
-                'duration_ms': duration_ms,
-                'timestamp': end_time
+                'duration_ms': duration * 1000,
+                'timestamp': time.time()
             }))
     
     return response
 
 @app.errorhandler(504)
 def gateway_timeout(error):
+    error_time = time.time()
     logger.error(json.dumps({
         'event': 'gateway_timeout',
+        'request_id': getattr(g, 'request_id', 'unknown'),
         'path': request.path,
         'method': request.method,
         'error': str(error),
-        'timestamp': time.time()
+        'database_uri': app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1] if '@' in app.config['SQLALCHEMY_DATABASE_URI'] else 'masked',
+        'engine_options': app.config['SQLALCHEMY_ENGINE_OPTIONS'],
+        'timestamp': error_time
     }))
     return "Gateway Timeout - The server took too long to respond", 504
 
@@ -263,6 +298,7 @@ def gateway_timeout(error):
 def handle_exception(e):
     logger.error(json.dumps({
         'event': 'unhandled_exception',
+        'request_id': getattr(g, 'request_id', 'unknown'),
         'error_type': type(e).__name__,
         'error': str(e),
         'path': request.path,

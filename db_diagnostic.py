@@ -70,13 +70,40 @@ class VercelDatabaseDiagnostic:
 
         try:
             parsed = urllib.parse.urlparse(supabase_url)
+            host = parsed.hostname
+            if '.supabase.co' in host:
+                # Supabaseのホスト名の場合、db.プレフィックスを追加
+                project_ref = host.split('.')[0]
+                host = f"db.{project_ref}.supabase.co"
             
+            if 'eyJ' in supabase_key:
+                # サービスロールキーからパスワードを抽出
+                split_key = supabase_key.split('.')
+                if len(split_key) >= 2:
+                    # 2番目のパートを取得してパスワードとして使用
+                    import base64
+                    try:
+                        password = split_key[1]
+                        # パディングを追加
+                        password += "=" * (-len(password) % 4)
+                        # base64デコード
+                        decoded = base64.b64decode(password)
+                        # UTF-8としてデコード
+                        password = decoded.decode('utf-8')
+                    except:
+                        password = supabase_key
+                else:
+                    password = supabase_key
+            else:
+                password = supabase_key
+
+            # 直接的な接続情報を構築
             connection_info = {
-                "host": parsed.hostname,
-                "port": parsed.port or 5432,
-                "database": parsed.path.lstrip('/'),
-                "user": parsed.username,
-                "password": parsed.password,
+                "host": f"db.{project_ref}.supabase.co",
+                "port": 5432,
+                "database": "postgres",
+                "user": "postgres",
+                "password": password
             }
 
             self.results["connection_details"] = {
