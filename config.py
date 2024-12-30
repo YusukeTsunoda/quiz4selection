@@ -101,20 +101,14 @@ class Config:
         "connect_args": {
             "sslmode": "require" if IS_PRODUCTION else "disable",
             "connect_timeout": 30,
-            "application_name": "quiz_app",
+            "application_name": "quiz_app_vercel",
             "keepalives": 1,
             "keepalives_idle": 30,
             "keepalives_interval": 10,
             "keepalives_count": 5,
             "options": f"-c statement_timeout={STATEMENT_TIMEOUT}",
-            "tcp_user_timeout": 30000,
             "client_encoding": 'utf8',
-            "target_session_attrs": "read-write",
-            "tcp_keepalives": 1,
-            "tcp_keepalives_idle": 30,
-            "tcp_keepalives_interval": 10,
-            "tcp_keepalives_count": 5,
-            "application_name": "quiz_app_vercel"
+            "target_session_attrs": "read-write"
         },
         "pool_pre_ping": True,
         "pool_recycle": 60,
@@ -128,9 +122,9 @@ class Config:
     if IS_PRODUCTION:
         SQLALCHEMY_ENGINE_OPTIONS.update({
             "isolation_level": "READ COMMITTED",
-            "echo": True,  # SQLログを有効化
-            "echo_pool": True,  # プールのログを有効化
-            "pool_reset_on_return": "rollback"  # コネクション返却時にロールバック
+            "echo": True,
+            "echo_pool": True,
+            "pool_reset_on_return": "rollback"
         })
 
     # SSL設定のログ出力
