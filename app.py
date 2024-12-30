@@ -95,13 +95,15 @@ def log_performance(func):
 app = Flask(__name__)
 
 # データベースURLの設定
-if os.environ.get('ENVIRONMENT') == 'production':
+if os.environ.get('VERCEL_ENV') == 'development':
+    # 開発環境ではローカルデータベースを使用
+    db_uri = os.environ.get('LOCAL_DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/quiz_db')
+    logger.info("Using LOCAL_DATABASE_URL for development")
+else:
+    # 本番環境ではDATABASE_URLを使用
     db_uri = os.environ.get('DATABASE_URL')
     if db_uri and db_uri.startswith('postgres://'):
         db_uri = db_uri.replace('postgres://', 'postgresql://', 1)
-else:
-    # ローカル開発環境用のデフォルト設定
-    db_uri = os.environ.get('LOCAL_DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/quiz_db')
 
 if not db_uri:
     raise ValueError("Database URI is not set")
@@ -179,7 +181,20 @@ migrate = Migrate(app, db)
 @log_performance
 def check_db_connection():
     try:
-        db_host = app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1].split('/')[0].split(':')[0]
+        # 環境変数から直接ホスト名を取得
+        if os.environ.get('VERCEL_ENV') == 'development':
+            db_host = 'localhost'
+        else:
+            db_uri = os.environ.get('DATABASE_URL', '')
+            db_host = db_uri.split('@')[1].split('/')[0].split(':')[0] if '@' in db_uri else ''
+        
+        if not db_host:
+            logger.error(json.dumps({
+                'event': 'db_host_error',
+                'error': 'Database host is not set',
+                'timestamp': time.time()
+            }))
+            return False
         
         # IPv4/IPv6アドレス解決の詳細ログ
         try:
@@ -553,3 +568,18 @@ if __name__ == '__main__':
     except Exception as e:
         logger.error(f"Failed to start application: {e}")
         sys.exit(1)
+
+@app.route('/')
+def index():
+    """
+    ルートページのハンドラ
+    学年選択ページにリダイレクト
+    """
+    return redirect(url_for('grade_select'))
+
+@app.route('/grade_select')
+def grade_select():
+    """
+    学年選択ページを表示
+    """
+    return render_template('grade_select.html')
