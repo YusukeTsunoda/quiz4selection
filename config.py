@@ -4,6 +4,9 @@ import logging
 import time
 from supabase import create_client, Client
 from functools import lru_cache
+import urllib3
+import ssl
+import requests
 
 # ロガーの設定
 logging.basicConfig(
@@ -169,29 +172,17 @@ def get_supabase_client():
                 logger.info(f"Initializing Supabase client (attempt {retry_count + 1}/{max_retries})...")
                 
                 # 新しい形式でのクライアント初期化
-                _supabase_instance = create_client(
-                    Config.SUPABASE_URL,
-                    Config.SUPABASE_KEY,
-                    {
-                        'db': {
-                            'schema': 'public'
-                        },
-                        'auth': {
-                            'autoRefreshToken': True,
-                            'persistSession': True
-                        }
-                    }
-                )
-                
-                # 軽量な接続テスト
                 try:
-                    # データベース接続テスト
+                    _supabase_instance = create_client(
+                        supabase_url=Config.SUPABASE_URL,
+                        supabase_key=Config.SUPABASE_KEY
+                    )
+                    # 軽量な接続テスト
                     data = _supabase_instance.table('quiz_attempts').select("count").limit(1).execute()
                     logger.info("Database connection test successful")
                 except Exception as e:
-                    logger.warning(f"Database test failed: {e}")
-                    # エラーを再度発生させて、リトライロジックを働かせる
-                    raise
+                    logger.error(f"Error initializing Supabase client: {e}")
+                    _supabase_instance = None
                 
                 _last_connection_time = current_time
                 end_time = time.time()
