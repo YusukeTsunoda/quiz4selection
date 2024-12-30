@@ -1,257 +1,36 @@
 import os
 from dotenv import load_dotenv
+from supabase import create_client
 import logging
-import time
-from supabase import create_client, Client
-from functools import lru_cache
-import urllib3
-import ssl
-import requests
-import json
-from utils.logging_utils import db_logger, network_logger, api_logger
-
-# ロガーの設定
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+from sqlalchemy import create_engine
 
 load_dotenv()
 
-class DatabaseConnection:
-    """データベース接続を管理するクラス"""
-    def __init__(self):
-        self._client = None
-        self._last_used = None
-        self._connection_timeout = 300  # 5分
-        self._retry_count = 0
-        self._max_retries = 3
-
-    @property
-    def client(self):
-        current_time = time.time()
-        
-        # コネクションの有効期限チェック
-        if self._client is not None and self._last_used is not None:
-            if current_time - self._last_used > self._connection_timeout:
-                logger.info("Connection expired, recreating...")
-                self._client = None
-        
-        if self._client is None:
-            while self._retry_count < self._max_retries:
-                try:
-                    logger.info(f"Attempting to create Supabase client (attempt {self._retry_count + 1}/{self._max_retries})")
-                    self._client = get_supabase_client()
-                    if self._client:
-                        self._last_used = current_time
-                        self._retry_count = 0
-                        break
-                    else:
-                        self._retry_count += 1
-                        if self._retry_count < self._max_retries:
-                            logger.warning(f"Failed to create client, retrying in 2 seconds...")
-                            time.sleep(2)
-                except Exception as e:
-                    logger.error(f"Error creating Supabase client: {e}")
-                    self._retry_count += 1
-                    if self._retry_count < self._max_retries:
-                        logger.warning(f"Failed to create client, retrying in 2 seconds...")
-                        time.sleep(2)
-            
-            if self._client is None:
-                logger.error("Failed to create Supabase client after all retries")
-                raise Exception("Could not establish database connection")
-        else:
-            self._last_used = current_time
-        
-        return self._client
-
 class Config:
-    # 環境変数の読み込みを先に行う
-    IS_PRODUCTION = os.getenv('VERCEL_ENV') == 'production'
-    SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'your-secret-key')
-    SUPABASE_URL = os.getenv('SUPABASE_URL')
-    SUPABASE_KEY = os.getenv('SUPABASE_KEY')
-    DATABASE_URL = os.getenv('DATABASE_URL')
-    LOCAL_DATABASE_URL = os.getenv('LOCAL_DATABASE_URL', 'postgresql://localhost/quiz_app')
-
-    # クエリタイムアウトの設定
-    QUERY_TIMEOUT = 30  # 秒
-    STATEMENT_TIMEOUT = 30000  # ミリ秒
-
-    # データベース接続設定
-    if IS_PRODUCTION:
-        SQLALCHEMY_DATABASE_URI = DATABASE_URL
-        if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
-            SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-        logger.info("Using Supabase direct connection in production")
-        # 接続文字列のデバッグ（パスワードは隠す）
-        debug_uri = SQLALCHEMY_DATABASE_URI
-        if debug_uri:
-            parts = debug_uri.split('@')
-            if len(parts) > 1:
-                masked_uri = f"{parts[0].split(':')[0]}:****@{parts[1]}"
-                logger.info(f"Database URI format: {masked_uri}")
-    else:
-        SQLALCHEMY_DATABASE_URI = LOCAL_DATABASE_URL
-        logger.info("Using local database connection")
-
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'your-secret-key'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SUPABASE_URL = os.environ.get('SUPABASE_URL')
+    SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
+    LOCAL_DATABASE_URL = os.environ.get('LOCAL_DATABASE_URL')
+    ENVIRONMENT = os.environ.get('ENVIRONMENT', 'development')
 
-    # データベース接続オプション最適化
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        "pool_size": 1,  # Vercelではプールサイズを1に固定
-        "max_overflow": 0,
-        "connect_args": {
-            "sslmode": "require" if IS_PRODUCTION else "disable",
-            "connect_timeout": 30,
-            "application_name": "quiz_app_vercel",
-            "client_encoding": 'utf8',
-            "target_session_attrs": "read-write",
-            "options": f"-c statement_timeout={STATEMENT_TIMEOUT}",
-            "tcp_user_timeout": 30000,
-            "keepalives": 1,
-            "keepalives_idle": 30,
-            "keepalives_interval": 10,
-            "keepalives_count": 5,
-        },
-        "pool_pre_ping": True,
-        "pool_recycle": 60,
-        "pool_timeout": 30,
-        "execution_options": {
-            "timeout": 30
-        }
-    }
+# データベース接続の設定
+def get_db_connection():
+    if Config.ENVIRONMENT == 'production':
+        return Config.SQLALCHEMY_DATABASE_URI
+    return Config.LOCAL_DATABASE_URL
 
-    # 本番環境での追加設定
-    if IS_PRODUCTION:
-        SQLALCHEMY_ENGINE_OPTIONS.update({
-            "isolation_level": "READ COMMITTED",
-            "echo": False,  # ログ出力を最小限に
-            "pool_reset_on_return": None  # 接続リセットを無効化
-        })
+db_connection = get_db_connection()
 
-    # SSL設定のログ出力
-    if IS_PRODUCTION:
-        logger.info(f"SSL Mode: {SQLALCHEMY_ENGINE_OPTIONS['connect_args']['sslmode']}")
-        logger.info(f"TCP User Timeout: {SQLALCHEMY_ENGINE_OPTIONS['connect_args']['tcp_user_timeout']} milliseconds")
-        logger.info(f"Client Encoding: {SQLALCHEMY_ENGINE_OPTIONS['connect_args']['client_encoding']}")
-        logger.info(f"Target Session Attrs: {SQLALCHEMY_ENGINE_OPTIONS['connect_args']['target_session_attrs']}")
+# Supabaseクライアントの初期化
+def init_supabase():
+    try:
+        return create_client(
+            supabase_url=Config.SUPABASE_URL,
+            supabase_key=Config.SUPABASE_KEY,
+        )
+    except Exception as e:
+        return None
 
-    # キャッシュ設定
-    CACHE_TYPE = "simple"
-    CACHE_DEFAULT_TIMEOUT = 300
-    CACHE_THRESHOLD = 500
-
-# Supabaseクライアントの初期化（シングルトン）
-_supabase_instance = None
-_last_connection_time = None
-_connection_timeout = 300  # 5分
-
-def get_supabase_client():
-    """
-    Supabaseクライアントのシングルトンインスタンスを取得
-    """
-    global _supabase_instance, _last_connection_time
-    current_time = time.time()
-
-    # コネクションの有効期限チェック
-    if _supabase_instance is not None and _last_connection_time is not None:
-        if current_time - _last_connection_time > _connection_timeout:
-            network_logger.info(json.dumps({
-                'event': 'connection_expired',
-                'host': Config.SUPABASE_URL,
-                'last_used': _last_connection_time,
-                'current_time': current_time
-            }))
-            _supabase_instance = None
-
-    if _supabase_instance is None:
-        start_time = time.time()
-        retry_count = 0
-        max_retries = 3
-        retry_delay = 2
-
-        while retry_count < max_retries:
-            try:
-                api_logger.info(json.dumps({
-                    'event': 'supabase_init_attempt',
-                    'attempt': retry_count + 1,
-                    'max_retries': max_retries,
-                    'host': Config.SUPABASE_URL
-                }))
-                
-                connection_id = network_logger.log_network_connection(
-                    Config.SUPABASE_URL,
-                    '5432'
-                )
-                
-                _supabase_instance = create_client(
-                    supabase_url=Config.SUPABASE_URL,
-                    supabase_key=Config.SUPABASE_KEY
-                )
-
-                # 軽量な接続テスト
-                try:
-                    data = _supabase_instance.table('quiz_attempts').select("count").limit(1).execute()
-                    db_logger.info(json.dumps({
-                        'event': 'connection_test_success',
-                        'duration_ms': (time.time() - start_time) * 1000
-                    }))
-                except Exception as e:
-                    db_logger.error(json.dumps({
-                        'event': 'connection_test_failed',
-                        'error': str(e),
-                        'duration_ms': (time.time() - start_time) * 1000
-                    }))
-                    raise
-                
-                _last_connection_time = current_time
-                end_time = time.time()
-                
-                api_logger.info(json.dumps({
-                    'event': 'supabase_init_success',
-                    'duration_ms': (end_time - start_time) * 1000
-                }))
-                
-                break
-                
-            except Exception as e:
-                retry_count += 1
-                api_logger.error(json.dumps({
-                    'event': 'supabase_init_error',
-                    'attempt': retry_count,
-                    'error': str(e),
-                    'duration_ms': (time.time() - start_time) * 1000
-                }))
-                
-                if retry_count < max_retries:
-                    time.sleep(retry_delay)
-                else:
-                    network_logger.error(json.dumps({
-                        'event': 'connection_failed',
-                        'host': Config.SUPABASE_URL,
-                        'attempts': retry_count,
-                        'total_duration_ms': (time.time() - start_time) * 1000
-                    }))
-                    return None
-
-    return _supabase_instance
-
-# 設定のログ出力（一度だけ）
-logger.info(f"Environment: {'Production' if Config.IS_PRODUCTION else 'Development'}")
-logger.info(f"SSL mode: {'enabled' if Config.IS_PRODUCTION else 'disabled'}")
-logger.info(f"Database connection timeout: {Config.SQLALCHEMY_ENGINE_OPTIONS['connect_args']['connect_timeout']} seconds")
-logger.info(f"Query timeout: {Config.QUERY_TIMEOUT} seconds")
-logger.info(f"Statement timeout: {Config.STATEMENT_TIMEOUT} milliseconds")
-logger.info(f"Pool settings - Size: {Config.SQLALCHEMY_ENGINE_OPTIONS['pool_size']}, "
-           f"Timeout: {Config.SQLALCHEMY_ENGINE_OPTIONS['pool_timeout']}, "
-           f"Recycle: {Config.SQLALCHEMY_ENGINE_OPTIONS['pool_recycle']}")
-
-# データベース接続とSupabaseクライアントのインスタンスを作成
-db_connection = DatabaseConnection()
-supabase = get_supabase_client()
-
-# エクスポートする変数を明示的に定義
-__all__ = ['Config', 'db_connection', 'supabase']
+supabase = init_supabase()
