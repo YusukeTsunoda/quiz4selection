@@ -108,7 +108,8 @@ class Config:
             "keepalives_count": 5,
             "options": f"-c statement_timeout={STATEMENT_TIMEOUT}",
             "client_encoding": 'utf8',
-            "target_session_attrs": "read-write"
+            "target_session_attrs": "read-write",
+            "tcp_user_timeout": 30000, # ここを追加
         },
         "pool_pre_ping": True,
         "pool_recycle": 60,
