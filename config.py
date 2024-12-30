@@ -20,6 +20,8 @@ class DatabaseConnection:
         self._client = None
         self._last_used = None
         self._connection_timeout = 300  # 5分
+        self._retry_count = 0
+        self._max_retries = 3
 
     @property
     def client(self):
@@ -32,8 +34,29 @@ class DatabaseConnection:
                 self._client = None
         
         if self._client is None:
-            self._client = get_supabase_client()
-            self._last_used = current_time
+            while self._retry_count < self._max_retries:
+                try:
+                    logger.info(f"Attempting to create Supabase client (attempt {self._retry_count + 1}/{self._max_retries})")
+                    self._client = get_supabase_client()
+                    if self._client:
+                        self._last_used = current_time
+                        self._retry_count = 0
+                        break
+                    else:
+                        self._retry_count += 1
+                        if self._retry_count < self._max_retries:
+                            logger.warning(f"Failed to create client, retrying in 2 seconds...")
+                            time.sleep(2)
+                except Exception as e:
+                    logger.error(f"Error creating Supabase client: {e}")
+                    self._retry_count += 1
+                    if self._retry_count < self._max_retries:
+                        logger.warning(f"Failed to create client, retrying in 2 seconds...")
+                        time.sleep(2)
+            
+            if self._client is None:
+                logger.error("Failed to create Supabase client after all retries")
+                raise Exception("Could not establish database connection")
         else:
             self._last_used = current_time
         
@@ -63,6 +86,13 @@ class Config:
             if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
                 SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
             logger.info("Using Supabase direct connection in production")
+            # 接続文字列のデバッグ（パスワードは隠す）
+            debug_uri = SQLALCHEMY_DATABASE_URI
+            if debug_uri:
+                parts = debug_uri.split('@')
+                if len(parts) > 1:
+                    masked_uri = f"{parts[0].split(':')[0]}:****@{parts[1]}"
+                    logger.info(f"Database URI format: {masked_uri}")
     else:
         SQLALCHEMY_DATABASE_URI = LOCAL_DATABASE_URL
         logger.info("Using local database connection")
@@ -74,14 +104,16 @@ class Config:
         "pool_size": 1 if IS_PRODUCTION else 5,
         "max_overflow": 0,
         "connect_args": {
-            "sslmode": "require" if IS_PRODUCTION else "disable",
+            "sslmode": "verify-full" if IS_PRODUCTION else "disable",
             "connect_timeout": 10,
             "application_name": "quiz_app",
             "keepalives": 1,
             "keepalives_idle": 30,
             "keepalives_interval": 10,
             "keepalives_count": 5,
-            "options": f"-c statement_timeout={STATEMENT_TIMEOUT}"
+            "options": f"-c statement_timeout={STATEMENT_TIMEOUT}",
+            "tcp_user_timeout": 10000,  # 10秒
+            "client_encoding": 'utf8'
         },
         "pool_pre_ping": True,
         "pool_recycle": 60,
@@ -90,6 +122,12 @@ class Config:
             "timeout": QUERY_TIMEOUT
         }
     }
+
+    # SSL設定のログ出力
+    if IS_PRODUCTION:
+        logger.info(f"SSL Mode: {SQLALCHEMY_ENGINE_OPTIONS['connect_args']['sslmode']}")
+        logger.info("TCP User Timeout: 10 seconds")
+        logger.info("Client Encoding: utf8")
 
     # キャッシュ設定
     CACHE_TYPE = "simple"
