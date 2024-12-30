@@ -54,56 +54,29 @@ class VercelDatabaseDiagnostic:
 
     def get_connection_details(self) -> Optional[Dict[str, Any]]:
         """接続情報を取得"""
-        supabase_url = os.getenv('POSTGRES_URL') or os.getenv('DATABASE_URL')
-        if not supabase_url:
-            # フォールバック: Supabase URLから構築
-            supabase_url = os.getenv('SUPABASE_URL')
-            supabase_key = os.getenv('SUPABASE_KEY', '')
-            if supabase_url and supabase_key:
-                parsed = urllib.parse.urlparse(supabase_url)
-                project_ref = parsed.hostname.split('.')[0]
-                supabase_url = f"postgresql://postgres:{supabase_key}@{project_ref}.supabase.co:5432/postgres"
-
-        if not supabase_url:
-            logger.error("データベースURLが見つかりません")
-            return None
-
         try:
-            parsed = urllib.parse.urlparse(supabase_url)
-            host = parsed.hostname
-            if '.supabase.co' in host:
-                # Supabaseのホスト名の場合、db.プレフィックスを追加
-                project_ref = host.split('.')[0]
-                host = f"db.{project_ref}.supabase.co"
+            # 環境変数からデータベースURLを取得
+            database_url = os.environ.get('DATABASE_URL')
+            if not database_url:
+                self.results["error"] = "DATABASE_URL is not set"
+                return None
+
+            # URLをパースして接続情報を抽出
+            from urllib.parse import urlparse
+            parsed = urlparse(database_url)
             
-            if 'eyJ' in supabase_key:
-                # サービスロールキーからパスワードを抽出
-                split_key = supabase_key.split('.')
-                if len(split_key) >= 2:
-                    # 2番目のパートを取得してパスワードとして使用
-                    import base64
-                    try:
-                        password = split_key[1]
-                        # パディングを追加
-                        password += "=" * (-len(password) % 4)
-                        # base64デコード
-                        decoded = base64.b64decode(password)
-                        # UTF-8としてデコード
-                        password = decoded.decode('utf-8')
-                    except:
-                        password = supabase_key
-                else:
-                    password = supabase_key
-            else:
-                password = supabase_key
+            # ホスト名からプロジェクト参照を抽出
+            host = parsed.hostname
+            if not host:
+                self.results["error"] = "Invalid DATABASE_URL format"
+                return None
 
-            # 直接的な接続情報を構築
             connection_info = {
-                "host": f"db.{project_ref}.supabase.co",
-                "port": 5432,
-                "database": "postgres",
-                "user": "postgres",
-                "password": password
+                "host": host,  # ホスト名をそのまま使用
+                "port": parsed.port or 5432,
+                "database": parsed.path.lstrip('/'),
+                "user": parsed.username,
+                "password": parsed.password
             }
 
             self.results["connection_details"] = {
@@ -114,27 +87,9 @@ class VercelDatabaseDiagnostic:
             }
 
             return connection_info
-
-            self.results["connection_details"] = {
-                "host": connection_info["host"],
-                "port": connection_info["port"],
-                "database": connection_info["database"],
-                "has_password": bool(connection_info["password"]),
-                "password_length": len(supabase_key) if supabase_key else 0
-            }
-
-            return connection_info
-
-            self.results["connection_details"] = {
-                "host": connection_info["host"],
-                "port": connection_info["port"],
-                "database": connection_info["database"],
-                "has_password": bool(connection_info["password"])
-            }
-
-            return connection_info
+            
         except Exception as e:
-            logger.error(f"接続情報の解析エラー: {str(e)}")
+            self.results["error"] = f"Failed to parse connection details: {str(e)}"
             return None
 
     def check_dns(self, hostname: str) -> None:

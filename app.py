@@ -25,6 +25,7 @@ import logging
 from logging.config import dictConfig
 from models import db, User, QuizAttempt
 from config import Config
+from urllib.parse import urlparse
 
 # ロガーの設定
 logging.basicConfig(
@@ -103,16 +104,33 @@ app = Flask(__name__)
 # データベースURLの設定
 if os.environ.get('VERCEL_ENV') == 'development':
     # 開発環境ではローカルデータベースを使用
-    db_uri = os.environ.get('LOCAL_DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/quiz_db')
+    db_uri = os.environ.get('LOCAL_DATABASE_URL')
+    if not db_uri:
+        logger.error("LOCAL_DATABASE_URL is not set for development environment")
+        raise ValueError("LOCAL_DATABASE_URL is required in development environment")
     logger.info("Using LOCAL_DATABASE_URL for development")
 else:
     # 本番環境ではDATABASE_URLを使用
     db_uri = os.environ.get('DATABASE_URL')
-    if db_uri and db_uri.startswith('postgres://'):
+    if not db_uri:
+        logger.error("DATABASE_URL is not set for production environment")
+        raise ValueError("DATABASE_URL is required in production environment")
+    
+    # URLの形式を確認して修正
+    if db_uri.startswith('postgres://'):
         db_uri = db_uri.replace('postgres://', 'postgresql://', 1)
+        logger.info("Converted postgres:// to postgresql:// in DATABASE_URL")
 
-if not db_uri:
-    raise ValueError("Database URI is not set")
+# データベース接続設定の詳細をログ出力（機密情報を除く）
+parsed_uri = urlparse(db_uri)
+logger.info(json.dumps({
+    'event': 'database_configuration',
+    'host': parsed_uri.hostname,
+    'port': parsed_uri.port or 5432,
+    'database': parsed_uri.path.lstrip('/'),
+    'ssl_mode': 'prefer',
+    'application_name': 'quiz_app'
+}))
 
 app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -128,7 +146,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'keepalives_idle': 30,
         'keepalives_interval': 10,
         'keepalives_count': 5,
-        'sslmode': 'prefer',  # 'require'から'prefer'に変更
+        'sslmode': 'prefer',
         'options': '-c statement_timeout=5000'
     }
 }
