@@ -97,7 +97,7 @@
           <div class="accordion-item mb-3">
             <h2 class="accordion-header">
               <button
-                class="accordion-button collapsed {% if not stats.is_answered %}unanswered{% endif %}"
+                class="accordion-button collapsed"
                 type="button"
                 data-bs-toggle="collapse"
                 data-bs-target="#question{{ loop.index }}"
@@ -105,64 +105,41 @@
                 <div
                   class="d-flex w-100 justify-content-between align-items-center"
                 >
-                  <div
-                    class="question-title {% if not stats.is_answered %}text-muted{% endif %}"
-                  >
-                    {{ question }}
-                  </div>
-                  {% if stats.is_answered %}
+                  <div class="question-title">{{ question }}</div>
                   <div class="stats-summary">
                     <span class="badge bg-info me-2"
-                      >試行: {{ stats.attempts }}回</span
+                      >試行: {{ stats.total }}回</span
                     >
                     <span
-                      class="badge {% if stats.correct_rate > 0.7 %}bg-success{% elif stats.correct_rate > 0.4 %}bg-warning{% else %}bg-danger{% endif %}"
+                      class="badge {% if stats.percentage > 70 %}bg-success{% elif stats.percentage > 40 %}bg-warning{% else %}bg-danger{% endif %}"
                     >
-                      正答率: {{ "%.1f"|format(stats.correct_rate * 100) }}%
+                      正答率: {{ "%.1f"|format(stats.percentage) }}%
                     </span>
                   </div>
-                  {% endif %}
                 </div>
               </button>
             </h2>
-            {% if stats.is_answered %}
             <div
               id="question{{ loop.index }}"
               class="accordion-collapse collapse"
             >
               <div class="accordion-body">
                 <div class="history-stats mb-3">
-                  <div>平均回答時間: {{ "%.1f"|format(stats.avg_time) }}秒</div>
+                  <div>正解: {{ stats.correct }}回 / 全{{ stats.total }}回</div>
                 </div>
-                {% if stats.recent_answers %}
-                <h5 class="mb-3">最近の回答履歴（最新10件）</h5>
-                <div class="recent-answers">
-                  {% for answer in stats.recent_answers[:10] %}
-                  <div
-                    class="answer-item mb-3 {% if answer.is_correct %}correct-answer-item{% else %}incorrect-answer-item{% endif %}"
-                  >
-                    <div class="answer-date text-muted">
-                      {{ answer.timestamp.strftime('%Y-%m-%d %H:%M') }}
-                    </div>
-                    <div
-                      class="answer-text {% if answer.is_correct %}correct-text{% else %}incorrect-text{% endif %}"
-                    >
-                      あなたの回答: {{ answer.selected_option }}
-                    </div>
-                    {% if not answer.is_correct %}
-                    <div class="correct-answer mt-1">
-                      正解: {{ answer.correct_option }}
-                    </div>
-                    {% endif %}
-                  </div>
-                  {% endfor %}
-                </div>
-                {% else %}
-                <p class="text-muted">回答履歴はありません</p>
-                {% endif %}
+                <button
+                  class="btn btn-sm btn-outline-primary show-history-btn"
+                  data-question="{{ question }}"
+                  onclick="showQuestionHistory('{{ grade }}', '{{ category }}', '{{ subcategory }}', '{{ difficulty }}', this.dataset.question)"
+                >
+                  詳細な履歴を表示
+                </button>
+                <div
+                  class="question-history-container mt-3"
+                  style="display: none"
+                ></div>
               </div>
             </div>
-            {% endif %}
           </div>
           {% endfor %}
         </div>
@@ -381,4 +358,82 @@
     position: relative;
   }
 </style>
+
+<script>
+  async function showQuestionHistory(
+    grade,
+    category,
+    subcategory,
+    difficulty,
+    question
+  ) {
+    const button = document.querySelector(
+      `button[data-question="${question}"]`
+    );
+    const container = button.parentElement.querySelector(
+      ".question-history-container"
+    );
+
+    if (container.style.display === "none") {
+      try {
+        const response = await fetch(
+          `/question_history/${grade}/${category}/${subcategory}/${difficulty}/${encodeURIComponent(
+            question
+          )}`
+        );
+        const history = await response.json();
+
+        if (history.length === 0) {
+          container.innerHTML =
+            '<p class="text-muted">詳細な履歴はありません</p>';
+        } else {
+          const historyHtml = history
+            .map(
+              (entry) => `
+          <div class="answer-item mb-3 ${
+            entry.is_correct ? "correct-answer-item" : "incorrect-answer-item"
+          }">
+            <div class="answer-date text-muted">
+              ${new Date(entry.timestamp).toLocaleString("ja-JP")}
+            </div>
+            <div class="answer-text ${
+              entry.is_correct ? "correct-text" : "incorrect-text"
+            }">
+              あなたの回答: ${entry.selected_option}
+            </div>
+            ${
+              !entry.is_correct
+                ? `<div class="correct-answer mt-1">正解: ${entry.correct_option}</div>`
+                : ""
+            }
+            <div class="time-taken">回答時間: ${entry.time_taken.toFixed(
+              1
+            )}秒</div>
+          </div>
+        `
+            )
+            .join("");
+
+          container.innerHTML = `
+          <h5 class="mb-3">回答履歴</h5>
+          <div class="recent-answers">
+            ${historyHtml}
+          </div>
+        `;
+        }
+
+        container.style.display = "block";
+        button.textContent = "履歴を隠す";
+      } catch (error) {
+        console.error("Error fetching question history:", error);
+        container.innerHTML =
+          '<p class="text-danger">履歴の取得に失敗しました</p>';
+        container.style.display = "block";
+      }
+    } else {
+      container.style.display = "none";
+      button.textContent = "詳細な履歴を表示";
+    }
+  }
+</script>
 {% endblock %}

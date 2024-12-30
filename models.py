@@ -108,11 +108,38 @@ class QuizAttempt(db.Model):
     def get_question_stats(grade, category, subcategory, difficulty):
         """問題別の統計情報を取得"""
         try:
-            if supabase:
-                data = QuizAttempt.get_from_supabase(grade, category, subcategory, difficulty)
-                question_stats = {}
+            question_stats = {}
+            
+            # ローカルデータベースからの取得
+            attempts = QuizAttempt.query.filter_by(
+                grade=grade,
+                category=category,
+                subcategory=subcategory,
+                difficulty=difficulty
+            ).all()
+            
+            # ローカルデータの処理
+            for attempt in attempts:
+                if not attempt.quiz_history:
+                    continue
                 
-                for attempt in data:
+                for history in attempt.quiz_history:
+                    q_text = history.get('question', '')
+                    if not q_text:
+                        continue
+                        
+                    if q_text not in question_stats:
+                        question_stats[q_text] = {'correct': 0, 'total': 0}
+                        
+                    question_stats[q_text]['total'] += 1
+                    if history.get('is_correct', False):
+                        question_stats[q_text]['correct'] += 1
+            
+            # Supabaseからのデータ取得と処理
+            if supabase:
+                supabase_data = QuizAttempt.get_from_supabase(grade, category, subcategory, difficulty)
+                
+                for attempt in supabase_data:
                     if not attempt.get('quiz_history'):
                         continue
                     
@@ -127,36 +154,66 @@ class QuizAttempt(db.Model):
                         question_stats[q_text]['total'] += 1
                         if history.get('is_correct', False):
                             question_stats[q_text]['correct'] += 1
-                
-                return question_stats
-            return {}
+            
+            # 正答率の計算を追加
+            for stats in question_stats.values():
+                stats['percentage'] = (stats['correct'] / stats['total'] * 100) if stats['total'] > 0 else 0
+            
+            return question_stats
+            
         except Exception as e:
-            print(f"Error getting question stats from Supabase: {e}")
+            logger.error(f"Error getting question stats: {e}")
             return {}
 
     @classmethod
     def get_question_history(cls, grade, category, subcategory, difficulty, question_text):
         """特定の問題の回答履歴を取得"""
-        attempts = cls.query.filter_by(
-            grade=grade,
-            category=category,
-            subcategory=subcategory,
-            difficulty=difficulty
-        ).order_by(desc(cls.timestamp)).all()
+        try:
+            history = []
+            
+            # ローカルデータベースからの取得
+            local_attempts = cls.query.filter_by(
+                grade=grade,
+                category=category,
+                subcategory=subcategory,
+                difficulty=difficulty
+            ).order_by(desc(cls.timestamp)).all()
 
-        history = []
-        for attempt in attempts:
-            if not attempt.quiz_history:
-                continue
+            for attempt in local_attempts:
+                if not attempt.quiz_history:
+                    continue
 
-            for question in attempt.quiz_history:
-                if question.get('question') == question_text:
-                    history.append({
-                        'timestamp': attempt.timestamp,
-                        'is_correct': question.get('is_correct'),
-                        'selected_option': question.get('selected_option'),
-                        'correct_option': question.get('correct_option'),
-                        'time_taken': question.get('time_taken', 0)
-                    })
+                for question in attempt.quiz_history:
+                    if question.get('question') == question_text:
+                        history.append({
+                            'timestamp': attempt.timestamp.isoformat() if isinstance(attempt.timestamp, datetime) else attempt.timestamp,
+                            'is_correct': question.get('is_correct'),
+                            'selected_option': question.get('selected_option'),
+                            'correct_option': question.get('correct_option'),
+                            'time_taken': question.get('time_taken', 0)
+                        })
+            
+            # Supabaseからのデータ取得
+            if supabase:
+                supabase_attempts = cls.get_from_supabase(grade, category, subcategory, difficulty)
+                
+                for attempt in supabase_attempts:
+                    if not attempt.get('quiz_history'):
+                        continue
 
-        return sorted(history, key=lambda x: x['timestamp'], reverse=True)
+                    for question in attempt['quiz_history']:
+                        if question.get('question') == question_text:
+                            history.append({
+                                'timestamp': attempt.get('timestamp'),
+                                'is_correct': question.get('is_correct'),
+                                'selected_option': question.get('selected_option'),
+                                'correct_option': question.get('correct_option'),
+                                'time_taken': question.get('time_taken', 0)
+                            })
+
+            # タイムスタンプでソート
+            return sorted(history, key=lambda x: x['timestamp'], reverse=True)
+            
+        except Exception as e:
+            logger.error(f"Error getting question history: {e}")
+            return []

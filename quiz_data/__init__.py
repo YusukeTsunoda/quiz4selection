@@ -35,4 +35,4 @@ def load_questions():
                 
     return questions_by_category
 
-questions_by_category = load_questions() 
+questions_by_category = load_questions()

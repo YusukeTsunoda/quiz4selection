@@ -1,5 +1,7 @@
 import socket
 import dns.resolver
+from dns_diagnostics import DNSDiagnostics
+from logging_utils import setup_logger
 import json
 import time
 import os
@@ -115,7 +117,7 @@ def run_connection_diagnostics(host, port):
     # ネットワーク接続性の確認
     connection_result = check_network_connectivity(host, port)
     
-    return connection_result 
+    return connection_result
 
 def diagnose_supabase_connection(host, port=5432):
     """Supabase接続の診断を実行"""
@@ -194,4 +196,4 @@ def diagnose_supabase_connection(host, port=5432):
             'error': str(e),
             'timestamp': time.time()
         }))
-        return None 
+        return None
