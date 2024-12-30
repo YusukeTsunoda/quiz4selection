@@ -47,10 +47,11 @@ class Config:
     SUPABASE_KEY = os.getenv('SUPABASE_KEY')
     DATABASE_URL = os.getenv('DATABASE_URL')
     SUPAVISOR_URL = os.getenv('SUPAVISOR_URL')
+    LOCAL_DATABASE_URL = os.getenv('LOCAL_DATABASE_URL', 'postgresql://localhost/quiz_app')
 
     # クエリタイムアウトの設定
-    QUERY_TIMEOUT = 5  # 秒
-    STATEMENT_TIMEOUT = 5000  # ミリ秒
+    QUERY_TIMEOUT = 10  # 秒
+    STATEMENT_TIMEOUT = 10000  # ミリ秒
 
     # データベース接続設定
     if IS_PRODUCTION:
@@ -61,41 +62,39 @@ class Config:
             SQLALCHEMY_DATABASE_URI = DATABASE_URL
             if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
                 SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-            logger.info("Using direct database connection in production")
+            logger.info("Using Supabase direct connection in production")
     else:
-        SQLALCHEMY_DATABASE_URI = DATABASE_URL
-        if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
-            SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-        logger.info("Using development database connection")
+        SQLALCHEMY_DATABASE_URI = LOCAL_DATABASE_URL
+        logger.info("Using local database connection")
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # データベース接続オプション最適化
     SQLALCHEMY_ENGINE_OPTIONS = {
-        "pool_size": 1,
+        "pool_size": 1 if IS_PRODUCTION else 5,
         "max_overflow": 0,
         "connect_args": {
             "sslmode": "require" if IS_PRODUCTION else "disable",
-            "connect_timeout": 5,
+            "connect_timeout": 10,
             "application_name": "quiz_app",
             "keepalives": 1,
             "keepalives_idle": 30,
             "keepalives_interval": 10,
             "keepalives_count": 5,
-            "options": f"-c statement_timeout={STATEMENT_TIMEOUT}"  # クエリタイムアウトの設定
+            "options": f"-c statement_timeout={STATEMENT_TIMEOUT}"
         },
         "pool_pre_ping": True,
         "pool_recycle": 60,
-        "pool_timeout": 5,
+        "pool_timeout": 10,
         "execution_options": {
-            "timeout": QUERY_TIMEOUT  # SQLAlchemyのクエリタイムアウト
+            "timeout": QUERY_TIMEOUT
         }
     }
 
     # キャッシュ設定
     CACHE_TYPE = "simple"
-    CACHE_DEFAULT_TIMEOUT = 300  # 5分
-    CACHE_THRESHOLD = 500  # キャッシュするアイテムの最大数
+    CACHE_DEFAULT_TIMEOUT = 300
+    CACHE_THRESHOLD = 500
 
 # Supabaseクライアントの初期化（シングルトン）
 _supabase_instance = None
