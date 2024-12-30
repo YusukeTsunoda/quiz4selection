@@ -12,7 +12,7 @@ from sqlalchemy import text, create_engine
 import socket
 import time
 from functools import wraps
-from utils.logging_utils import request_logger, db_logger, api_logger
+from utils.logging_utils import request_logger, db_logger, api_logger, system_logger, log_system_metrics
 import uuid
 
 # ロガーの設定
@@ -113,19 +113,74 @@ SUBCATEGORY_NAMES = {
 def log_performance(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        request_id = str(uuid.uuid4())
         start_time = time.time()
+        
+        # リクエスト開始時のシステムメトリクスを記録
+        log_system_metrics()
+        
+        # リクエストのロギング
+        request_logger.info(json.dumps({
+            'event': 'request_start',
+            'request_id': request_id,
+            'method': request.method,
+            'path': request.path,
+            'endpoint': request.endpoint,
+            'args': dict(request.args),
+            'headers': {k: v for k, v in request.headers.items() if k.lower() not in ['cookie', 'authorization']},
+            'timestamp': start_time
+        }))
+        
         try:
-            result = f(*args, **kwargs)
+            # 処理の実行
+            response = f(*args, **kwargs)
             end_time = time.time()
-            execution_time = end_time - start_time
-            logger.info(f"Function {f.__name__} executed in {execution_time:.2f} seconds")
-            if execution_time > 8:
-                logger.warning(f"Function {f.__name__} execution time ({execution_time:.2f}s) is approaching Vercel timeout")
-            return result
+            duration_ms = (end_time - start_time) * 1000
+            
+            # レスポンスのロギング
+            request_logger.info(json.dumps({
+                'event': 'request_end',
+                'request_id': request_id,
+                'status_code': response.status_code if hasattr(response, 'status_code') else 200,
+                'duration_ms': duration_ms,
+                'timestamp': end_time
+            }))
+            
+            # 処理時間が長い場合は警告
+            if duration_ms > 5000:  # 5秒以上
+                request_logger.warning(json.dumps({
+                    'event': 'long_request_warning',
+                    'request_id': request_id,
+                    'duration_ms': duration_ms,
+                    'endpoint': request.endpoint,
+                    'timestamp': end_time
+                }))
+            
+            # 終了時のシステムメトリクスを記録
+            log_system_metrics()
+            
+            return response
+            
         except Exception as e:
             end_time = time.time()
-            logger.error(f"Error in {f.__name__}: {str(e)}, execution time: {end_time - start_time:.2f}s", exc_info=True)
+            duration_ms = (end_time - start_time) * 1000
+            
+            # エラーのロギング
+            request_logger.error(json.dumps({
+                'event': 'request_error',
+                'request_id': request_id,
+                'error': str(e),
+                'error_type': type(e).__name__,
+                'duration_ms': duration_ms,
+                'endpoint': request.endpoint,
+                'timestamp': end_time
+            }))
+            
+            # エラー時のシステムメトリクスを記録
+            log_system_metrics()
+            
             raise
+            
     return decorated_function
 
 def get_shuffled_question(question):
@@ -294,18 +349,19 @@ def log_request(f):
     return decorated_function
 
 @app.route('/')
-@log_request
+@log_performance
 def index():
     return render_template('index.html')
 
 @app.route('/grade/<int:grade>/category/<category>/subcategory/<subcategory>/difficulty/<difficulty>')
-@log_request
+@log_performance
 def quiz_with_params(grade, category, subcategory, difficulty):
     try:
-        # クイズデータの取得開始時間を記録
         start_time = time.time()
         
+        # クイズデータの取得
         quiz_data = get_quiz_data(grade, category, subcategory, difficulty)
+        fetch_time = time.time()
         
         # クイズデータ取得の所要時間をロギング
         db_logger.info(json.dumps({
@@ -314,7 +370,8 @@ def quiz_with_params(grade, category, subcategory, difficulty):
             'category': category,
             'subcategory': subcategory,
             'difficulty': difficulty,
-            'duration_ms': (time.time() - start_time) * 1000
+            'duration_ms': (fetch_time - start_time) * 1000,
+            'timestamp': fetch_time
         }))
         
         if quiz_data is None:
@@ -323,25 +380,44 @@ def quiz_with_params(grade, category, subcategory, difficulty):
                 'grade': grade,
                 'category': category,
                 'subcategory': subcategory,
-                'difficulty': difficulty
+                'difficulty': difficulty,
+                'timestamp': time.time()
             }))
             return "Quiz not found", 404
-            
-        return render_template('quiz.html', 
-                             quiz_data=quiz_data,
-                             grade=grade,
-                             category=category,
-                             subcategory=subcategory,
-                             difficulty=difficulty)
-                             
+        
+        # テンプレートのレンダリング時間を計測
+        render_start = time.time()
+        response = render_template('quiz.html',
+                                 quiz_data=quiz_data,
+                                 grade=grade,
+                                 category=category,
+                                 subcategory=subcategory,
+                                 difficulty=difficulty)
+        render_time = time.time()
+        
+        # レンダリング時間のロギング
+        request_logger.info(json.dumps({
+            'event': 'template_render',
+            'template': 'quiz.html',
+            'duration_ms': (render_time - render_start) * 1000,
+            'total_duration_ms': (render_time - start_time) * 1000,
+            'timestamp': render_time
+        }))
+        
+        return response
+        
     except Exception as e:
+        error_time = time.time()
         request_logger.error(json.dumps({
             'event': 'quiz_error',
             'grade': grade,
             'category': category,
             'subcategory': subcategory,
             'difficulty': difficulty,
-            'error': str(e)
+            'error': str(e),
+            'error_type': type(e).__name__,
+            'duration_ms': (error_time - start_time) * 1000,
+            'timestamp': error_time
         }))
         raise
 

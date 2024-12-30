@@ -6,15 +6,18 @@ import os
 
 def setup_logger(name, level=logging.INFO):
     """ロガーのセットアップ（標準出力のみ）"""
-    formatter = logging.Formatter(
-        '%(asctime)s %(levelname)s %(message)s'
-    )
-
     logger = logging.getLogger(name)
+    
+    # すでに設定済みの場合は既存のロガーを返す
+    if logger.handlers:
+        return logger
+        
     logger.setLevel(level)
-
-    # 既存のハンドラをクリア
-    logger.handlers = []
+    logger.propagate = False  # 親ロガーへの伝播を防止
+    
+    formatter = logging.Formatter(
+        '%(asctime)s [%(name)s] %(levelname)s: %(message)s'
+    )
 
     # 標準出力へのハンドラを追加
     console_handler = logging.StreamHandler()
@@ -50,7 +53,8 @@ class NetworkLogger:
             'event': 'connection_start',
             'connection_id': connection_id,
             'host': host,
-            'port': port
+            'port': port,
+            'timestamp': time.time()
         }))
         
         return connection_id
@@ -67,18 +71,33 @@ class NetworkLogger:
                 'host': connection['host'],
                 'port': connection['port'],
                 'status': status,
-                'duration_ms': duration * 1000
+                'duration_ms': duration * 1000,
+                'timestamp': time.time()
             }))
             
             del self.connections[connection_id]
 
     def error(self, message):
         """エラーログの出力"""
-        self.logger.error(message)
+        if isinstance(message, str):
+            try:
+                message = json.loads(message)
+            except json.JSONDecodeError:
+                message = {'message': message}
+        
+        message['timestamp'] = time.time()
+        self.logger.error(json.dumps(message))
 
     def info(self, message):
         """情報ログの出力"""
-        self.logger.info(message)
+        if isinstance(message, str):
+            try:
+                message = json.loads(message)
+            except json.JSONDecodeError:
+                message = {'message': message}
+        
+        message['timestamp'] = time.time()
+        self.logger.info(json.dumps(message))
 
 network_logger = NetworkLogger()
 
@@ -87,18 +106,29 @@ def log_system_metrics():
     try:
         import psutil
         
-        cpu_percent = psutil.cpu_percent(interval=1)
-        memory = psutil.virtual_memory()
-        disk = psutil.disk_usage('/')
-        
-        system_logger.info(json.dumps({
+        metrics = {
             'event': 'system_metrics',
-            'cpu_percent': cpu_percent,
-            'memory_percent': memory.percent,
-            'disk_percent': disk.percent
-        }))
+            'timestamp': time.time(),
+            'metrics': {
+                'cpu': {
+                    'percent': psutil.cpu_percent(interval=1),
+                    'count': psutil.cpu_count(),
+                    'freq': psutil.cpu_freq()._asdict() if psutil.cpu_freq() else None
+                },
+                'memory': psutil.virtual_memory()._asdict(),
+                'disk': psutil.disk_usage('/')._asdict(),
+                'network': {
+                    'connections': len(psutil.net_connections()),
+                    'stats': {nic: stats._asdict() for nic, stats in psutil.net_if_stats().items()}
+                }
+            }
+        }
+        
+        system_logger.info(json.dumps(metrics))
+        
     except Exception as e:
         system_logger.error(json.dumps({
             'event': 'system_metrics_error',
-            'error': str(e)
+            'error': str(e),
+            'timestamp': time.time()
         })) 
