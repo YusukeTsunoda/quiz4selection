@@ -17,6 +17,8 @@ import uuid
 from quiz_data import questions_by_category
 import psutil
 import traceback
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 # ロガーの設定
 logging.basicConfig(
@@ -109,8 +111,37 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_size': 1,
     'pool_timeout': 30,
     'pool_recycle': 1800,
-    'pool_pre_ping': True
+    'pool_pre_ping': True,
+    'connect_args': {
+        'connect_timeout': 10,
+        'application_name': 'quiz_app',
+        'keepalives': 1,
+        'keepalives_idle': 30,
+        'keepalives_interval': 10,
+        'keepalives_count': 5
+    }
 }
+
+# SQLAlchemyのイベントリスナーを設定
+@event.listens_for(Engine, "before_cursor_execute")
+def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    conn.info.setdefault('query_start_time', time.time())
+    logger.info(json.dumps({
+        'event': 'query_start',
+        'statement': statement,
+        'parameters': str(parameters),
+        'timestamp': time.time()
+    }))
+
+@event.listens_for(Engine, "after_cursor_execute")
+def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    total = time.time() - conn.info.pop('query_start_time')
+    logger.info(json.dumps({
+        'event': 'query_complete',
+        'statement': statement,
+        'duration_ms': total * 1000,
+        'timestamp': time.time()
+    }))
 
 # 残りの設定を読み込む
 app.config.from_object(Config)
@@ -128,11 +159,33 @@ migrate = Migrate(app, db)
 @log_performance
 def check_db_connection():
     try:
+        logger.info(json.dumps({
+            'event': 'db_connection_attempt',
+            'db_uri': app.config['SQLALCHEMY_DATABASE_URI'].replace(
+                app.config['SQLALCHEMY_DATABASE_URI'].split('@')[0],
+                '***SECRET***'
+            ),
+            'timestamp': time.time()
+        }))
+        
         with db.session.begin():
+            start_time = time.time()
             db.session.execute(text("SELECT 1"))
+            duration = time.time() - start_time
+            
+            logger.info(json.dumps({
+                'event': 'db_connection_success',
+                'duration_ms': duration * 1000,
+                'timestamp': time.time()
+            }))
             return True
     except Exception as e:
-        logger.error(f"Database connection error: {e}")
+        logger.error(json.dumps({
+            'event': 'db_connection_error',
+            'error': str(e),
+            'traceback': traceback.format_exc(),
+            'timestamp': time.time()
+        }))
         return False
 
 @app.before_request
@@ -193,18 +246,27 @@ def after_request(response):
 
 @app.errorhandler(504)
 def gateway_timeout(error):
-    error_time = time.time()
     logger.error(json.dumps({
         'event': 'gateway_timeout',
-        'request_id': getattr(g, 'request_id', 'unknown'),
         'path': request.path,
         'method': request.method,
         'error': str(error),
-        'memory_mb': psutil.Process().memory_info().rss / 1024 / 1024,
-        'cpu_percent': psutil.cpu_percent(),
-        'timestamp': error_time
+        'timestamp': time.time()
     }))
-    return "Request timeout. Please try again.", 504
+    return "Gateway Timeout - The server took too long to respond", 504
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    logger.error(json.dumps({
+        'event': 'unhandled_exception',
+        'error_type': type(e).__name__,
+        'error': str(e),
+        'path': request.path,
+        'method': request.method,
+        'traceback': traceback.format_exc(),
+        'timestamp': time.time()
+    }))
+    return "An internal error occurred", 500
 
 # データベーステーブルの作成（キャッシュ付き）
 @cache.memoize(timeout=3600)
@@ -217,7 +279,65 @@ def create_database_tables():
         logger.error(f"Error creating database tables: {e}")
         return False
 
+# データベース接続テストを実行
+def test_database_connection():
+    try:
+        logger.info("Starting database connection test...")
+        start_time = time.time()
+        
+        # DNS解決のテスト
+        db_host = app.config['SQLALCHEMY_DATABASE_URI'].split('@')[1].split('/')[0].split(':')[0]
+        try:
+            ip_address = socket.gethostbyname(db_host)
+            logger.info(json.dumps({
+                'event': 'dns_resolution',
+                'host': db_host,
+                'ip': ip_address,
+                'duration_ms': (time.time() - start_time) * 1000
+            }))
+        except socket.gaierror as e:
+            logger.error(json.dumps({
+                'event': 'dns_resolution_error',
+                'host': db_host,
+                'error': str(e)
+            }))
+
+        # TCP接続テスト
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)
+            start_connect = time.time()
+            sock.connect((db_host, 5432))
+            logger.info(json.dumps({
+                'event': 'tcp_connection',
+                'host': db_host,
+                'port': 5432,
+                'duration_ms': (time.time() - start_connect) * 1000
+            }))
+            sock.close()
+        except Exception as e:
+            logger.error(json.dumps({
+                'event': 'tcp_connection_error',
+                'host': db_host,
+                'port': 5432,
+                'error': str(e)
+            }))
+
+        # データベース接続テスト
+        if check_db_connection():
+            logger.info("Database connection test completed successfully")
+        else:
+            logger.error("Database connection test failed")
+
+    except Exception as e:
+        logger.error(json.dumps({
+            'event': 'database_test_error',
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }))
+
 with app.app_context():
+    test_database_connection()
     create_database_tables()
 
 # クイズデータの取得（キャッシュ付き）
