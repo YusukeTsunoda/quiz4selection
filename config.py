@@ -40,12 +40,12 @@ def resolve_db_host(host, port=5432):
         # 解決失敗時は元のホスト名を返す
         return hostname
 
-def test_database_connection(app):
+def test_database_connection(database_uri, engine_options):
     """データベース接続をテストする関数"""
     try:
         engine = create_engine(
-            app.config['SQLALCHEMY_DATABASE_URI'],
-            **app.config['SQLALCHEMY_ENGINE_OPTIONS']
+            database_uri,
+            **engine_options
         )
         with engine.connect() as connection:
             connection.execute("SELECT 1")
@@ -137,9 +137,9 @@ class Config:
                     }
                 })
 
-                # 接続テストを実行
+                # 接続テストを実行（修正版）
                 logger.info("Testing database connection...")
-                if not test_database_connection(self):
+                if not test_database_connection(self.SQLALCHEMY_DATABASE_URI, self.SQLALCHEMY_ENGINE_OPTIONS):
                     raise ConnectionError("Failed to establish database connection")
             
             # 環境に応じたデバッグ設定
