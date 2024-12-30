@@ -2,6 +2,7 @@ import os
 import logging
 import json
 import socket
+from urllib.parse import urlparse
 from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -11,35 +12,33 @@ logger.setLevel(logging.INFO)
 
 def resolve_db_host(host, port=5432):
     """
-    IPv4優先でデータベースホストのDNSを解決。
-    IPv4が使えない場合はIPv6にフォールバック。
+    IPv6優先でSupabaseホストのDNSを解決
     """
     try:
-        # まずIPv4を試す
-        logger.info(f"Attempting IPv4 resolution for {host}")
+        # URLからホスト名を抽出
+        parsed_url = urlparse(host)
+        hostname = parsed_url.hostname or host.replace('https://', '').replace('http://', '')
+        
+        # もしホスト名がdb.で始まっていなければ追加
+        if not hostname.startswith('db.'):
+            hostname = f"db.{hostname}"
+        
+        logger.info(f"Attempting IPv6 resolution for {hostname}")
+        # IPv6のみを試行
         addrinfo = socket.getaddrinfo(
-            host, port,
-            family=socket.AF_INET,
-            type=socket.SOCK_STREAM
+            hostname, port,
+            family=socket.AF_INET6,
+            type=socket.SOCK_STREAM,
+            proto=socket.IPPROTO_TCP
         )
         ip = addrinfo[0][4][0]
-        logger.info(f"Successfully resolved IPv4 address: {ip}")
-        return ip
-    except socket.gaierror as e:
-        logger.warning(f"IPv4 resolution failed: {e}, trying IPv6")
-        try:
-            # IPv4が失敗したらIPv6を試す
-            addrinfo = socket.getaddrinfo(
-                host, port,
-                family=socket.AF_INET6,
-                type=socket.SOCK_STREAM
-            )
-            ip = addrinfo[0][4][0]
-            logger.info(f"Successfully resolved IPv6 address: {ip}")
-            return ip
-        except socket.gaierror as e:
-            logger.error(f"Both IPv4 and IPv6 resolution failed: {e}")
-            raise
+        logger.info(f"Successfully resolved IPv6 address: {ip}")
+        # IPv6アドレスを角括弧で囲む（PostgreSQL接続文字列の要件）
+        return f"[{ip}]"
+    except Exception as e:
+        logger.error(f"IPv6 resolution failed: {e}")
+        # 解決失敗時は元のホスト名を返す
+        return hostname
 
 def test_database_connection(app):
     """データベース接続をテストする関数"""
@@ -92,8 +91,8 @@ class Config:
     def __init__(self):
         try:
             # データベースURLの設定
-            # または VERCEL_ENV が production の場合は強制的にproduction扱いにする
             self.FLASK_ENV = 'production' if os.environ.get('VERCEL_ENV') == 'production' else os.environ.get('FLASK_ENV', 'development')
+            
             print(f"FLASK_ENV: {self.FLASK_ENV}")
             if self.FLASK_ENV == 'development' or self.VERCEL_ENV == 'development':
                 logger.info("Using LOCAL_DATABASE_URL for development")
@@ -113,19 +112,15 @@ class Config:
                 if not all([db_pass, db_name, db_host]):
                     raise ValueError("Required database environment variables are not set")
 
-                # DNS解決でIPアドレスを取得
+                # IPv6解決を試みる
                 resolved_host = resolve_db_host(db_host, int(db_port))
-                
+                logger.info(f"Using resolved host: {resolved_host}")
+
                 # 接続文字列を構築
                 database_url = f"postgresql://{db_user}:{db_pass}@{resolved_host}:{db_port}/{db_name}"
                 
-                # PostgreSQL URLの修正（必要な場合）
-                if database_url.startswith('postgres://'):
-                    database_url = database_url.replace('postgres://', 'postgresql://', 1)
-                
+                # 接続設定を更新
                 self.SQLALCHEMY_DATABASE_URI = database_url
-                
-                # 本番環境での追加の接続設定
                 self.SQLALCHEMY_ENGINE_OPTIONS.update({
                     'pool_size': 10,
                     'max_overflow': 20,
@@ -133,9 +128,19 @@ class Config:
                     'connect_args': {
                         **self.SQLALCHEMY_ENGINE_OPTIONS['connect_args'],
                         'sslmode': 'require',
-                        'connect_timeout': 5
+                        'connect_timeout': 10,  # タイムアウトを少し長めに
+                        'keepalives': 1,
+                        'keepalives_idle': 30,
+                        'keepalives_interval': 10,
+                        'keepalives_count': 5,
+                        'options': '-c statement_timeout=30000'
                     }
                 })
+
+                # 接続テストを実行
+                logger.info("Testing database connection...")
+                if not test_database_connection(self):
+                    raise ConnectionError("Failed to establish database connection")
             
             # 環境に応じたデバッグ設定
             self.DEBUG = self.FLASK_ENV == 'development'
