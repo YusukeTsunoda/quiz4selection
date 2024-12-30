@@ -12,6 +12,8 @@ from sqlalchemy import text, create_engine
 import socket
 import time
 from functools import wraps
+from utils.logging_utils import request_logger, db_logger, api_logger
+import uuid
 
 # ロガーの設定
 logging.basicConfig(level=logging.INFO)
@@ -242,6 +244,106 @@ def get_prioritized_questions(questions, grade, category, subcategory, difficult
     except Exception as e:
         logger.error(f"Error in get_prioritized_questions: {e}")
         return None
+
+def log_request(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        request_id = str(uuid.uuid4())
+        start_time = time.time()
+        
+        # リクエストのロギング
+        request_logger.info(json.dumps({
+            'event': 'request_start',
+            'request_id': request_id,
+            'method': request.method,
+            'path': request.path,
+            'args': dict(request.args),
+            'headers': dict(request.headers),
+            'body': request.get_json(silent=True) if request.is_json else None
+        }))
+        
+        try:
+            response = f(*args, **kwargs)
+            end_time = time.time()
+            duration_ms = (end_time - start_time) * 1000
+            
+            # レスポンスのロギング
+            request_logger.info(json.dumps({
+                'event': 'request_end',
+                'request_id': request_id,
+                'status_code': response.status_code if hasattr(response, 'status_code') else 200,
+                'duration_ms': duration_ms
+            }))
+            
+            return response
+            
+        except Exception as e:
+            end_time = time.time()
+            duration_ms = (end_time - start_time) * 1000
+            
+            # エラーのロギング
+            request_logger.error(json.dumps({
+                'event': 'request_error',
+                'request_id': request_id,
+                'error': str(e),
+                'duration_ms': duration_ms
+            }))
+            
+            raise
+            
+    return decorated_function
+
+@app.route('/')
+@log_request
+def index():
+    return render_template('index.html')
+
+@app.route('/grade/<int:grade>/category/<category>/subcategory/<subcategory>/difficulty/<difficulty>')
+@log_request
+def quiz(grade, category, subcategory, difficulty):
+    try:
+        # クイズデータの取得開始時間を記録
+        start_time = time.time()
+        
+        quiz_data = get_quiz_data(grade, category, subcategory, difficulty)
+        
+        # クイズデータ取得の所要時間をロギング
+        db_logger.info(json.dumps({
+            'event': 'quiz_data_fetch',
+            'grade': grade,
+            'category': category,
+            'subcategory': subcategory,
+            'difficulty': difficulty,
+            'duration_ms': (time.time() - start_time) * 1000
+        }))
+        
+        if quiz_data is None:
+            request_logger.error(json.dumps({
+                'event': 'quiz_not_found',
+                'grade': grade,
+                'category': category,
+                'subcategory': subcategory,
+                'difficulty': difficulty
+            }))
+            return "Quiz not found", 404
+            
+        return render_template('quiz.html', 
+                             quiz_data=quiz_data,
+                             grade=grade,
+                             category=category,
+                             subcategory=subcategory,
+                             difficulty=difficulty)
+                             
+    except Exception as e:
+        request_logger.error(json.dumps({
+            'event': 'quiz_error',
+            'grade': grade,
+            'category': category,
+            'subcategory': subcategory,
+            'difficulty': difficulty,
+            'error': str(e)
+        }))
+        raise
 
 @app.route('/')
 def select_grade():

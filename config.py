@@ -7,6 +7,8 @@ from functools import lru_cache
 import urllib3
 import ssl
 import requests
+import json
+from utils.logging_utils import db_logger, network_logger, api_logger
 
 # ロガーの設定
 logging.basicConfig(
@@ -157,44 +159,82 @@ def get_supabase_client():
     # コネクションの有効期限チェック
     if _supabase_instance is not None and _last_connection_time is not None:
         if current_time - _last_connection_time > _connection_timeout:
-            logger.info("Supabase connection expired, recreating...")
+            network_logger.info(json.dumps({
+                'event': 'connection_expired',
+                'host': Config.SUPABASE_URL,
+                'last_used': _last_connection_time,
+                'current_time': current_time
+            }))
             _supabase_instance = None
 
     if _supabase_instance is None:
         start_time = time.time()
         retry_count = 0
         max_retries = 3
-        retry_delay = 2  # 秒
+        retry_delay = 2
 
         while retry_count < max_retries:
             try:
-                logger.info(f"Initializing Supabase client (attempt {retry_count + 1}/{max_retries})...")
+                api_logger.info(json.dumps({
+                    'event': 'supabase_init_attempt',
+                    'attempt': retry_count + 1,
+                    'max_retries': max_retries,
+                    'host': Config.SUPABASE_URL
+                }))
                 
-                # 新しい形式でのクライアント初期化
+                connection_id = network_logger.log_network_connection(
+                    Config.SUPABASE_URL,
+                    '5432'
+                )
+                
+                _supabase_instance = create_client(
+                    supabase_url=Config.SUPABASE_URL,
+                    supabase_key=Config.SUPABASE_KEY
+                )
+
+                # 軽量な接続テスト
                 try:
-                    _supabase_instance = create_client(
-                        supabase_url=Config.SUPABASE_URL,
-                        supabase_key=Config.SUPABASE_KEY
-                    )
-                    # 軽量な接続テスト
                     data = _supabase_instance.table('quiz_attempts').select("count").limit(1).execute()
-                    logger.info("Database connection test successful")
+                    db_logger.info(json.dumps({
+                        'event': 'connection_test_success',
+                        'duration_ms': (time.time() - start_time) * 1000
+                    }))
                 except Exception as e:
-                    logger.error(f"Error initializing Supabase client: {e}")
-                    _supabase_instance = None
+                    db_logger.error(json.dumps({
+                        'event': 'connection_test_failed',
+                        'error': str(e),
+                        'duration_ms': (time.time() - start_time) * 1000
+                    }))
+                    raise
                 
                 _last_connection_time = current_time
                 end_time = time.time()
-                logger.info(f"Supabase client initialized successfully in {end_time - start_time:.2f} seconds")
+                
+                api_logger.info(json.dumps({
+                    'event': 'supabase_init_success',
+                    'duration_ms': (end_time - start_time) * 1000
+                }))
+                
                 break
+                
             except Exception as e:
                 retry_count += 1
-                logger.error(f"Error initializing Supabase client (attempt {retry_count}/{max_retries}): {e}")
+                api_logger.error(json.dumps({
+                    'event': 'supabase_init_error',
+                    'attempt': retry_count,
+                    'error': str(e),
+                    'duration_ms': (time.time() - start_time) * 1000
+                }))
+                
                 if retry_count < max_retries:
-                    logger.info(f"Retrying in {retry_delay} seconds...")
                     time.sleep(retry_delay)
                 else:
-                    logger.error("Failed to initialize Supabase client after all retries")
+                    network_logger.error(json.dumps({
+                        'event': 'connection_failed',
+                        'host': Config.SUPABASE_URL,
+                        'attempts': retry_count,
+                        'total_duration_ms': (time.time() - start_time) * 1000
+                    }))
                     return None
 
     return _supabase_instance
