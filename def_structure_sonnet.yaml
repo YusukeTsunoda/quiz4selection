@@ -6,6 +6,7 @@ main:
         外部依存:
         - Flask
         - SQLAlchemy
+        - Supabase
         機能:
         - ルーティング設定
         - アプリケーション初期化
@@ -15,10 +16,31 @@ main:
         - 問題単位の履歴データ取得処理
         - 問題ごとの正答率計算処理
         - タブ切り替え機能の実装
+        - データベース接続管理
+        - エラーハンドリング
+        - ログ出力
       dependency:
         - /models.py
         - /extensions.py
         - /quiz_data.py
+        - /config.py
+
+    config.py:
+      content: |-
+        設定ファイル
+        外部依存:
+        - python-dotenv
+        - Supabase
+        機能:
+        - 環境変数の管理
+        - Supabase設定
+        - データベース接続設定
+        - Supavisor設定
+        - ログ設定
+        - セキュリティ設定
+        - 本番/開発環境の切り替え
+      dependency:
+        - /.env
 
     models.py:
       content: |-
@@ -42,10 +64,12 @@ main:
         Flaskの拡張機能の初期化
         外部依存:
         - Flask-SQLAlchemy
+        - Flask-Migrate
         機能:
         - データベース設定
         - 共有拡張機能の初期化
         - セッション設定
+        - マイグレーション管理
 
     quiz_data.py:
       content: |-
@@ -56,6 +80,9 @@ main:
         - 難易度設定
         - 問題のランダム選択
         - 正解判定ロジック
+        - 問題の優先順位付け
+        - 未回答問題の管理
+        - 低正答率問題の管理
 
     static:
       css:
@@ -75,6 +102,7 @@ main:
             - 問題別回答履歴のカラーコーディング
             - スクロールバーのカスタマイズ
             - 正答率と時間表示のレイアウト
+            - エラーメッセージのスタイル
 
       js:
         quiz.js:
@@ -88,6 +116,8 @@ main:
             - アニメーション制御
             - 履歴表示の制御
             - タブ切り替え制御
+            - エラーハンドリング
+            - ローディング表示
 
     templates:
       base.html:
@@ -100,6 +130,7 @@ main:
           - Bootstrap/CSSの読み込み
           - JavaScriptの読み込み
           - レスポンシブ対応
+          - エラーメッセージ表示
 
       index.html:
         content: |-
@@ -111,6 +142,7 @@ main:
           - スコア表示
           - 問題表示
           - 選択肢表示
+          - エラーメッセージ
         dependency:
           - /templates/base.html
 
@@ -124,6 +156,8 @@ main:
           - スコア表示
           - 問題番号表示
           - 選択肢の動的処理
+          - タイマー表示
+          - エラー表示
         dependency:
           - /templates/base.html
           - /static/js/quiz.js
@@ -138,6 +172,7 @@ main:
           - 次のクイズへの案内
           - ダッシュボードへのリンク
           - 不正解問題の詳細表示
+          - 時間分析
         dependency:
           - /templates/base.html
 
@@ -157,6 +192,7 @@ main:
           - 問題ごとの正答率表示
           - 回答時間の表示
           - 正答率と時間の表示レイアウト
+          - エラーメッセージ表示
         dependency:
           - /templates/base.html
 
@@ -168,6 +204,7 @@ main:
           - カテゴリー選択機能
           - カテゴリー説明
           - 難易度選択への遷移
+          - エラーメッセージ表示
         dependency:
           - /templates/base.html
 
@@ -179,6 +216,8 @@ main:
           - 難易度説明
           - 選択中のカテゴリ表示
           - カテゴリ選択への戻るリンク
+          - 統計情報表示
+          - エラーメッセージ表示
         dependency:
           - /templates/base.html
 
@@ -193,5 +232,21 @@ main:
           - 平均スコアの表示
           - 最高スコアの表示
           - 詳細履歴へのリンク
+          - エラー表示
         dependency:
           - /templates/base.html
+
+    requirements.txt:
+      content: |-
+        依存パッケージ定義
+        必須パッケージ:
+        - Flask==2.2.5
+        - Werkzeug==2.2.3
+        - flask-migrate==4.0.4
+        - python-dotenv==1.0.0
+        - psycopg2-binary==2.9.9
+        - flask-login==0.6.2
+        - Flask-SQLAlchemy==2.5.1
+        - SQLAlchemy==1.4.46
+        - supabase-py
+        - python-dotenv
