@@ -703,6 +703,7 @@ def signup():
         try:
             email = request.form['email']
             password = request.form['password']
+            username = request.form['username']
             
             # Supabaseでユーザー登録
             response = supabase.auth.sign_up({
@@ -714,6 +715,7 @@ def signup():
             user = User(
                 id=response.user.id,
                 email=response.user.email,
+                username=username,
                 is_admin=False  # デフォルトで一般ユーザー
             )
             db.session.add(user)
@@ -746,9 +748,11 @@ def login():
             user = User.query.get(response.user.id)
             if not user:
                 # 初回ログイン時にユーザーを作成
+                username = email.split('@')[0]  # メールアドレスのローカル部分をユーザー名として使用
                 user = User(
                     id=response.user.id,
                     email=response.user.email,
+                    username=username,
                     is_admin=False
                 )
                 db.session.add(user)
@@ -758,6 +762,7 @@ def login():
             session['user'] = {
                 'id': user.id,
                 'email': user.email,
+                'username': user.username,
                 'is_admin': user.is_admin
             }
             
