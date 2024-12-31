@@ -1,4 +1,5 @@
-{% extends "base.html" %} {% block content %}
+{% extends "base.html" %}
+{% block content %}
 <div class="container mt-5">
   <div class="row justify-content-center">
     <div class="col-md-6">
@@ -7,7 +8,23 @@
           <h2>アカウント登録</h2>
         </div>
         <div class="card-body">
-          <form method="POST" action="{{ url_for('signup') }}">
+          <form method="POST" action="{{ url_for('signup') }}" class="needs-validation" novalidate>
+            <div class="mb-3">
+              <label for="username" class="form-label">ユーザー名</label>
+              <input
+                type="text"
+                class="form-control"
+                id="username"
+                name="username"
+                required
+                pattern="^[a-zA-Z0-9_-]{3,16}$"
+                minlength="3"
+                maxlength="16"
+              />
+              <div class="invalid-feedback">
+                3〜16文字の英数字、ハイフン(-)、アンダースコア(_)で入力してください
+              </div>
+            </div>
             <div class="mb-3">
               <label for="email" class="form-label">メールアドレス</label>
               <input
@@ -17,6 +34,9 @@
                 name="email"
                 required
               />
+              <div class="invalid-feedback">
+                有効なメールアドレスを入力してください
+              </div>
             </div>
             <div class="mb-3">
               <label for="password" class="form-label">パスワード</label>
@@ -26,8 +46,33 @@
                 id="password"
                 name="password"
                 required
+                minlength="8"
+                pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}"
               />
-              <div class="form-text">8文字以上で入力してください</div>
+              <div class="form-text mb-2">
+                8文字以上で、以下を含める必要があります：
+                <ul class="mb-0 mt-1">
+                  <li>英大文字</li>
+                  <li>英小文字</li>
+                  <li>数字</li>
+                </ul>
+              </div>
+              <div class="invalid-feedback">
+                パスワードは8文字以上で、大文字・小文字・数字を含める必要があります
+              </div>
+            </div>
+            <div class="mb-3">
+              <label for="confirm_password" class="form-label">パスワード（確認）</label>
+              <input
+                type="password"
+                class="form-control"
+                id="confirm_password"
+                name="confirm_password"
+                required
+              />
+              <div class="invalid-feedback">
+                パスワードが一致しません
+              </div>
             </div>
             <div class="d-grid gap-2">
               <button type="submit" class="btn btn-primary">登録</button>
@@ -35,9 +80,7 @@
           </form>
           <div class="text-center mt-3">
             <p>
-              すでにアカウントをお持ちの方は<a href="{{ url_for('login') }}"
-                >こちら</a
-              >
+              すでにアカウントをお持ちの方は<a href="{{ url_for('login') }}">こちら</a>
             </p>
           </div>
         </div>
@@ -87,5 +130,41 @@
     font-size: 0.875rem;
     margin-top: 0.25rem;
   }
+
+  .form-text ul {
+    padding-left: 1.2rem;
+  }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // パスワード一致チェック
+  const password = document.getElementById('password');
+  const confirmPassword = document.getElementById('confirm_password');
+  
+  function validatePassword() {
+    if (password.value !== confirmPassword.value) {
+      confirmPassword.setCustomValidity('パスワードが一致しません');
+    } else {
+      confirmPassword.setCustomValidity('');
+    }
+  }
+
+  password.addEventListener('change', validatePassword);
+  confirmPassword.addEventListener('keyup', validatePassword);
+
+  // Bootstrap 5のバリデーション
+  const forms = document.querySelectorAll('.needs-validation');
+  
+  Array.from(forms).forEach(form => {
+    form.addEventListener('submit', event => {
+      if (!form.checkValidity()) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      form.classList.add('was-validated');
+    }, false);
+  });
+});
+</script>
 {% endblock %}

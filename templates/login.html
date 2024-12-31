@@ -1,4 +1,5 @@
-{% extends "base.html" %} {% block content %}
+{% extends "base.html" %}
+{% block content %}
 <div class="container mt-5">
   <div class="row justify-content-center">
     <div class="col-md-6">
@@ -7,36 +8,77 @@
           <h2>ログイン</h2>
         </div>
         <div class="card-body">
-          <form method="POST" action="{{ url_for('login') }}">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                  {{ message }}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+          
+          <form method="POST" action="{{ url_for('login') }}" class="needs-validation" novalidate>
             <div class="mb-3">
               <label for="email" class="form-label">メールアドレス</label>
-              <input
-                type="email"
-                class="form-control"
-                id="email"
-                name="email"
-                required
-              />
+              <div class="input-group">
+                <span class="input-group-text">
+                  <i class="bi bi-envelope"></i>
+                </span>
+                <input
+                  type="email"
+                  class="form-control"
+                  id="email"
+                  name="email"
+                  required
+                  autocomplete="email"
+                />
+                <div class="invalid-feedback">
+                  メールアドレスを入力してください
+                </div>
+              </div>
             </div>
             <div class="mb-3">
               <label for="password" class="form-label">パスワード</label>
-              <input
-                type="password"
-                class="form-control"
-                id="password"
-                name="password"
-                required
-              />
+              <div class="input-group">
+                <span class="input-group-text">
+                  <i class="bi bi-key"></i>
+                </span>
+                <input
+                  type="password"
+                  class="form-control"
+                  id="password"
+                  name="password"
+                  required
+                  autocomplete="current-password"
+                />
+                <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                  <i class="bi bi-eye"></i>
+                </button>
+                <div class="invalid-feedback">
+                  パスワードを入力してください
+                </div>
+              </div>
+            </div>
+            <div class="mb-3 form-check">
+              <input type="checkbox" class="form-check-input" id="remember" name="remember">
+              <label class="form-check-label" for="remember">ログイン状態を保持する</label>
             </div>
             <div class="d-grid gap-2">
-              <button type="submit" class="btn btn-primary">ログイン</button>
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-box-arrow-in-right me-2"></i>ログイン
+              </button>
             </div>
           </form>
-          <div class="text-center mt-3">
-            <p>
-              アカウントをお持ちでない方は<a href="{{ url_for('signup') }}"
-                >こちら</a
-              >
+          <div class="text-center mt-4">
+            <p class="mb-2">
+              <a href="{{ url_for('reset_password') }}" class="text-secondary">
+                <i class="bi bi-question-circle me-1"></i>パスワードをお忘れの方
+              </a>
+            </p>
+            <p class="border-top pt-3">
+              アカウントをお持ちでない方は<a href="{{ url_for('signup') }}">新規登録</a>
             </p>
           </div>
         </div>
@@ -64,11 +106,18 @@
   .btn-primary {
     background-color: #4caf50;
     border-color: #4caf50;
+    padding: 0.6rem;
   }
 
   .btn-primary:hover {
     background-color: #45a049;
     border-color: #45a049;
+  }
+
+  .btn-outline-secondary:hover {
+    background-color: #f8f9fa;
+    color: #4caf50;
+    border-color: #ced4da;
   }
 
   a {
@@ -80,5 +129,72 @@
     color: #45a049;
     text-decoration: underline;
   }
+
+  .text-secondary {
+    color: #6c757d !important;
+  }
+
+  .text-secondary:hover {
+    color: #4caf50 !important;
+  }
+
+  .input-group-text {
+    background-color: #f8f9fa;
+    border-right: none;
+  }
+
+  .input-group .form-control {
+    border-left: none;
+  }
+
+  .input-group .form-control:focus {
+    border-left: none;
+    box-shadow: none;
+  }
+
+  .form-check-input:checked {
+    background-color: #4caf50;
+    border-color: #4caf50;
+  }
+
+  .bi {
+    font-size: 1.1rem;
+  }
+
+  @media (max-width: 768px) {
+    .card-body {
+      padding: 1.5rem;
+    }
+  }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Bootstrap バリデーション
+  const forms = document.querySelectorAll('.needs-validation');
+  Array.from(forms).forEach(form => {
+    form.addEventListener('submit', event => {
+      if (!form.checkValidity()) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      form.classList.add('was-validated');
+    }, false);
+  });
+
+  // パスワード表示/非表示の切り替え
+  const togglePassword = document.querySelector('#togglePassword');
+  const password = document.querySelector('#password');
+  
+  togglePassword.addEventListener('click', function (e) {
+    const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+    password.setAttribute('type', type);
+    this.querySelector('i').classList.toggle('bi-eye');
+    this.querySelector('i').classList.toggle('bi-eye-slash');
+  });
+});
+</script>
+
+<!-- Bootstrap Icons CSSの追加 -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
 {% endblock %}
