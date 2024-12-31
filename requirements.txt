@@ -7,3 +7,5 @@ flask-login==0.6.2
 Flask-SQLAlchemy==3.0.2
 SQLAlchemy==1.4.46
 flask-caching==2.0.2
+dnspython==2.7.0
+supabase==2.0.3

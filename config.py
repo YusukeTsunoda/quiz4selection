@@ -1,105 +1,88 @@
 import os
+import socket
 import logging
-import json
-from sqlalchemy import create_engine
-from sqlalchemy.exc import SQLAlchemyError
+from dotenv import load_dotenv
 
 # ロガーの設定
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-def test_database_connection(app):
-    """データベース接続をテストする関数"""
+# 環境変数の読み込み
+load_dotenv()
+
+def resolve_db_host(host, port=5432):
+    """Supabaseホストの DNS 解決 - IPv6専用版"""
     try:
-        engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'])
-        with engine.connect() as connection:
-            connection.execute("SELECT 1")
-        logger.info("Database connection test successful")
-        return True
-    except SQLAlchemyError as e:
-        logger.error(f"Database connection test failed: {e}")
-        return False
+        from urllib.parse import urlparse
+        parsed_url = urlparse(host)
+        hostname = parsed_url.hostname or host
+        logger.info(f"Attempting to resolve: {hostname}")
+
+        # IPv6のみを使用するように設定
+        addrinfo = socket.getaddrinfo(
+            hostname,
+            port,
+            family=socket.AF_INET6,  # IPv6のみ
+            type=socket.SOCK_STREAM,
+            proto=socket.IPPROTO_TCP,
+            flags=socket.AI_ADDRCONFIG  # IPv4マッピングを無効化
+        )
+        
+        if not addrinfo:
+            logger.error("No IPv6 addresses found")
+            return hostname
+
+        ip = addrinfo[0][4][0]
+        logger.info(f"Resolved IPv6: {ip}")
+        # IPv6アドレスは常に括弧で囲む
+        return f"[{ip}]"
+
+    except socket.gaierror as e:
+        logger.error(f"IPv6 DNS resolution error: {e}")
+        return hostname
     except Exception as e:
-        logger.error(f"Unexpected error in database connection test: {e}")
-        return False
+        logger.error(f"Unexpected error in IPv6 resolution: {e}")
+        return hostname
 
 class Config:
-    """アプリケーションの設定クラス"""
-    # セッション設定
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev')
-    
-    # 環境設定
-    FLASK_ENV = os.environ.get('FLASK_ENV', 'development')
-    VERCEL_ENV = os.environ.get('VERCEL_ENV')
-    
-    # データベース設定
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
-    # SQLAlchemy接続プール設定
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': 5,  # 接続プールのサイズ
-        'max_overflow': 10,  # 最大追加接続数
-        'pool_timeout': 30,  # 接続タイムアウト（秒）
-        'pool_recycle': 1800,  # 接続再利用時間（秒）
-    }
-    
+    """アプリケーション設定クラス"""
     def __init__(self):
-        # 環境変数の状態をログ出力
-        logger.info(json.dumps({
-            'event': 'environment_check',
-            'vercel_env': os.environ.get('VERCEL_ENV'),
-            'database_url_set': bool(os.environ.get('DATABASE_URL')),
-            'local_database_url_set': bool(os.environ.get('LOCAL_DATABASE_URL'))
-        }))
-        
-        # 開発環境の設定
-        if self.FLASK_ENV == 'development' or self.VERCEL_ENV == 'development':
-            logger.info("Using LOCAL_DATABASE_URL for development")
-            database_url = os.environ.get('LOCAL_DATABASE_URL')
-            if not database_url:
-                raise ValueError("LOCAL_DATABASE_URL is not set in development environment")
-            self.SQLALCHEMY_DATABASE_URI = database_url
-            self.DEBUG = True
-            self.DEVELOPMENT = True
-        # 本番環境の設定
-        else:
-            logger.info("Using DATABASE_URL for production")
-            database_url = os.environ.get('DATABASE_URL')
-            if not database_url:
-                raise ValueError("DATABASE_URL is not set in production environment")
-            # PostgreSQL URLの修正
-            if database_url.startswith('postgres://'):
-                database_url = database_url.replace('postgres://', 'postgresql://', 1)
-            self.SQLALCHEMY_DATABASE_URI = database_url
-            self.DEBUG = False
-            self.DEVELOPMENT = False
-            
-            # 本番環境での追加の接続設定
-            self.SQLALCHEMY_ENGINE_OPTIONS.update({
-                'pool_pre_ping': True,  # 接続前の生存確認
-                'pool_recycle': 300,    # より短い接続再利用時間
-            })
-        
-        # データベース設定の状態をログ出力
-        logger.info(json.dumps({
-            'event': 'database_config',
-            'is_production': not self.DEVELOPMENT,
-            'database_url_set': bool(self.SQLALCHEMY_DATABASE_URI),
-            'engine_options': self.SQLALCHEMY_ENGINE_OPTIONS
-        }))
+        # 基本設定
+        self.FLASK_ENV = os.getenv('FLASK_ENV', 'development')
+        self.DEBUG = os.getenv('FLASK_DEBUG', '0') == '1'
+        self.SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'dev_key_for_quiz_app')
 
-# Supabaseクライアントの初期化
-try:
-    logger.info("Initializing Supabase client...")
-    if os.environ.get('NEXT_PUBLIC_SUPABASE_URL') and os.environ.get('NEXT_PUBLIC_SUPABASE_ANON_KEY'):
-        from supabase import create_client
-        supabase = create_client(
-            os.environ.get('NEXT_PUBLIC_SUPABASE_URL'),
-            os.environ.get('NEXT_PUBLIC_SUPABASE_ANON_KEY')
-        )
-    else:
-        logger.error("Failed to initialize Supabase client: supabase_url is required")
-        supabase = None
-except Exception as e:
-    logger.error(f"Error initializing Supabase client: {e}")
-    supabase = None
+        # データベース設定
+        if self.FLASK_ENV == 'development':
+            # 開発環境用の設定
+            self.SQLALCHEMY_DATABASE_URI = os.getenv('LOCAL_DATABASE_URL')
+            self.SQLALCHEMY_ENGINE_OPTIONS = {
+                "pool_pre_ping": True,
+                "pool_recycle": 300,
+            }
+        else:
+            # 本番環境（Supabase）用の設定
+            db_user = os.getenv('POSTGRES_USER')
+            db_password = os.getenv('POSTGRES_PASSWORD')
+            db_host = os.getenv('NEXT_PUBLIC_SUPABASE_URL')
+            db_port = os.getenv('POSTGRES_PORT', '5432')
+            db_name = os.getenv('POSTGRES_DATABASE')
+            self.SQLALCHEMY_DATABASE_URI = os.getenv('SQLALCHEMY_DATABASE_URI')
+
+            # IPv6アドレスの解決
+            resolved_host = resolve_db_host(db_host, int(db_port))
+            
+            # データベースURLの構築
+            self.SQLALCHEMY_DATABASE_URI = f"postgresql://{db_user}:{db_password}@{resolved_host}:{db_port}/{db_name}"
+            
+            # 本番環境用のエンジンオプション
+            self.SQLALCHEMY_ENGINE_OPTIONS = {
+                "pool_pre_ping": True,
+                "pool_recycle": 300,
+                "connect_args": {
+                    "sslmode": "require"
+                }
+            }
+
+        # 共通設定
+        self.SQLALCHEMY_TRACK_MODIFICATIONS = False
