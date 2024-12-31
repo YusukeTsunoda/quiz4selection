@@ -47,44 +47,50 @@ def resolve_db_host(host, port=5432):
 class Config:
     """アプリケーション設定クラス"""
     def __init__(self):
+        # デバッグ情報の出力
+        logger.info("=== Config Initialization Start ===")
+        
         # 基本設定
-        self.FLASK_ENV = os.getenv('FLASK_ENV', 'development')
-        self.DEBUG = os.getenv('FLASK_DEBUG', '0') == '1'
-        self.SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'dev_key_for_quiz_app')
-
+        self.FLASK_ENV = 'production' if os.getenv('VERCEL') else os.getenv('FLASK_ENV', 'development')
+        logger.info(f"Current Environment: {self.FLASK_ENV}")
+        
         # データベース設定
         if self.FLASK_ENV == 'development':
-            # 開発環境用の設定
-            self.SQLALCHEMY_DATABASE_URI = os.getenv('LOCAL_DATABASE_URL')
-            print(self.SQLALCHEMY_DATABASE_URI)
-            self.SQLALCHEMY_ENGINE_OPTIONS = {
-                "pool_pre_ping": True,
-                "pool_recycle": 300,
-            }
+            db_url = os.getenv('LOCAL_DATABASE_URL')
+            logger.info(f"Development Database URL exists: {bool(db_url)}")
         else:
-            # 本番環境（Supabase）用の設定
-            db_url = os.getenv('SQLALCHEMY_DATABASE_URI')
-            if not db_url:
-                # 環境変数から個別に構築
-                db_user = os.getenv('POSTGRES_USER')
-                db_password = os.getenv('POSTGRES_PASSWORD')
-                db_host = os.getenv('NEXT_PUBLIC_SUPABASE_URL')
-                db_port = os.getenv('POSTGRES_PORT', '5432')
-                db_name = os.getenv('POSTGRES_DATABASE')
-                
-                # IPv6アドレスの解決
-                resolved_host = resolve_db_host(db_host, int(db_port))
-                db_url = f"postgresql://{db_user}:{db_password}@{resolved_host}:{db_port}/{db_name}"
+            db_url = os.getenv('DATABASE_URL') or os.getenv('SQLALCHEMY_DATABASE_URI')
+            logger.info(f"Production Database URL exists: {bool(db_url)}")
             
-            self.SQLALCHEMY_DATABASE_URI = db_url
-            print(self.SQLALCHEMY_DATABASE_URI)
-            self.SQLALCHEMY_ENGINE_OPTIONS = {
-                "pool_pre_ping": True,
-                "pool_recycle": 300,
-                "connect_args": {
-                    "sslmode": "require"
+            if not db_url:
+                # 個別パラメータの確認
+                params = {
+                    'user': os.getenv('POSTGRES_USER'),
+                    'password': bool(os.getenv('POSTGRES_PASSWORD')),  # パスワードの有無のみログ
+                    'host': os.getenv('NEXT_PUBLIC_SUPABASE_URL'),
+                    'port': os.getenv('POSTGRES_PORT', '5432'),
+                    'database': os.getenv('POSTGRES_DATABASE')
                 }
-            }
-
+                logger.info(f"Database Parameters: {params}")
+                
+                if all(v for k, v in params.items() if k != 'password'):
+                    resolved_host = resolve_db_host(params['host'], int(params['port']))
+                    db_url = f"postgresql://{params['user']}:{os.getenv('POSTGRES_PASSWORD')}@{resolved_host}:{params['port']}/{params['database']}"
+                    logger.info("Database URL constructed from parameters")
+                else:
+                    logger.error("Missing required database parameters")
+                    
+        self.SQLALCHEMY_DATABASE_URI = db_url
+        logger.info(f"Final Database URI set: {bool(self.SQLALCHEMY_DATABASE_URI)}")
+        
+        # エンジンオプション
+        self.SQLALCHEMY_ENGINE_OPTIONS = {
+            "pool_pre_ping": True,
+            "pool_recycle": 300,
+        }
+        if self.FLASK_ENV != 'development':
+            self.SQLALCHEMY_ENGINE_OPTIONS["connect_args"] = {"sslmode": "require"}
+        
         # 共通設定
         self.SQLALCHEMY_TRACK_MODIFICATIONS = False
+        logger.info("=== Config Initialization End ===")
