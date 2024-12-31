@@ -1,13 +1,10 @@
 from datetime import datetime
 import json
+import logging
 from flask_sqlalchemy import SQLAlchemy
+from extensions import db
 
-<<<<<<< HEAD
 logger = logging.getLogger(__name__)
-=======
-# データベースインスタンスの作成
-db = SQLAlchemy()
->>>>>>> ca349853c6a96ebe070137e810353321b3bdbb5c
 
 class QuizAttempt(db.Model):
     """クイズの試行を記録するモデル"""
