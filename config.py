@@ -56,26 +56,27 @@ class Config:
         if self.FLASK_ENV == 'development':
             # 開発環境用の設定
             self.SQLALCHEMY_DATABASE_URI = os.getenv('LOCAL_DATABASE_URL')
+            print(self.SQLALCHEMY_DATABASE_URI)
             self.SQLALCHEMY_ENGINE_OPTIONS = {
                 "pool_pre_ping": True,
                 "pool_recycle": 300,
             }
         else:
             # 本番環境（Supabase）用の設定
-            db_user = os.getenv('POSTGRES_USER')
-            db_password = os.getenv('POSTGRES_PASSWORD')
-            db_host = os.getenv('NEXT_PUBLIC_SUPABASE_URL')
-            db_port = os.getenv('POSTGRES_PORT', '5432')
-            db_name = os.getenv('POSTGRES_DATABASE')
-            self.SQLALCHEMY_DATABASE_URI = os.getenv('SQLALCHEMY_DATABASE_URI')
-
-            # IPv6アドレスの解決
-            resolved_host = resolve_db_host(db_host, int(db_port))
+            db_url = os.getenv('SQLALCHEMY_DATABASE_URI')
+            if not db_url:
+                # 環境変数から個別に構築
+                db_user = os.getenv('POSTGRES_USER')
+                db_password = os.getenv('POSTGRES_PASSWORD')
+                db_host = os.getenv('NEXT_PUBLIC_SUPABASE_URL')
+                db_port = os.getenv('POSTGRES_PORT', '5432')
+                db_name = os.getenv('POSTGRES_DATABASE')
+                
+                # IPv6アドレスの解決
+                resolved_host = resolve_db_host(db_host, int(db_port))
+                db_url = f"postgresql://{db_user}:{db_password}@{resolved_host}:{db_port}/{db_name}"
             
-            # データベースURLの構築
-            self.SQLALCHEMY_DATABASE_URI = f"postgresql://{db_user}:{db_password}@{resolved_host}:{db_port}/{db_name}"
-            
-            # 本番環境用のエンジンオプション
+            self.SQLALCHEMY_DATABASE_URI = db_url
             self.SQLALCHEMY_ENGINE_OPTIONS = {
                 "pool_pre_ping": True,
                 "pool_recycle": 300,
