@@ -3,7 +3,7 @@ import socket
 import logging
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 # ロガーの設定
 logger = logging.getLogger(__name__)
@@ -36,6 +36,35 @@ def analyze_db_url(db_url):
     except Exception as e:
         logger.error(f"Error analyzing database URL: {e}")
 
+def update_db_url_params(db_url):
+    """データベースURLのクエリパラメータを安全に更新"""
+    if not db_url:
+        return db_url
+        
+    try:
+        # URLをパース
+        parsed = urlparse(db_url)
+        # 既存のクエリパラメータを取得
+        params = parse_qs(parsed.query)
+        
+        # sslmodeパラメータを追加/更新
+        params['sslmode'] = ['require']
+        
+        # 新しいクエリ文字列を作成
+        new_query = urlencode(params, doseq=True)
+        
+        # URLを再構築
+        return urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            new_query,
+            parsed.fragment
+        ))
+    except Exception as e:
+        logger.error(f"Error updating database URL parameters: {e}")
+        return db_url
 
 class Config:
     """アプリケーション設定クラス"""
@@ -47,14 +76,9 @@ class Config:
         else:
             # 本番環境用の接続文字列を取得
             db_url = os.getenv('DATABASE_URL') or os.getenv('SQLALCHEMY_DATABASE_URI')
-            
-            # 接続文字列が存在する場合、SSL設定を追加
             if db_url:
-                # すでにクエリパラメータが存在するかチェック
-                if '?' in db_url:
-                    db_url += '&sslmode=require'
-                else:
-                    db_url += '?sslmode=require'
+                # クエリパラメータを安全に更新
+                db_url = update_db_url_params(db_url)
         
         # 接続文字列の解析
         analyze_db_url(db_url)
