@@ -20,8 +20,8 @@ def resolve_db_host(host, port=5432):
         hostname = parsed_url.hostname or host.replace('https://', '').replace('http://', '')
         
         # もしホスト名がdb.で始まっていなければ追加
-        if not hostname.startswith('db.'):
-            hostname = f"db.{hostname}"
+        # if not hostname.startswith('db.'):
+        #     hostname = f"db.{hostname}"
         
         logger.info(f"Attempting IPv6 resolution for {hostname}")
         # IPv6のみを試行
