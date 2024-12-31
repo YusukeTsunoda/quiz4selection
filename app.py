@@ -266,7 +266,7 @@ def start_quiz(grade, category, subcategory, difficulty):
         session['current_question'] = 0
         session['score'] = 0
         session['quiz_history'] = []
-        session['answered_questions'] = set()  # 回答済み問題を追跡
+        session['answered_questions'] = []  # リストとして初期化
         session['grade'] = grade
         session['category'] = category
         session['subcategory'] = subcategory
@@ -303,7 +303,7 @@ def submit_answer():
         questions = session.get('questions', [])
         current_score = session.get('score', 0)
         quiz_history = session.get('quiz_history', [])
-        answered_questions = session.get('answered_questions', set())
+        answered_questions = session.get('answered_questions', [])  # リストとして取得
 
         # 既に回答済みの問題かチェック
         if current_question in answered_questions:
@@ -338,9 +338,10 @@ def submit_answer():
         })
         session['quiz_history'] = quiz_history
         
-        # 回答済みの問題として記録
-        answered_questions.add(current_question)
-        session['answered_questions'] = answered_questions
+        # 回答済みの問題として記録（リストに追加）
+        if current_question not in answered_questions:
+            answered_questions.append(current_question)
+            session['answered_questions'] = answered_questions
 
         # 最後の問題の場合、QuizAttemptを保存
         if is_last_question:
