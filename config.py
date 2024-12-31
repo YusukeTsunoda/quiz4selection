@@ -36,6 +36,7 @@ def analyze_db_url(db_url):
     except Exception as e:
         logger.error(f"Error analyzing database URL: {e}")
 
+
 class Config:
     """アプリケーション設定クラス"""
     def __init__(self):
@@ -44,7 +45,16 @@ class Config:
         if self.FLASK_ENV == 'development':
             db_url = os.getenv('LOCAL_DATABASE_URL')
         else:
+            # 本番環境用の接続文字列を取得
             db_url = os.getenv('DATABASE_URL') or os.getenv('SQLALCHEMY_DATABASE_URI')
+            
+            # 接続文字列が存在する場合、SSL設定を追加
+            if db_url:
+                # すでにクエリパラメータが存在するかチェック
+                if '?' in db_url:
+                    db_url += '&sslmode=require'
+                else:
+                    db_url += '?sslmode=require'
         
         # 接続文字列の解析
         analyze_db_url(db_url)
@@ -54,9 +64,9 @@ class Config:
             "pool_pre_ping": True,
             "pool_recycle": 300,
         }
+        
+        # SSL設定はすでにURLに含まれているため、connect_argsからは削除
         if self.FLASK_ENV != 'development':
-            self.SQLALCHEMY_ENGINE_OPTIONS["connect_args"] = {
-                "sslmode": "require"
-            }
+            self.SQLALCHEMY_ENGINE_OPTIONS["connect_args"] = {}
         
         self.SQLALCHEMY_TRACK_MODIFICATIONS = False
