@@ -418,7 +418,7 @@ def next_question():
 
 @app.route('/dashboard')
 def dashboard():
-    """学習成績ダッシュボードを表示"""
+    """学習成績ダッシュボードを表示する"""
     try:
         # クイズの試行履歴を取得
         quiz_attempts = QuizAttempt.query.order_by(QuizAttempt.timestamp.desc()).all()
