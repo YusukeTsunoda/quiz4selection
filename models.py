@@ -23,14 +23,29 @@ class QuizAttempt(db.Model):
     @property
     def quiz_history(self):
         """クイズ履歴をJSONとして取得"""
-        if self._quiz_history:
+        if self._quiz_history is None:
+            return []
+        
+        # すでにリスト型の場合はそのまま返す
+        if isinstance(self._quiz_history, list):
+            return self._quiz_history
+            
+        # 文字列の場合はJSONとしてパース
+        try:
             return json.loads(self._quiz_history)
-        return []
+        except (TypeError, json.JSONDecodeError) as e:
+            logger.error(f"Error parsing quiz history: {e}")
+            return []
 
     @quiz_history.setter
     def quiz_history(self, value):
         """クイズ履歴をJSON形式で保存"""
-        self._quiz_history = json.dumps(value) if value else None
+        if value is None:
+            self._quiz_history = None
+        elif isinstance(value, str):
+            self._quiz_history = value
+        else:
+            self._quiz_history = json.dumps(value)
 
     @staticmethod
     def get_stats(grade, category, subcategory, difficulty):
