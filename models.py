@@ -1,4 +1,3 @@
-from flask_login import UserMixin
 from datetime import datetime
 from extensions import db
 from sqlalchemy import func, JSON, desc
@@ -8,19 +7,9 @@ from config import supabase
 
 logger = logging.getLogger(__name__)
 
-class User(UserMixin, db.Model):
-    __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(64), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(256))
-    high_score = db.Column(db.Integer, default=0)
-    quiz_attempts = db.relationship('QuizAttempt', backref='user', lazy=True)
-
 class QuizAttempt(db.Model):
     __tablename__ = 'quiz_attempts'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     grade = db.Column(db.Integer, nullable=False)
     category = db.Column(db.String(50), nullable=False)
     subcategory = db.Column(db.String(50), nullable=False)
