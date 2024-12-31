@@ -67,6 +67,7 @@ class Config:
             db_host = os.getenv('NEXT_PUBLIC_SUPABASE_URL')
             db_port = os.getenv('POSTGRES_PORT', '5432')
             db_name = os.getenv('POSTGRES_DATABASE')
+            self.SQLALCHEMY_DATABASE_URI = os.getenv('SQLALCHEMY_DATABASE_URI')
 
             # IPv6アドレスの解決
             resolved_host = resolve_db_host(db_host, int(db_port))
