@@ -69,6 +69,11 @@ def update_db_url_params(db_url):
 class Config:
     """アプリケーション設定クラス"""
     def __init__(self):
+        # セッション設定
+        self.SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'dev_key_for_quiz_app')
+        self.SESSION_TYPE = 'filesystem'
+        self.PERMANENT_SESSION_LIFETIME = 1800  # 30分
+
         self.FLASK_ENV = 'production' if os.getenv('VERCEL') else os.getenv('FLASK_ENV', 'development')
         
         if self.FLASK_ENV == 'development':
