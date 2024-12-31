@@ -4,11 +4,12 @@ import json
 import random
 import logging
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, g
-from models import db, QuizAttempt
+from models import db, QuizAttempt, User
 from config import Config, supabase
 from dotenv import load_dotenv
 from sqlalchemy.exc import SQLAlchemyError
 from functools import wraps
+import commands  # コマンドをインポート
 
 # .envファイルを読み込む
 load_dotenv()
@@ -46,6 +47,9 @@ try:
 except Exception as e:
     logger.error(f"Failed to initialize database: {e}")
     sys.exit(1)
+
+# コマンドの登録
+commands.init_app(app)
 
 # データベース接続エラーハンドリング
 def get_db():
@@ -139,6 +143,21 @@ def login_required(f):
         if 'user' not in session:
             flash('ログインが必要です。', 'error')
             return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            flash('ログインが必要です。', 'error')
+            return redirect(url_for('login'))
+        
+        user = User.query.get(session['user']['id'])
+        if not user or not user.is_admin:
+            flash('管理者権限が必要です。', 'error')
+            return redirect(url_for('grade_select'))
+            
         return f(*args, **kwargs)
     return decorated_function
 
@@ -691,11 +710,21 @@ def signup():
                 "password": password
             })
             
+            # ユーザーをデータベースに保存
+            user = User(
+                id=response.user.id,
+                email=response.user.email,
+                is_admin=False  # デフォルトで一般ユーザー
+            )
+            db.session.add(user)
+            db.session.commit()
+            
             flash('登録確認メールを送信しました。メールを確認してください。', 'success')
             return redirect(url_for('login'))
             
         except Exception as e:
             logger.error(f"Error in signup: {e}")
+            db.session.rollback()
             flash('登録に失敗しました。', 'error')
             
     return render_template('signup.html')
@@ -713,14 +742,27 @@ def login():
                 "password": password
             })
             
+            # ユーザー情報を取得
+            user = User.query.get(response.user.id)
+            if not user:
+                # 初回ログイン時にユーザーを作成
+                user = User(
+                    id=response.user.id,
+                    email=response.user.email,
+                    is_admin=False
+                )
+                db.session.add(user)
+                db.session.commit()
+            
             # セッションにユーザー情報を保存
             session['user'] = {
-                'id': response.user.id,
-                'email': response.user.email
+                'id': user.id,
+                'email': user.email,
+                'is_admin': user.is_admin
             }
             
             flash('ログインしました。', 'success')
-            return redirect(url_for('grade_select'))
+            return redirect(url_for('admin_dashboard' if user.is_admin else 'grade_select'))
             
         except Exception as e:
             logger.error(f"Error in login: {e}")
@@ -740,3 +782,78 @@ def logout():
         flash('ログアウトに失敗しました。', 'error')
         
     return redirect(url_for('login'))
+
+@app.route('/admin')
+@admin_required
+def admin_dashboard():
+    """管理者ダッシュボード"""
+    users = User.query.filter_by(is_admin=False).all()
+    return render_template('admin/dashboard.html', users=users)
+
+@app.route('/admin/user/<user_id>', methods=['GET', 'POST'])
+@admin_required
+def admin_user_edit(user_id):
+    """ユーザーの権限編集"""
+    user = User.query.get_or_404(user_id)
+    
+    if request.method == 'POST':
+        try:
+            # 許可する学年を更新
+            allowed_grades = request.form.getlist('grades[]')
+            user.allowed_grades = [int(grade) for grade in allowed_grades]
+            
+            # 許可する科目とサブカテゴリを更新
+            allowed_subjects = {}
+            for category in CATEGORY_NAMES.keys():
+                subcategories = request.form.getlist(f'{category}[]')
+                if subcategories:
+                    allowed_subjects[category] = subcategories
+            
+            user.allowed_subjects = allowed_subjects
+            db.session.commit()
+            
+            flash('ユーザー権限を更新しました。', 'success')
+            return redirect(url_for('admin_dashboard'))
+            
+        except Exception as e:
+            logger.error(f"Error updating user permissions: {e}")
+            db.session.rollback()
+            flash('ユーザー権限の更新に失敗しました。', 'error')
+    
+    return render_template('admin/user_edit.html',
+                         user=user,
+                         categories=CATEGORY_NAMES,
+                         subcategories=SUBCATEGORY_NAMES)
+
+@app.route('/admin/setup', methods=['POST'])
+def admin_setup():
+    """本番環境での初期管理者セットアップ用エンドポイント"""
+    try:
+        # 環境変数から設定用のシークレットキーを取得
+        setup_secret = os.environ.get('ADMIN_SETUP_SECRET')
+        if not setup_secret:
+            return jsonify({'error': 'ADMIN_SETUP_SECRET is not configured'}), 500
+
+        # リクエストからシークレットキーとメールアドレスを取得
+        data = request.get_json()
+        if not data or data.get('secret') != setup_secret:
+            return jsonify({'error': 'Invalid secret key'}), 403
+
+        email = data.get('email')
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+
+        # ユーザーを検索
+        user = User.get_by_email(email)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # 管理者に設定
+        if user.promote_to_admin():
+            return jsonify({'message': f'Successfully set {email} as admin'})
+        else:
+            return jsonify({'message': f'User {email} is already an admin'})
+
+    except Exception as e:
+        logger.error(f"Error in admin setup: {e}")
+        return jsonify({'error': str(e)}), 500

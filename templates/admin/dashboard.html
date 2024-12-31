@@ -1,0 +1,97 @@
+{% extends "base.html" %} {% block content %}
+<div class="container mt-4">
+  <h1 class="mb-4">管理者ダッシュボード</h1>
+
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title h5 mb-0">ユーザー一覧</h2>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>メールアドレス</th>
+              <th>登録日時</th>
+              <th>許可された学年</th>
+              <th>許可された科目</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in users %}
+            <tr>
+              <td>{{ user.email }}</td>
+              <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td>
+                {% for grade in user.allowed_grades %}
+                <span class="badge bg-primary">{{ grade }}年</span>
+                {% endfor %}
+              </td>
+              <td>
+                {% for category, subcategories in user.allowed_subjects.items()
+                %}
+                <div class="mb-1">
+                  <strong>{{ category }}:</strong>
+                  {% for subcategory in subcategories %}
+                  <span class="badge bg-info">{{ subcategory }}</span>
+                  {% endfor %}
+                </div>
+                {% endfor %}
+              </td>
+              <td>
+                <a
+                  href="{{ url_for('admin_user_edit', user_id=user.id) }}"
+                  class="btn btn-sm btn-primary"
+                >
+                  <i class="fas fa-edit"></i> 編集
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  }
+
+  .table th {
+    background-color: #f8f9fa;
+  }
+
+  .badge {
+    font-weight: 500;
+    padding: 0.35em 0.65em;
+    margin: 0.1em;
+  }
+
+  .btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  .btn-primary {
+    background-color: #4caf50;
+    border-color: #4caf50;
+  }
+
+  .btn-primary:hover {
+    background-color: #45a049;
+    border-color: #45a049;
+  }
+
+  .badge.bg-primary {
+    background-color: #4caf50 !important;
+  }
+
+  .badge.bg-info {
+    background-color: #17a2b8 !important;
+  }
+</style>
+{% endblock %}

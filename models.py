@@ -6,19 +6,68 @@ from extensions import db
 
 logger = logging.getLogger(__name__)
 
+class User(db.Model):
+    __tablename__ = 'users'
+    
+    id = db.Column(db.String, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    allowed_subjects = db.Column(db.JSON, default=lambda: {
+        'japanese': ['kanji', 'reading', 'grammar', 'writing'],
+        'math': ['calculation', 'figure', 'measurement', 'graph'],
+        'science': ['physics', 'chemistry', 'biology', 'earth_science'],
+        'society': ['history', 'geography', 'civics', 'current_events', 'prefectures']
+    })
+    allowed_grades = db.Column(db.JSON, default=lambda: list(range(1, 7)))
+    quiz_attempts = db.relationship('QuizAttempt', backref='user', lazy=True)
+
+    @staticmethod
+    def create_user(id, username, email):
+        """ユーザーを作成する"""
+        try:
+            user = User(
+                id=id,
+                username=username,
+                email=email,
+                is_admin=False
+            )
+            db.session.add(user)
+            db.session.commit()
+            return user
+        except Exception as e:
+            logger.error(f"Error creating user: {e}")
+            db.session.rollback()
+            raise
+
+    @staticmethod
+    def get_by_email(email):
+        """メールアドレスでユーザーを検索"""
+        return User.query.filter_by(email=email).first()
+
+    def promote_to_admin(self):
+        """ユーザーを管理者に昇格"""
+        if not self.is_admin:
+            self.is_admin = True
+            db.session.commit()
+            return True
+        return False
+
 class QuizAttempt(db.Model):
     """クイズの試行を記録するモデル"""
     __tablename__ = 'quiz_attempts'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.String, db.ForeignKey('users.id'), nullable=True)
     grade = db.Column(db.Integer, nullable=False)
     category = db.Column(db.String(50), nullable=False)
     subcategory = db.Column(db.String(50), nullable=False)
     difficulty = db.Column(db.String(20), nullable=False)
-    score = db.Column(db.Integer, nullable=False, default=0)
-    total_questions = db.Column(db.Integer, nullable=False, default=0)
-    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    _quiz_history = db.Column('quiz_history', db.Text, nullable=True)
+    score = db.Column(db.Integer, default=0)
+    total_questions = db.Column(db.Integer, default=0)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    _quiz_history = db.Column('quiz_history', db.Text)
 
     @property
     def quiz_history(self):
@@ -40,9 +89,7 @@ class QuizAttempt(db.Model):
     @quiz_history.setter
     def quiz_history(self, value):
         """クイズ履歴をJSON形式で保存"""
-        if value is None:
-            self._quiz_history = None
-        elif isinstance(value, str):
+        if isinstance(value, str):
             self._quiz_history = value
         else:
             self._quiz_history = json.dumps(value)
