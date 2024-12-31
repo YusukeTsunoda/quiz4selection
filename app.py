@@ -50,7 +50,7 @@ try:
     db.init_app(app)
     with app.app_context():
         # データベース接続のテスト
-        if not test_database_connection(app):
+        if not test_database_connection(app.config['SQLALCHEMY_DATABASE_URI'], app.config['SQLALCHEMY_ENGINE_OPTIONS']):
             logger.error("Database connection test failed")
             sys.exit(1)
         

@@ -2,6 +2,7 @@ import os
 import logging
 import json
 import socket
+import signal
 from urllib.parse import urlparse
 from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
@@ -12,32 +13,43 @@ logger.setLevel(logging.INFO)
 
 def resolve_db_host(host, port=5432):
     """
-    IPv6優先でSupabaseホストのDNSを解決
+    Supabaseホストの DNS 解決 - 改善版
     """
     try:
-        # URLからホスト名を抽出
         parsed_url = urlparse(host)
-        hostname = parsed_url.hostname or host.replace('https://', '').replace('http://', '')
+        hostname = parsed_url.hostname or host
         
-        # もしホスト名がdb.で始まっていなければ追加
-        # if not hostname.startswith('db.'):
-        #     hostname = f"db.{hostname}"
+        logger.info(f"Attempting to resolve: {hostname}")
         
-        logger.info(f"Attempting IPv6 resolution for {hostname}")
-        # IPv6のみを試行
+        # getaddrinfo のオプションを調整
         addrinfo = socket.getaddrinfo(
-            hostname, port,
+            hostname, 
+            port,
             family=socket.AF_INET6,
             type=socket.SOCK_STREAM,
-            proto=socket.IPPROTO_TCP
+            proto=socket.IPPROTO_TCP,
+            flags=socket.AI_V4MAPPED | socket.AI_ADDRCONFIG  # フラグを追加
         )
+        
+        if not addrinfo:
+            logger.error("No addresses found")
+            return hostname
+            
         ip = addrinfo[0][4][0]
-        logger.info(f"Successfully resolved IPv6 address: {ip}")
-        # IPv6アドレスを角括弧で囲む（PostgreSQL接続文字列の要件）
-        return f"[{ip}]"
+        logger.info(f"Resolved IPv6: {ip}")
+        
+        # IPv6 アドレスを正しく整形
+        return f"[{ip}]" if ':' in ip else ip
+        
+    except socket.gaierror as e:
+        logger.error(f"DNS resolution error: {e}")
+        return hostname
+    except OSError as e:
+        logger.error(f"OS error during resolution: {e}")
+        # OSエラーの場合は、元のホスト名をそのまま使用
+        return hostname
     except Exception as e:
-        logger.error(f"IPv6 resolution failed: {e}")
-        # 解決失敗時は元のホスト名を返す
+        logger.error(f"Unexpected error in resolution: {e}")
         return hostname
 
 def test_database_connection(database_uri, engine_options):
@@ -112,8 +124,31 @@ class Config:
                 if not all([db_pass, db_name, db_host]):
                     raise ValueError("Required database environment variables are not set")
 
-                # IPv6解決を試みる
-                resolved_host = resolve_db_host(db_host, int(db_port))
+                # まずURLの形式を確認
+                parsed_url = urlparse(db_host)
+                if not parsed_url.hostname:
+                    # URLではなくホスト名が直接指定されている場合
+                    hostname = db_host
+                else:
+                    hostname = parsed_url.hostname
+                    
+                logger.info(f"Attempting to resolve hostname: {hostname}")
+                
+                # タイムアウトを設定して実行
+                def timeout_handler(signum, frame):
+                    raise TimeoutError("DNS resolution timed out")
+                
+                # 3秒のタイムアウトを設定
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(3)
+                
+                try:
+                    resolved_host = resolve_db_host(hostname, int(db_port))
+                    signal.alarm(0)  # タイムアウトをキャンセル
+                except TimeoutError:
+                    logger.warning("DNS resolution timed out, using original hostname")
+                    resolved_host = hostname
+                
                 logger.info(f"Using resolved host: {resolved_host}")
 
                 # 接続文字列を構築
