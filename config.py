@@ -77,6 +77,7 @@ class Config:
                 db_url = f"postgresql://{db_user}:{db_password}@{resolved_host}:{db_port}/{db_name}"
             
             self.SQLALCHEMY_DATABASE_URI = db_url
+            print(self.SQLALCHEMY_DATABASE_URI)
             self.SQLALCHEMY_ENGINE_OPTIONS = {
                 "pool_pre_ping": True,
                 "pool_recycle": 300,
