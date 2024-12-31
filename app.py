@@ -5,9 +5,10 @@ import random
 import logging
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, g
 from models import db, QuizAttempt
-from config import Config
+from config import Config, supabase
 from dotenv import load_dotenv
 from sqlalchemy.exc import SQLAlchemyError
+from functools import wraps
 
 # .envファイルを読み込む
 load_dotenv()
@@ -99,6 +100,7 @@ SUBCATEGORY_NAMES = {
     'reading': '読解',
     'grammar': '文法',
     'writing': '作文',
+    'hyakuninishu': '百人一首',
     'calculation': '計算',
     'figure': '図形',
     'measurement': '測定',
@@ -131,12 +133,22 @@ def get_shuffled_question(question):
     
     return shuffled
 
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            flash('ログインが必要です。', 'error')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route('/')
 def index():
     """ルートページのハンドラ"""
     return redirect(url_for('grade_select'))
 
 @app.route('/grade_select')
+@login_required
 def grade_select():
     """学年選択ページを表示"""
     return render_template('grade_select.html')
@@ -165,28 +177,19 @@ def select_subcategory(grade, category):
 def select_difficulty(grade, category, subcategory):
     """難易度選択画面を表示する"""
     try:
-        logger.info(f"Entering select_difficulty with grade={grade}, category={category}, subcategory={subcategory}")
-
         # 問題データの存在確認
         file_path = f'quiz_data/grade_{grade}/{category}.json'
-        logger.info(f"Checking file: {file_path}")
 
         if not os.path.exists(file_path):
-            logger.error(f"File not found: {file_path}")
             flash('問題データが見つかりません。', 'error')
             return redirect(url_for('grade_select'))
 
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            logger.info(f"Loaded data keys: {list(data.keys())}")
 
             if subcategory not in data:
-                logger.error(f"Subcategory {subcategory} not found in data")
                 flash('選択されたカテゴリーの問題が見つかりません。', 'error')
                 return redirect(url_for('grade_select'))
-
-            logger.info(f"Found subcategory {subcategory} in data")
-            logger.info(f"Available difficulties in {subcategory}: {list(data[subcategory].keys())}")
 
         # 各難易度のクイズ統計を取得
         stats = {}
@@ -220,43 +223,40 @@ def select_difficulty(grade, category, subcategory):
                     'highest_score': 0
                 }
 
-        logger.info(f"Stats: {stats}")
+        # 難易度の日本語名
+        difficulty_names = {
+            'easy': '初級',
+            'medium': '中級',
+            'hard': '上級'
+        }
 
         return render_template('difficulty_select.html',
                             grade=grade,
                             category=category,
                             subcategory=subcategory,
-                            stats=stats,
                             category_name=CATEGORY_NAMES[category],
-                            subcategory_name=SUBCATEGORY_NAMES[subcategory])
+                            subcategory_name=SUBCATEGORY_NAMES[subcategory],
+                            difficulty_names=difficulty_names,
+                            stats=stats)
+
     except Exception as e:
         logger.error(f"Error in select_difficulty: {e}")
-        logger.exception("Full traceback:")
         flash('難易度選択画面の表示中にエラーが発生しました。', 'error')
         return redirect(url_for('grade_select'))
 
 
 @app.route('/start_quiz/<int:grade>/<category>/<subcategory>/<difficulty>')
+@login_required
 def start_quiz(grade, category, subcategory, difficulty):
     """クイズを開始する"""
     try:
-        # デバッグログを追加
-        logger.info(f"Starting quiz with parameters:")
-        logger.info(f"Grade: {grade}")
-        logger.info(f"Category: {category}")
-        logger.info(f"Subcategory: {subcategory}")
-        logger.info(f"Difficulty: {difficulty}")
-
         # セッションをクリア
         session.clear()
-        logger.info("Session cleared")
 
         # 問題を取得
         questions = get_questions(grade, category, subcategory, difficulty)
-        logger.info(f"Retrieved {len(questions) if questions else 0} questions")
 
         if not questions:
-            logger.error("No questions retrieved")
             flash('問題の取得に失敗しました。', 'error')
             return redirect(url_for('select_difficulty', grade=grade,
                             category=category, subcategory=subcategory))
@@ -271,10 +271,8 @@ def start_quiz(grade, category, subcategory, difficulty):
         session['category'] = category
         session['subcategory'] = subcategory
         session['difficulty'] = difficulty
-        logger.info("Session data saved")
 
         # 最初の問題を表示
-        logger.info("Rendering first question")
         first_question = questions[0]
         return render_template('quiz.html',
                             question=first_question['question'],
@@ -286,7 +284,6 @@ def start_quiz(grade, category, subcategory, difficulty):
 
     except Exception as e:
         logger.error(f"Error in start_quiz: {e}")
-        logger.exception("Full traceback:")
         flash('クイズの開始中にエラーが発生しました。', 'error')
         return redirect(url_for('select_difficulty', grade=grade,
                         category=category, subcategory=subcategory))
@@ -417,8 +414,9 @@ def next_question():
 
 
 @app.route('/dashboard')
+@login_required
 def dashboard():
-    """学習成績ダッシュボードを表示する"""
+    """学習成績ダッシュボードを表示"""
     try:
         # クイズの試行履歴を取得
         quiz_attempts = QuizAttempt.query.order_by(QuizAttempt.timestamp.desc()).all()
@@ -476,7 +474,6 @@ def dashboard():
 
     except Exception as e:
         logger.error(f"Error in dashboard route: {e}")
-        logger.exception("Full traceback:")
         flash('ダッシュボードの表示中にエラーが発生しました。', 'error')
         return redirect(url_for('grade_select'))
     
@@ -625,6 +622,7 @@ def get_quiz_data(grade, category, subcategory, difficulty):
 
 
 @app.route('/quiz_history/<int:grade>/<category>/<subcategory>/<difficulty>')
+@login_required
 def quiz_history(grade, category, subcategory, difficulty):
     """特定の条件でのクイズ履歴を表示"""
     try:
@@ -676,6 +674,69 @@ def quiz_history(grade, category, subcategory, difficulty):
 
     except Exception as e:
         logger.error(f"Error in quiz_history route: {e}")
-        logger.exception("Full traceback:")
         flash('クイズ履歴の表示中にエラーが発生しました。', 'error')
         return redirect(url_for('dashboard'))
+
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        try:
+            email = request.form['email']
+            password = request.form['password']
+            
+            # Supabaseでユーザー登録
+            response = supabase.auth.sign_up({
+                "email": email,
+                "password": password
+            })
+            
+            flash('登録確認メールを送信しました。メールを確認してください。', 'success')
+            return redirect(url_for('login'))
+            
+        except Exception as e:
+            logger.error(f"Error in signup: {e}")
+            flash('登録に失敗しました。', 'error')
+            
+    return render_template('signup.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        try:
+            email = request.form['email']
+            password = request.form['password']
+            
+            # Supabaseでログイン
+            response = supabase.auth.sign_in_with_password({
+                "email": email,
+                "password": password
+            })
+            
+            # セッションにユーザー情報を保存
+            session['user'] = {
+                'id': response.user.id,
+                'email': response.user.email
+            }
+            
+            flash('ログインしました。', 'success')
+            return redirect(url_for('grade_select'))
+            
+        except Exception as e:
+            logger.error(f"Error in login: {e}")
+            flash('ログインに失敗しました。', 'error')
+            
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    try:
+        # Supabaseからログアウト
+        supabase.auth.sign_out()
+        session.clear()
+        flash('ログアウトしました。', 'success')
+    except Exception as e:
+        logger.error(f"Error in logout: {e}")
+        flash('ログアウトに失敗しました。', 'error')
+        
+    return redirect(url_for('login'))
