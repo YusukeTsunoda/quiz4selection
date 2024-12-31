@@ -191,17 +191,36 @@ def select_difficulty(grade, category, subcategory):
         # 各難易度のクイズ統計を取得
         stats = {}
         for difficulty in ['easy', 'medium', 'hard']:
-            logger.info(f"Getting stats for difficulty: {difficulty}")
-            stats[difficulty] = QuizAttempt.get_stats(grade, category, subcategory, difficulty)
-            logger.info(f"Stats for {difficulty}: {stats[difficulty]}")
+            attempts = QuizAttempt.query.filter_by(
+                grade=grade,
+                category=category,
+                subcategory=subcategory,
+                difficulty=difficulty
+            ).all()
 
-        logger.info("Preparing to render template with context:")
-        logger.info(f"grade: {grade}")
-        logger.info(f"category: {category}")
-        logger.info(f"subcategory: {subcategory}")
-        logger.info(f"category_name: {CATEGORY_NAMES.get(category)}")
-        logger.info(f"subcategory_name: {SUBCATEGORY_NAMES.get(subcategory)}")
-        logger.info(f"stats: {stats}")
+            if attempts:
+                total_attempts = len(attempts)
+                total_score_percentage = sum(
+                    attempt.score / attempt.total_questions * 100
+                    for attempt in attempts
+                )
+                highest_score_percentage = max(
+                    attempt.score / attempt.total_questions * 100
+                    for attempt in attempts
+                )
+                stats[difficulty] = {
+                    'attempts': total_attempts,
+                    'avg_score': total_score_percentage / total_attempts,
+                    'highest_score': highest_score_percentage
+                }
+            else:
+                stats[difficulty] = {
+                    'attempts': 0,
+                    'avg_score': 0,
+                    'highest_score': 0
+                }
+
+        logger.info(f"Stats: {stats}")
 
         return render_template('difficulty_select.html',
                             grade=grade,
@@ -423,31 +442,29 @@ def next_question():
 def dashboard():
     """学習成績ダッシュボードを表示"""
     try:
+        # クイズの試行履歴を取得
+        quiz_attempts = QuizAttempt.query.order_by(QuizAttempt.timestamp.desc()).all()
+
         # 進捗データの初期化
         progress = {grade: {} for grade in range(1, 7)}
-
-        # クイズの試行履歴を取得
-        quiz_attempts = QuizAttempt.query.order_by(QuizAttempt.id.desc()).all()
 
         # 各学年、カテゴリー、サブカテゴリーごとの進捗を集計
         for grade in range(1, 7):
             for category in CATEGORY_NAMES.keys():
-                if category not in progress[grade]:
-                    progress[grade][category] = {
-                        'name': CATEGORY_NAMES[category],
-                        'subcategories': {}
-                    }
+                progress[grade][category] = {
+                    'name': CATEGORY_NAMES[category],
+                    'subcategories': {}
+                }
 
                 for subcategory in get_subcategories(grade, category):
-                    if subcategory not in progress[grade][category]['subcategories']:
-                        progress[grade][category]['subcategories'][subcategory] = {
-                            'name': SUBCATEGORY_NAMES[subcategory],
-                            'levels': {
-                                'easy': {'attempts': 0, 'avg_score': 0, 'highest_score': 0},
-                                'medium': {'attempts': 0, 'avg_score': 0, 'highest_score': 0},
-                                'hard': {'attempts': 0, 'avg_score': 0, 'highest_score': 0}
-                            }
+                    progress[grade][category]['subcategories'][subcategory] = {
+                        'name': SUBCATEGORY_NAMES[subcategory],
+                        'levels': {
+                            'easy': {'attempts': 0, 'avg_score': 0, 'highest_score': 0},
+                            'medium': {'attempts': 0, 'avg_score': 0, 'highest_score': 0},
+                            'hard': {'attempts': 0, 'avg_score': 0, 'highest_score': 0}
                         }
+                    }
 
         # 試行履歴から統計を計算
         for attempt in quiz_attempts:
@@ -461,14 +478,11 @@ def dashboard():
             stats['attempts'] += 1
 
             # 平均スコアの更新
-            stats['avg_score'] = (
-                (stats['avg_score'] * (stats['attempts'] - 1) + score_percentage)
-                / stats['attempts']
-            )
+            current_total = stats['avg_score'] * (stats['attempts'] - 1)
+            stats['avg_score'] = (current_total + score_percentage) / stats['attempts']
 
             # 最高スコアの更新
-            stats['highest_score'] = max(
-                stats['highest_score'], score_percentage)
+            stats['highest_score'] = max(stats['highest_score'], score_percentage)
 
         # 難易度の日本語名
         difficulty_names = {
@@ -478,9 +492,9 @@ def dashboard():
         }
 
         return render_template('dashboard.html',
-                               progress=progress,
-                               difficulty_names=difficulty_names,
-                               quiz_attempts=quiz_attempts)
+                            progress=progress,
+                            difficulty_names=difficulty_names,
+                            quiz_attempts=quiz_attempts)
 
     except Exception as e:
         logger.error(f"Error in dashboard route: {e}")

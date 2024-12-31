@@ -16,7 +16,7 @@ class QuizAttempt(db.Model):
     difficulty = db.Column(db.String(20), nullable=False)
     score = db.Column(db.Integer, nullable=False, default=0)
     total_questions = db.Column(db.Integer, nullable=False, default=0)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     _quiz_history = db.Column('quiz_history', db.Text, nullable=True)
 
     @property
@@ -43,7 +43,7 @@ class QuizAttempt(db.Model):
 
         if not attempts:
             return {
-                'total_attempts': 0,
+                'attempts': 0,
                 'avg_score': 0,
                 'highest_score': 0
             }
@@ -59,7 +59,7 @@ class QuizAttempt(db.Model):
         )
 
         return {
-            'total_attempts': total_attempts,
+            'attempts': total_attempts,
             'avg_score': total_score_percentage / total_attempts,
             'highest_score': highest_score_percentage
         }
