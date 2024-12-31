@@ -1,213 +1,87 @@
 import os
-import logging
-import json
 import socket
-import signal
-from urllib.parse import urlparse
-from sqlalchemy import create_engine
-from sqlalchemy.exc import SQLAlchemyError
+import logging
+from dotenv import load_dotenv
 
 # ロガーの設定
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+# 環境変数の読み込み
+load_dotenv()
+
 def resolve_db_host(host, port=5432):
-    """
-    Supabaseホストの DNS 解決 - 改善版
-    """
+    """Supabaseホストの DNS 解決 - IPv6専用版"""
     try:
+        from urllib.parse import urlparse
         parsed_url = urlparse(host)
         hostname = parsed_url.hostname or host
-        
         logger.info(f"Attempting to resolve: {hostname}")
-        
-        # getaddrinfo のオプションを調整
+
+        # IPv6のみを使用するように設定
         addrinfo = socket.getaddrinfo(
-            hostname, 
+            hostname,
             port,
-            family=socket.AF_INET6,
+            family=socket.AF_INET6,  # IPv6のみ
             type=socket.SOCK_STREAM,
             proto=socket.IPPROTO_TCP,
-            flags=socket.AI_V4MAPPED | socket.AI_ADDRCONFIG  # フラグを追加
+            flags=socket.AI_ADDRCONFIG  # IPv4マッピングを無効化
         )
         
         if not addrinfo:
-            logger.error("No addresses found")
+            logger.error("No IPv6 addresses found")
             return hostname
-            
+
         ip = addrinfo[0][4][0]
         logger.info(f"Resolved IPv6: {ip}")
-        
-        # IPv6 アドレスを正しく整形
-        return f"[{ip}]" if ':' in ip else ip
-        
-    except socket.gaierror as e:
-        logger.error(f"DNS resolution error: {e}")
-        return hostname
-    except OSError as e:
-        logger.error(f"OS error during resolution: {e}")
-        # OSエラーの場合は、元のホスト名をそのまま使用
-        return hostname
-    except Exception as e:
-        logger.error(f"Unexpected error in resolution: {e}")
-        return hostname
+        # IPv6アドレスは常に括弧で囲む
+        return f"[{ip}]"
 
-def test_database_connection(database_uri, engine_options):
-    """データベース接続をテストする関数"""
-    try:
-        engine = create_engine(
-            database_uri,
-            **engine_options
-        )
-        with engine.connect() as connection:
-            connection.execute("SELECT 1")
-        logger.info("Database connection test successful")
-        return True
-    except SQLAlchemyError as e:
-        logger.error(f"Database connection test failed: {e}")
-        return False
+    except socket.gaierror as e:
+        logger.error(f"IPv6 DNS resolution error: {e}")
+        return hostname
     except Exception as e:
-        logger.error(f"Unexpected error in database connection test: {e}")
-        return False
+        logger.error(f"Unexpected error in IPv6 resolution: {e}")
+        return hostname
 
 class Config:
-    """アプリケーションの設定クラス"""
-    # セッション設定
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev')
-    
-    # 環境設定
-    FLASK_ENV = os.environ.get('FLASK_ENV', 'development')
-    VERCEL_ENV = os.environ.get('VERCEL_ENV')
-    
-    # データベース基本設定
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
-    # SQLAlchemy接続プール設定
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_size': 5,
-        'max_overflow': 10,
-        'pool_timeout': 30,
-        'pool_recycle': 300,
-        'pool_pre_ping': True,
-        'connect_args': {
-            'connect_timeout': 10,
-            'keepalives': 1,
-            'keepalives_idle': 30,
-            'keepalives_interval': 10,
-            'keepalives_count': 5,
-            'application_name': 'quiz4selection',
-            'options': '-c statement_timeout=30000'
-        }
-    }
-    
+    """アプリケーション設定クラス"""
     def __init__(self):
-        try:
-            # データベースURLの設定
-            self.FLASK_ENV = 'production' if os.environ.get('VERCEL_ENV') == 'production' else os.environ.get('FLASK_ENV', 'development')
+        # 基本設定
+        self.FLASK_ENV = os.getenv('FLASK_ENV', 'development')
+        self.DEBUG = os.getenv('FLASK_DEBUG', '0') == '1'
+        self.SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'dev_key_for_quiz_app')
+
+        # データベース設定
+        if self.FLASK_ENV == 'development':
+            # 開発環境用の設定
+            self.SQLALCHEMY_DATABASE_URI = os.getenv('LOCAL_DATABASE_URL')
+            self.SQLALCHEMY_ENGINE_OPTIONS = {
+                "pool_pre_ping": True,
+                "pool_recycle": 300,
+            }
+        else:
+            # 本番環境（Supabase）用の設定
+            db_user = os.getenv('POSTGRES_USER')
+            db_password = os.getenv('POSTGRES_PASSWORD')
+            db_host = os.getenv('NEXT_PUBLIC_SUPABASE_URL')
+            db_port = os.getenv('POSTGRES_PORT', '5432')
+            db_name = os.getenv('POSTGRES_DATABASE')
+
+            # IPv6アドレスの解決
+            resolved_host = resolve_db_host(db_host, int(db_port))
             
-            print(f"FLASK_ENV: {self.FLASK_ENV}")
-            if self.FLASK_ENV == 'development' or self.VERCEL_ENV == 'development':
-                logger.info("Using LOCAL_DATABASE_URL for development")
-                database_url = os.environ.get('LOCAL_DATABASE_URL')
-                if not database_url:
-                    raise ValueError("LOCAL_DATABASE_URL is not set in development environment")
-                self.SQLALCHEMY_DATABASE_URI = database_url
-            else:
-                logger.info("Using DATABASE_URL for production")
-                # データベース接続情報を環境変数から取得
-                db_user = os.environ.get('POSTGRES_USER', 'postgres')
-                db_pass = os.environ.get('POSTGRES_PASSWORD')
-                db_name = os.environ.get('POSTGRES_DATABASE')
-                db_host = os.environ.get('NEXT_PUBLIC_SUPABASE_URL')
-                db_port = os.environ.get('POSTGRES_PORT', '5432')
-
-                if not all([db_pass, db_name, db_host]):
-                    raise ValueError("Required database environment variables are not set")
-
-                # まずURLの形式を確認
-                parsed_url = urlparse(db_host)
-                if not parsed_url.hostname:
-                    # URLではなくホスト名が直接指定されている場合
-                    hostname = db_host
-                else:
-                    hostname = parsed_url.hostname
-                    
-                logger.info(f"Attempting to resolve hostname: {hostname}")
-                
-                # タイムアウトを設定して実行
-                def timeout_handler(signum, frame):
-                    raise TimeoutError("DNS resolution timed out")
-                
-                # 3秒のタイムアウトを設定
-                signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(3)
-                
-                try:
-                    resolved_host = resolve_db_host(hostname, int(db_port))
-                    signal.alarm(0)  # タイムアウトをキャンセル
-                except TimeoutError:
-                    logger.warning("DNS resolution timed out, using original hostname")
-                    resolved_host = hostname
-                
-                logger.info(f"Using resolved host: {resolved_host}")
-
-                # 接続文字列を構築
-                database_url = f"postgresql://{db_user}:{db_pass}@{resolved_host}:{db_port}/{db_name}"
-                
-                # 接続設定を更新
-                self.SQLALCHEMY_DATABASE_URI = database_url
-                self.SQLALCHEMY_ENGINE_OPTIONS.update({
-                    'pool_size': 10,
-                    'max_overflow': 20,
-                    'pool_recycle': 300,
-                    'connect_args': {
-                        **self.SQLALCHEMY_ENGINE_OPTIONS['connect_args'],
-                        'sslmode': 'require',
-                        'connect_timeout': 10,  # タイムアウトを少し長めに
-                        'keepalives': 1,
-                        'keepalives_idle': 30,
-                        'keepalives_interval': 10,
-                        'keepalives_count': 5,
-                        'options': '-c statement_timeout=30000'
-                    }
-                })
-
-                # 接続テストを実行（修正版）
-                logger.info("Testing database connection...")
-                if not test_database_connection(self.SQLALCHEMY_DATABASE_URI, self.SQLALCHEMY_ENGINE_OPTIONS):
-                    raise ConnectionError("Failed to establish database connection")
+            # データベースURLの構築
+            self.SQLALCHEMY_DATABASE_URI = f"postgresql://{db_user}:{db_password}@{resolved_host}:{db_port}/{db_name}"
             
-            # 環境に応じたデバッグ設定
-            self.DEBUG = self.FLASK_ENV == 'development'
-            self.DEVELOPMENT = self.FLASK_ENV == 'development'
-            
-            # 設定状態のログ出力（機密情報を除外）
-            logger.info(json.dumps({
-                'event': 'database_config',
-                'is_production': not self.DEVELOPMENT,
-                'database_url_set': bool(self.SQLALCHEMY_DATABASE_URI),
-                'engine_options': {
-                    k: v for k, v in self.SQLALCHEMY_ENGINE_OPTIONS.items()
-                    if k != 'connect_args'
+            # 本番環境用のエンジンオプション
+            self.SQLALCHEMY_ENGINE_OPTIONS = {
+                "pool_pre_ping": True,
+                "pool_recycle": 300,
+                "connect_args": {
+                    "sslmode": "require"
                 }
-            }))
-            
-        except Exception as e:
-            logger.error(f"Error in Config initialization: {e}")
-            raise
+            }
 
-# Supabaseクライアントの初期化
-try:
-    logger.info("Initializing Supabase client...")
-    if os.environ.get('NEXT_PUBLIC_SUPABASE_URL') and os.environ.get('NEXT_PUBLIC_SUPABASE_ANON_KEY'):
-        from supabase import create_client
-        supabase = create_client(
-            os.environ.get('NEXT_PUBLIC_SUPABASE_URL'),
-            os.environ.get('NEXT_PUBLIC_SUPABASE_ANON_KEY')
-        )
-    else:
-        logger.error("Failed to initialize Supabase client: supabase_url is required")
-        supabase = None
-except Exception as e:
-    logger.error(f"Error initializing Supabase client: {e}")
-    supabase = None
+        # 共通設定
+        self.SQLALCHEMY_TRACK_MODIFICATIONS = False

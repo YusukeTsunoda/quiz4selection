@@ -5,7 +5,7 @@ import random
 import logging
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, g
 from models import db, QuizAttempt
-from config import Config, test_database_connection
+from config import Config
 from dotenv import load_dotenv
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -18,24 +18,6 @@ logger.setLevel(logging.INFO)
 
 # アプリケーションの初期化
 app = Flask(__name__)
-
-# データベース設定
-DATABASE_URL = os.environ.get('DATABASE_URL', '')
-if DATABASE_URL.startswith('postgres://'):
-    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-
-SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI', DATABASE_URL)
-SQLALCHEMY_TRACK_MODIFICATIONS = False
-SQLALCHEMY_ENGINE_OPTIONS = {
-    "pool_pre_ping": True,
-    "pool_recycle": 300,
-    "connect_args": {
-        "sslmode": "require"
-    }
-}
-
-# セキュリティ設定
-SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'dev_key_for_quiz_app')
 
 # 設定の読み込み
 try:
@@ -50,8 +32,11 @@ try:
     db.init_app(app)
     with app.app_context():
         # データベース接続のテスト
-        if not test_database_connection(app.config['SQLALCHEMY_DATABASE_URI'], app.config['SQLALCHEMY_ENGINE_OPTIONS']):
-            logger.error("Database connection test failed")
+        try:
+            db.engine.connect().close()
+            logger.info("Database connection test successful")
+        except Exception as e:
+            logger.error(f"Database connection test failed: {e}")
             sys.exit(1)
         
         # データベーステーブルの作成
