@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from sqlalchemy.exc import SQLAlchemyError
 from functools import wraps
 import commands  # コマンドをインポート
+from extensions import db, migrate
 
 # .envファイルを読み込む
 load_dotenv()
@@ -32,6 +33,7 @@ except Exception as e:
 # データベースの初期化
 try:
     db.init_app(app)
+    migrate.init_app(app, db)  # マイグレーションの初期化を追加
     with app.app_context():
         # データベース接続のテスト
         try:
@@ -47,6 +49,15 @@ try:
 except Exception as e:
     logger.error(f"Failed to initialize database: {e}")
     sys.exit(1)
+
+# テンプレートで使用する関数を登録
+@app.context_processor
+def utility_processor():
+    return {
+        'get_subcategories': get_subcategories,
+        'CATEGORY_NAMES': CATEGORY_NAMES,
+        'SUBCATEGORY_NAMES': SUBCATEGORY_NAMES
+    }
 
 # コマンドの登録
 commands.init_app(app)
@@ -856,10 +867,16 @@ def admin_user_edit(user_id):
             db.session.rollback()
             flash('ユーザー権限の更新に失敗しました。', 'error')
     
+    # 各カテゴリのサブカテゴリを取得
+    all_subcategories = {}
+    for category in CATEGORY_NAMES.keys():
+        all_subcategories[category] = get_subcategories(1, category)
+    
     return render_template('admin/user_edit.html',
                          user=user,
                          categories=CATEGORY_NAMES,
-                         subcategories=SUBCATEGORY_NAMES)
+                         subcategories=SUBCATEGORY_NAMES,
+                         all_subcategories=all_subcategories)
 
 @app.route('/admin/setup', methods=['POST'])
 def admin_setup():

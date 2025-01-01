@@ -54,7 +54,7 @@
                 <h4 class="h6 mb-2">{{ category_name }}</h4>
                 <div class="row">
                   {% for subcategory, subcategory_name in subcategories.items()
-                  %} {% if subcategory in get_subcategories(1, category) %}
+                  %} {% if subcategory in all_subcategories[category] %}
                   <div class="col-md-3">
                     <div class="form-check">
                       <input

@@ -553,3 +553,21 @@ SQLALCHEMY_DATABASE_URI:
 SQLAlchemyは直接データベースに接続するので、DATABASE_URLと同じ形式を使用します
 
     これでできるはず。
+
+## 管理者画面　ローカル開発環境
+### 環境変数の設定：
+- export FLASK_APP=app.py
+- export FLASK_ENV=development
+### 管理者ユーザーの作成：
+- flask create-admin admin@example.com admin
+### 開発サーバーの起動：
+- flask run
+### ブラウザで http://localhost:5000 にアクセスし、以下の情報でログイン：
+- メールアドレス: admin@example.com
+- パスワード: admin
+
+これにより、管理者権限でログインし、以下の機能をテストできます：
+- 管理者ダッシュボード（/admin）
+- ユーザー権限の編集（/admin/user/<user_id>）
+- その他の管理者専用機能
+開発環境では認証がスキップされ、データベースもローカルのPostgreSQLを使用するため、Supabaseに依存せずにテストができます。

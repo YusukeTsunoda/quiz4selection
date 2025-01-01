@@ -1,266 +1,149 @@
-main:
+project_name: Quiz4selection
+description: 小学生向けの教科別クイズアプリケーション
+
+environment:
+  python_version: "3.12"
+  framework: Flask
+  database: PostgreSQL
+  authentication: Supabase
+
+directory_structure:
   root:
-    main.py:
-      content: |-
-        アプリケーションのエントリーポイント
-        機能:
-        - Flaskアプリケーションの起動
-        - 環境変数の読み込み
-        - ログ設定
-      dependency:
-        - /app.py
+    - app.py  # メインアプリケーションファイル
+    - config.py  # 設定ファイル
+    - models.py  # データベースモデル
+    - commands.py  # CLIコマンド
+    - extensions.py  # Flask拡張機能
+    - requirements.txt  # 依存関係
+    - create_test_users.py  # テストユーザー作成スクリプト
+    templates:  # テンプレートディレクトリ
+      admin:  # 管理者用テンプレート
+        - dashboard.html  # 管理者ダッシュボード
+        - user_edit.html  # ユーザー権限編集
+      - base.html  # ベーステンプレート
+      - grade_select.html  # 学年選択
+      - category_select.html  # カテゴリー選択
+      - subcategory_select.html  # サブカテゴリー選択
+      - difficulty_select.html  # 難易度選択
+      - quiz.html  # クイズ画面
+      - result.html  # 結果画面
+      - dashboard.html  # ユーザーダッシュボード
+      - quiz_history.html  # クイズ履歴
+      - login.html  # ログイン
+      - signup.html  # サインアップ
+      - reset_password.html  # パスワードリセット
+    quiz_data:  # クイズデータディレクトリ
+      grade_1:  # 1年生用データ
+        - japanese.json
+        - math.json
+        - science.json
+        - society.json
+      grade_2:  # 2年生用データ
+        - japanese.json
+        - math.json
+        - science.json
+        - society.json
+      grade_3:  # 3年生用データ
+        - japanese.json
+        - math.json
+        - science.json
+        - society.json
+      grade_4:  # 4年生用データ
+        - japanese.json
+        - math.json
+        - science.json
+        - society.json
+      grade_5:  # 5年生用データ
+        - japanese.json
+        - math.json
+        - science.json
+        - society.json
+      grade_6:  # 6年生用データ
+        - japanese.json
+        - math.json
+        - science.json
+        - society.json
 
-    app.py:
-      content: |-
-        Flaskアプリケーションのメインファイル
-        外部依存:
-        - Flask
-        - SQLAlchemy
-        機能:
-        - ルーティング設定
-        - アプリケーション初期化
-        - ビュー関数の定義
-        - セッション管理
-        - クイズロジックの実装
-        - 問題単位の履歴データ取得処理
-        - 問題ごとの正答率計算処理
-        - データベース接続管理
-        - エラーハンドリング
-        - ログ出力
-      dependency:
-        - /models.py
-        - /extensions.py
-        - /quiz_data.py
-        - /config.py
-        - /quiz_utils.py
+models:
+  User:
+    fields:
+      - id: String (primary key)
+      - username: String (unique)
+      - email: String (unique)
+      - is_admin: Boolean
+      - created_at: DateTime
+      - allowed_subjects: JSON
+      - allowed_grades: JSON
+  QuizAttempt:
+    fields:
+      - id: Integer (primary key)
+      - user_id: String (foreign key)
+      - grade: Integer
+      - category: String
+      - subcategory: String
+      - difficulty: String
+      - score: Integer
+      - total_questions: Integer
+      - timestamp: DateTime
+      - quiz_history: Text (JSON)
 
-    config.py:
-      content: |-
-        設定ファイル
-        外部依存:
-        - python-dotenv
-        機能:
-        - 環境変数の管理
-        - データベース接続設定
-        - ログ設定
-        - セキュリティ設定
-        - 本番/開発環境の切り替え
-      dependency:
-        - /.env
+routes:
+  auth:
+    - /signup: ユーザー登録
+    - /login: ログイン
+    - /logout: ログアウト
+    - /reset-password: パスワードリセット
+  quiz:
+    - /: ホーム（学年選択へリダイレクト）
+    - /grade_select: 学年選択
+    - /grade/<grade>/category: カテゴリー選択
+    - /grade/<grade>/category/<category>/subcategory: サブカテゴリー選択
+    - /grade/<grade>/category/<category>/subcategory/<subcategory>/difficulty: 難易度選択
+    - /start_quiz/<grade>/<category>/<subcategory>/<difficulty>: クイズ開始
+    - /submit_answer: 回答提出
+    - /next_question: 次の問題
+    - /result: クイズ結果
+  admin:
+    - /admin: 管理者ダッシュボード
+    - /admin/user/<user_id>: ユーザー権限編集
+    - /admin/setup: 管理者セットアップ
+  dashboard:
+    - /dashboard: ユーザーダッシュボード
+    - /quiz_history/<grade>/<category>/<subcategory>/<difficulty>: クイズ履歴
 
-    models.py:
-      content: |-
-        データベースモデルの定義
-        外部依存:
-        - SQLAlchemy
-        機能:
-        - クイズ履歴モデル
-        - 問題履歴の保存
-        - スコア計算ロジック
-        - 問題単位の履歴集計機能
-        - 問題ごとの正答率計算
-        - 問題別の回答履歴取得
-        - タイムスタンプ付き回答履歴管理
-      dependency:
-        - /extensions.py
-
-    extensions.py:
-      content: |-
-        Flaskの拡張機能の初期化
-        外部依存:
-        - Flask-SQLAlchemy
-        機能:
-        - データベース設定
-        - 共有拡張機能の初期化
-
-    quiz_data.py:
-      content: |-
-        クイズデータの管理
-        機能:
-        - クイズ問題の定義
-        - 問題カテゴリーの管理
-        - 難易度設定
-        - 問題のランダム選択
-        - 正解判定ロジック
-        - 問題の優先順位付け
-        - 未回答問題の管理
-        - 低正答率問題の管理
-
-    quiz_utils.py:
-      content: |-
-        クイズユーティリティ関数
-        機能:
-        - 問題シャッフル
-        - 選択肢シャッフル
-        - 正答率計算
-        - 履歴データ処理
-        - 統計情報の計算
-
-    static:
-      css:
-        style.css:
-          content: |-
-            アプリケーションのスタイル定義
-            機能:
-            - レイアウト
-            - カラースキーム
-            - レスポンシブデザイン
-            - アニメーション効果
-            - 正解/不正解の色分け
-            - クイズ履歴のスタイリング
-            - 問題単位の履歴表示スタイル
-            - 時系列表示のスタイル
-            - 問題別回答履歴のカラーコーディング
-
-      js:
-        quiz.js:
-          content: |-
-            クライアントサイドの機能
-            機能:
-            - クイズタイマー
-            - 解答チェック
-            - 動的UI更新
-            - スコア計算
-            - アニメーション制御
-            - 履歴表示の制御
-            - エラーハンドリング
-
-    templates:
-      base.html:
-        content: |-
-          ベーステンプレート
-          機能:
-          - 共通レイアウト
-          - ナビゲーション
-          - メタ情報
-          - Bootstrap/CSSの読み込み
-          - JavaScriptの読み込み
-          - レスポンシブ対応
-
-      index.html:
-        content: |-
-          トップページ
-          機能:
-          - ウェルカムメッセージ
-          - クイズ開始オプション
-        dependency:
-          - /templates/base.html
-
-      quiz.html:
-        content: |-
-          クイズページ
-          機能:
-          - 問題表示
-          - 解答フォーム
-          - プログレスバー
-          - スコア表示
-          - タイマー表示
-        dependency:
-          - /templates/base.html
-          - /static/js/quiz.js
-
-      result.html:
-        content: |-
-          結果表示ページ
-          機能:
-          - スコア表示
-          - 正解・不正解の確認
-          - 解説表示
-          - 次のクイズへの案内
-        dependency:
-          - /templates/base.html
-
-      quiz_history.html:
-        content: |-
-          クイズ履歴ページ
-          機能:
-          - 過去の成績表示
-          - 各問題の詳細表示
-          - 正解・不正解の色分け表示
-          - タイムスタンプ表示
-          - タブ切り替え機能
-          - 問題単位での履歴表示
-          - 問題ごとの正答率表示
-        dependency:
-          - /templates/base.html
-
-      grade_select.html:
-        content: |-
-          学年選択ページ
-          機能:
-          - 学年一覧表示
-          - 学年選択機能
-        dependency:
-          - /templates/base.html
-
-      category_select.html:
-        content: |-
-          カテゴリー選択ページ
-          機能:
-          - カテゴリー一覧表示
-          - カテゴリー選択機能
-          - カテゴリー説明
-        dependency:
-          - /templates/base.html
-
-      subcategory_select.html:
-        content: |-
-          サブカテゴリー選択ページ
-          機能:
-          - サブカテゴリー一覧表示
-          - サブカテゴリー選択機能
-        dependency:
-          - /templates/base.html
-
-      difficulty_select.html:
-        content: |-
-          難易度選択ページ
-          機能:
-          - 難易度レベル選択
-          - 難易度説明
-          - 統計情報表示
-        dependency:
-          - /templates/base.html
-
-      dashboard.html:
-        content: |-
-          ダッシュボードページ
-          機能:
-          - カテゴリごとの進捗状況
-          - 難易度別の成績表示
-          - 受験回数の表示
-          - 平均スコアの表示
-          - 最高スコアの表示
-          - 詳細履歴へのリンク
-        dependency:
-          - /templates/base.html
-
-    requirements.txt:
-      content: |-
-        依存パッケージ定義
-        必須パッケージ:
-        - Flask==2.2.5
-        - Werkzeug==2.2.3
-        - flask-migrate==4.0.4
-        - python-dotenv==1.0.0
-        - psycopg2-binary==2.9.9
-        - flask-login==0.6.2
-        - Flask-SQLAlchemy==2.5.1
-        - SQLAlchemy==1.4.46
-
-    migrations:
-      content: |-
-        データベースマイグレーションファイル
-        機能:
-        - スキーマの変更履歴
-        - マイグレーションスクリプト
-        - データベース更新管理
-
-    quiz_data:
-      content: |-
-        問題データファイル
-        機能:
-        - 学年別問題データ
-        - カテゴリ別問題
-        - 難易度別問題セット
-        - JSON形式のデータ保存
+test_users:
+  student_1:
+    username: tanaka_ichiro
+    email: tanaka1@example.com
+    grade: 1
+    subjects:
+      japanese: [kanji, reading]
+      math: [calculation]
+  student_3:
+    username: suzuki_hanako
+    email: suzuki3@example.com
+    grade: 3
+    subjects:
+      japanese: [kanji, reading, grammar]
+      math: [calculation, figure]
+      science: [physics]
+  student_5:
+    username: sato_taro
+    email: sato5@example.com
+    grade: 5
+    subjects:
+      japanese: [kanji, reading, grammar, writing]
+      math: [calculation, figure, measurement]
+      science: [physics, chemistry]
+      society: [history, geography]
+  parent:
+    username: yamada_parent
+    email: yamada_p@example.com
+    grade: all
+    subjects: all
+  teacher:
+    username: sensei
+    email: teacher@example.com
+    is_admin: true
+    grade: all
+    subjects: all

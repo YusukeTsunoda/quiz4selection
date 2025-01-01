@@ -69,4 +69,40 @@ def promote_admin_command(email, admin_email, admin_password):
 def init_app(app):
     """アプリケーションにコマンドを登録"""
     app.cli.add_command(init_admin_command)
-    app.cli.add_command(promote_admin_command) 
+    app.cli.add_command(promote_admin_command)
+    app.cli.add_command(create_admin_command)
+
+@click.command('create-admin')
+@click.argument('email')
+@click.argument('username')
+@with_appcontext
+def create_admin_command(email, username):
+    """管理者ユーザーを作成するコマンド"""
+    try:
+        # メールアドレスの重複チェック
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            if existing_user.is_admin:
+                click.echo(f'ユーザー {email} は既に管理者です。')
+                return
+            else:
+                # 既存ユーザーを管理者に昇格
+                existing_user.is_admin = True
+                db.session.commit()
+                click.echo(f'既存ユーザー {email} を管理者に昇格させました。')
+                return
+
+        # 新しい管理者ユーザーを作成
+        user = User(
+            id=f'dev-admin-{username}',  # 開発環境用のID
+            email=email,
+            username=username,
+            is_admin=True
+        )
+        db.session.add(user)
+        db.session.commit()
+        click.echo(f'管理者ユーザー {email} を作成しました。')
+
+    except Exception as e:
+        click.echo(f'エラーが発生しました: {str(e)}')
+        db.session.rollback() 
