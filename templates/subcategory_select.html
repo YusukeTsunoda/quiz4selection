@@ -1,48 +1,68 @@
 {% extends "base.html" %} {% block content %}
-<div class="container mt-4">
-  <div class="text-center mb-4">
-    <h1 class="display-4 fw-bold">{{ grade }}年生 {{ category_name }}</h1>
-    <h2 class="h3 mb-4">どの分野？</h2>
-  </div>
-
-  <div class="row justify-content-center g-4">
-    {% for subcategory in subcategories %}
-    <div class="col-6 col-md-4">
-      <a
-        href="{{ url_for('select_difficulty', grade=grade, category=category, subcategory=subcategory) }}"
-        class="text-decoration-none"
-      >
-        <div class="subcategory-button p-4 rounded-lg shadow text-center">
-          <span class="fs-2">{{ subcategory_names[subcategory] }}</span>
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title h5 mb-0">
+            {{ grade }}年生の{{ CATEGORY_NAMES[category] }}の単元を選択
+          </h2>
         </div>
-      </a>
+        <div class="card-body">
+          <div class="row g-4">
+            {% for subcategory in get_subcategories(grade, category) %}
+            <div class="col-md-4">
+              <a
+                href="{{ url_for('select_difficulty', grade=grade, category=category, subcategory=subcategory) }}"
+                class="btn btn-outline-primary w-100 h-100 d-flex align-items-center justify-content-center py-3"
+              >
+                <div class="text-center">
+                  <i class="fas fa-book-open fa-2x mb-2"></i>
+                  <h3 class="h6">{{ SUBCATEGORY_NAMES[subcategory] }}</h3>
+                  <small class="text-muted d-block mt-1">
+                    {{ grade }}年生向け
+                  </small>
+                </div>
+              </a>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="card-footer">
+          <a
+            href="{{ url_for('select_category', grade=grade) }}"
+            class="btn btn-secondary"
+          >
+            <i class="fas fa-arrow-left"></i> 教科選択に戻る
+          </a>
+        </div>
+      </div>
     </div>
-    {% endfor %}
-  </div>
-
-  <div class="text-center mt-5">
-    <a href="{{ url_for('select_category', grade=grade) }}" class="btn">
-      <i class="fas fa-arrow-left"></i>もどる
-    </a>
   </div>
 </div>
 
 <style>
-  .subcategory-button {
-    background-color: #fff;
-    border: 3px solid #6c63ff;
-    transition: all 0.3s ease;
-    cursor: pointer;
+  .btn-outline-primary {
+    transition: all 0.3s;
+    border-width: 2px;
   }
 
-  .subcategory-button:hover {
-    background-color: #6c63ff;
-    color: white;
-    transform: translateY(-5px);
+  .btn-outline-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   }
 
-  .subcategory-button span {
-    font-weight: bold;
+  .card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  }
+
+  .h6 {
+    margin-bottom: 0;
+    color: #2c3e50;
+  }
+
+  .text-muted {
+    font-size: 0.8rem;
   }
 </style>
 {% endblock %}

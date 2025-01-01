@@ -102,7 +102,7 @@ def handle_db_error(error):
     db.session.rollback()
     return "データベースエラーが発生しました。しばらく待ってから再試行してください。", 500
 
-# カテゴリーと科目の定義
+# カテゴリーと科目名の対応
 CATEGORY_NAMES = {
     'japanese': '国語',
     'math': '算数',
@@ -110,26 +110,96 @@ CATEGORY_NAMES = {
     'society': '社会'
 }
 
+# サブカテゴリーの日本語名
 SUBCATEGORY_NAMES = {
-    'kanji': '漢字',
-    'reading': '読解',
-    'grammar': '文法',
-    'writing': '作文',
-    'hyakuninishu': '百人一首',
-    'calculation': '計算',
-    'figure': '図形',
-    'measurement': '測定',
-    'graph': 'グラフ',
-    'physics': '物理',
-    'chemistry': '化学',
-    'biology': '生物',
-    'earth_science': '地学',
-    'history': '歴史',
-    'geography': '地理',
-    'civics': '公民',
-    'current_events': '時事',
-    'prefectures': '都道府県'
+    # 国語
+    'kanji': '漢字の読み書き',
+    'reading_comprehension': '文章の要旨',
+    'character_understanding': '登場人物の心情',
+    'paragraph_structure': '段落と中心文',
+    'idioms': '慣用句・ことわざ',
+    'letter_writing': '手紙の書き方',
+    'essay_writing': '作文・感想文',
+    
+    # 算数
+    'large_numbers': '大きな数',
+    'rounding': '概数と四捨五入',
+    'decimals': '小数',
+    'fractions': '分数',
+    'angles': '角度',
+    'area': '面積',
+    'parallel_lines': '垂直と平行',
+    'patterns': '変わり方調べ',
+    'line_graphs': '折れ線グラフ',
+    
+    # 理科
+    'weather': '天気と気温',
+    'moon_stars': '月と星',
+    'electricity': '電気の働き',
+    'properties': '空気と水の性質',
+    'metals': '金属の性質',
+    'living_things': '生き物の成長',
+    'seasonal_changes': '季節と生き物',
+    
+    # 社会
+    'prefectures': '都道府県',
+    'map_symbols': '地図記号',
+    'local_geography': '県の地理と産業',
+    'water_resources': '水源と水道',
+    'environment': 'ごみと環境',
+    'disaster_prevention': '災害対策',
+    'traditional_culture': '伝統文化',
+    'regional_industry': '地域の産業'
 }
+
+# 学年ごとのカテゴリーとサブカテゴリー
+GRADE_CATEGORIES = {
+    4: {
+        'japanese': [
+            'kanji',
+            'reading_comprehension',
+            'character_understanding',
+            'paragraph_structure',
+            'idioms',
+            'letter_writing',
+            'essay_writing'
+        ],
+        'math': [
+            'large_numbers',
+            'rounding',
+            'decimals',
+            'fractions',
+            'angles',
+            'area',
+            'parallel_lines',
+            'patterns',
+            'line_graphs'
+        ],
+        'science': [
+            'weather',
+            'moon_stars',
+            'electricity',
+            'properties',
+            'metals',
+            'living_things',
+            'seasonal_changes'
+        ],
+        'society': [
+            'prefectures',
+            'map_symbols',
+            'local_geography',
+            'water_resources',
+            'environment',
+            'disaster_prevention',
+            'traditional_culture',
+            'regional_industry'
+        ]
+    }
+}
+
+def get_subcategories(grade, category):
+    """指定された学年とカテゴリのサブカテゴリを取得"""
+    return GRADE_CATEGORIES.get(grade, {}).get(category, [])
 
 def get_shuffled_question(question):
     """問題の選択肢をシャッフルする"""
@@ -207,23 +277,13 @@ def select_subcategory(grade, category):
 def select_difficulty(grade, category, subcategory):
     """難易度選択画面を表示する"""
     try:
-        # 問題データの存在確認
-        file_path = f'quiz_data/grade_{grade}/{category}.json'
-
-        if not os.path.exists(file_path):
-            flash('問題データが見つかりません。', 'error')
-            return redirect(url_for('grade_select'))
-
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-
-            if subcategory not in data:
-                flash('選択されたカテゴリーの問題が見つかりません。', 'error')
-                return redirect(url_for('grade_select'))
-
         # 各難易度のクイズ統計を取得
         stats = {}
         for difficulty in ['easy', 'medium', 'hard']:
+            # 問題データの存在確認
+            file_path = f'quiz_data/grade_{grade}/{category}/{subcategory}/{difficulty}/questions.json'
+            has_questions = os.path.exists(file_path)
+
             attempts = QuizAttempt.query.filter_by(
                 grade=grade,
                 category=category,
@@ -244,13 +304,15 @@ def select_difficulty(grade, category, subcategory):
                 stats[difficulty] = {
                     'attempts': total_attempts,
                     'avg_score': total_score_percentage / total_attempts,
-                    'highest_score': highest_score_percentage
+                    'highest_score': highest_score_percentage,
+                    'has_questions': has_questions
                 }
             else:
                 stats[difficulty] = {
                     'attempts': 0,
                     'avg_score': 0,
-                    'highest_score': 0
+                    'highest_score': 0,
+                    'has_questions': has_questions
                 }
 
         # 難易度の日本語名
@@ -543,18 +605,6 @@ def result():
         return redirect(url_for('grade_select'))
 
 
-def get_subcategories(grade, category):
-    """指定された学年とカテゴリのサブカテゴリを取得"""
-    # カテゴリに応じたサブカテゴリのマッピング
-    category_subcategories = {
-        'japanese': ['kanji', 'reading', 'grammar', 'writing'],
-        'math': ['calculation', 'figure', 'measurement', 'graph'],
-        'science': ['physics', 'chemistry', 'biology', 'earth_science'],
-        'society': ['history', 'geography', 'civics', 'current_events', 'prefectures']
-    }
-    return category_subcategories.get(category, [])
-
-
 def get_questions(grade, category, subcategory, difficulty):
     """指定された条件に基づいて問題を取得する"""
     try:
@@ -593,7 +643,8 @@ def get_questions(grade, category, subcategory, difficulty):
 def get_quiz_data(grade, category, subcategory, difficulty):
     """クイズデータを取得する関数"""
     try:
-        file_path = f'quiz_data/grade_{grade}/{category}.json'
+        # 新しいフォルダ構造に基づいたファイルパス
+        file_path = f'quiz_data/grade_{grade}/{category}/{subcategory}/{difficulty}/questions.json'
         logger.info(f"Loading quiz data from: {file_path}")
 
         # ファイルの存在確認
@@ -605,50 +656,14 @@ def get_quiz_data(grade, category, subcategory, difficulty):
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             logger.info(f"Successfully loaded JSON data")
-            logger.info(f"Available subcategories: {list(data.keys())}")
 
-            # サブカテゴリの確認
-            if subcategory not in data:
-                logger.error(f"Subcategory {subcategory} not found in data")
-                return None, "選択されたサブカテゴリーの問題が見つかりません"
+            if not data or not isinstance(data, list):
+                logger.error("Invalid question data format")
+                return None, "問題データの形式が正しくありません"
 
-            logger.info(f"Found subcategory {subcategory}")
-            logger.info(
-                f"Available difficulties: {
-                    list(
-                        data[subcategory].keys())}")
-
-            # 難易度の確認
-            if difficulty not in data[subcategory]:
-                logger.error(
-                    f"Difficulty {difficulty} not found in {subcategory}")
-                return None, "選択された難易度の問題が見つかりません"
-
-            all_questions = data[subcategory][difficulty]
-            if not all_questions:
-                logger.error(
-                    f"No questions found for {category}/{subcategory}/{difficulty}")
-                return None, "問題が見つかりません"
-
-            # 利用可能な問題数を確認
-            num_questions = len(all_questions)
-            target_questions = min(10, num_questions)  # 10問または利用可能な全問題数の少ない方
-
-            logger.info(f"Total available questions: {num_questions}")
-            logger.info(f"Target number of questions: {target_questions}")
-
-            # 問題をランダムに選択
-            selected_questions = random.sample(all_questions, target_questions)
-
-            # 各問題の選択肢をシャッフル
-            shuffled_questions = [
-                get_shuffled_question(q) for q in selected_questions]
-
-            logger.info(
-                f"Successfully loaded and shuffled {
-                    len(shuffled_questions)} questions")
-            for i, q in enumerate(shuffled_questions):
-                logger.info(f"Question {i + 1} correct index: {q['correct']}")
+            # 問題をシャッフル
+            shuffled_questions = [get_shuffled_question(q) for q in data]
+            logger.info(f"Successfully loaded and shuffled {len(shuffled_questions)} questions")
 
             return shuffled_questions, None
 

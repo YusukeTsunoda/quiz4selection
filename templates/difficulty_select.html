@@ -5,11 +5,15 @@
       {{ grade }}年生 - {{ category_name }} - {{ subcategory_name }}
     </h2>
     <div class="difficulty-buttons">
+      {% if stats.easy.has_questions %}
       <a
         href="{{ url_for('start_quiz', grade=grade, category=category, subcategory=subcategory, difficulty='easy') }}"
         class="text-decoration-none"
       >
-        <div class="difficulty-button easy p-4 rounded-lg shadow text-center">
+        {% endif %}
+        <div
+          class="difficulty-button easy p-4 rounded-lg shadow text-center {% if not stats.easy.has_questions %}disabled{% endif %}"
+        >
           <span class="fs-2">かんたん</span>
           {% if stats.easy.attempts > 0 %}
           <div class="stats-info">
@@ -17,15 +21,23 @@
             <p>平均スコア: {{ "%.1f"|format(stats.easy.avg_score) }}%</p>
             <p>最高スコア: {{ "%.1f"|format(stats.easy.highest_score) }}%</p>
           </div>
+          {% endif %} {% if not stats.easy.has_questions %}
+          <div class="no-questions">
+            <p>問題が準備中です</p>
+          </div>
           {% endif %}
         </div>
+        {% if stats.easy.has_questions %}
       </a>
-
+      {% endif %} {% if stats.medium.has_questions %}
       <a
         href="{{ url_for('start_quiz', grade=grade, category=category, subcategory=subcategory, difficulty='medium') }}"
         class="text-decoration-none"
       >
-        <div class="difficulty-button medium p-4 rounded-lg shadow text-center">
+        {% endif %}
+        <div
+          class="difficulty-button medium p-4 rounded-lg shadow text-center {% if not stats.medium.has_questions %}disabled{% endif %}"
+        >
           <span class="fs-2">ふつう</span>
           {% if stats.medium.attempts > 0 %}
           <div class="stats-info">
@@ -33,15 +45,23 @@
             <p>平均スコア: {{ "%.1f"|format(stats.medium.avg_score) }}%</p>
             <p>最高スコア: {{ "%.1f"|format(stats.medium.highest_score) }}%</p>
           </div>
+          {% endif %} {% if not stats.medium.has_questions %}
+          <div class="no-questions">
+            <p>問題が準備中です</p>
+          </div>
           {% endif %}
         </div>
+        {% if stats.medium.has_questions %}
       </a>
-
+      {% endif %} {% if stats.hard.has_questions %}
       <a
         href="{{ url_for('start_quiz', grade=grade, category=category, subcategory=subcategory, difficulty='hard') }}"
         class="text-decoration-none"
       >
-        <div class="difficulty-button hard p-4 rounded-lg shadow text-center">
+        {% endif %}
+        <div
+          class="difficulty-button hard p-4 rounded-lg shadow text-center {% if not stats.hard.has_questions %}disabled{% endif %}"
+        >
           <span class="fs-2">むずかしい</span>
           {% if stats.hard.attempts > 0 %}
           <div class="stats-info">
@@ -49,9 +69,15 @@
             <p>平均スコア: {{ "%.1f"|format(stats.hard.avg_score) }}%</p>
             <p>最高スコア: {{ "%.1f"|format(stats.hard.highest_score) }}%</p>
           </div>
+          {% endif %} {% if not stats.hard.has_questions %}
+          <div class="no-questions">
+            <p>問題が準備中です</p>
+          </div>
           {% endif %}
         </div>
+        {% if stats.hard.has_questions %}
       </a>
+      {% endif %}
     </div>
 
     <div class="text-center mt-4">
@@ -86,29 +112,34 @@
     border-radius: 10px;
   }
 
-  .difficulty-button:hover {
+  .difficulty-button:not(.disabled):hover {
     color: white;
     transform: translateY(-5px);
+  }
+
+  .difficulty-button.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .difficulty-button.easy {
     border: 3px solid #4caf50;
   }
-  .difficulty-button.easy:hover {
+  .difficulty-button.easy:not(.disabled):hover {
     background-color: #4caf50;
   }
 
   .difficulty-button.medium {
     border: 3px solid #ff9800;
   }
-  .difficulty-button.medium:hover {
+  .difficulty-button.medium:not(.disabled):hover {
     background-color: #ff9800;
   }
 
   .difficulty-button.hard {
     border: 3px solid #f44336;
   }
-  .difficulty-button.hard:hover {
+  .difficulty-button.hard:not(.disabled):hover {
     background-color: #f44336;
   }
 
@@ -119,6 +150,12 @@
 
   .stats-info p {
     margin: 5px 0;
+  }
+
+  .no-questions {
+    margin-top: 10px;
+    font-size: 0.9em;
+    color: #666;
   }
 </style>
 {% endblock %}
