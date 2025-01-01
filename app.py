@@ -693,6 +693,11 @@ def submit_answer():
         selected_index = data.get('answer')
         logger.info(f"Received answer data: {data}")
         
+        # selected_indexがNoneの場合のエラーハンドリング
+        if selected_index is None:
+            logger.error("No answer received from client")
+            return jsonify({'success': False, 'error': 'No answer selected'})
+        
         current_question = session.get('current_question', 0)
         questions = session.get('questions', [])
         quiz_history = session.get('quiz_history', [])
@@ -707,9 +712,13 @@ def submit_answer():
         logger.info(f"Question data: {current_q}")
         logger.info(f"Selected index: {selected_index}, Correct index: {correct_index}")
         
-        # 型を合わせて比較
-        is_correct = int(selected_index) == int(correct_index)
-        logger.info(f"Is correct: {is_correct}")
+        # 型を合わせて比較（エラーハンドリングを追加）
+        try:
+            is_correct = int(selected_index) == int(correct_index)
+            logger.info(f"Is correct: {is_correct}")
+        except (ValueError, TypeError) as e:
+            logger.error(f"Error comparing answers: {e}")
+            return jsonify({'success': False, 'error': 'Invalid answer format'})
         
         if is_correct:
             current_score += 1
