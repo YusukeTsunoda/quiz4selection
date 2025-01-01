@@ -1076,6 +1076,7 @@ def quiz_history(grade, category, subcategory, difficulty):
             difficulty=difficulty,
             category_name=CATEGORY_NAMES.get(category, category),
             subcategory_name=SUBCATEGORY_NAMES.get(category, {}).get(subcategory, subcategory)
+        )
 
     except Exception as e:
         logger.error(f"Error in quiz_history route: {e}")
