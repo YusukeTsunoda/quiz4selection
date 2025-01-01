@@ -690,9 +690,13 @@ def submit_answer():
             return jsonify({'success': False, 'error': 'User not logged in'})
 
         data = request.get_json()
-        selected_index = data.get('answer')
         logger.info(f"Received answer data: {data}")
         
+        # answerとselectedの両方のキーをチェック
+        selected_index = data.get('answer')
+        if selected_index is None:
+            selected_index = data.get('selected')
+            
         # selected_indexがNoneの場合のエラーハンドリング
         if selected_index is None:
             logger.error("No answer received from client")
