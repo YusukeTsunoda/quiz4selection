@@ -1,1 +1,10 @@
-[]
+{
+  "questions": [],
+  "metadata": {
+    "grade": 6,
+    "subject": "math",
+    "category": "probability",
+    "difficulty": "hard",
+    "total_questions": 0
+  }
+}

@@ -116,14 +116,14 @@ CATEGORY_NAMES = {
 SUBCATEGORY_NAMES = {
     'japanese': {
         'hiragana': 'ひらがな・カタカナの読み書き',
-        'kanji': '漢字の読み書き',
-        'story': '物語文の読解',
-        'explanation': '説明文の読解',
-        'speech': 'スピーチや挨拶',
-        'composition': '作文',
-        'grammar': '文法',
+        'kanji': '漢字の読み書き（配当漢字約200字）',
+        'story': '物語文の読解（あらすじ、登場人物）',
+        'explanation': '説明文の読解（段落、要点）',
+        'speech': 'スピーチの仕方',
+        'composition': '作文の書き方',
+        'grammar': '主語と述語の関係',
         'reading': '音読と朗読',
-        'vocabulary': '語彙',
+        'vocabulary': '熟語の意味と使い方',
         'literature': '文学的な文章',
         'summary': '要約',
         'discussion': '話し合い',
@@ -138,20 +138,20 @@ SUBCATEGORY_NAMES = {
         'comparison': '複数資料の関連付け'
     },
     'math': {
-        'numbers': '数と計算',
-        'addition': 'たし算',
-        'subtraction': 'ひき算',
-        'shapes': '図形',
-        'measurement': '測定',
-        'time': '時計と時間',
-        'counting': '数え方',
-        'multiplication': 'かけ算',
-        'division': 'わり算',
+        'numbers': '数と計算（1から100まで）',
+        'addition': 'たし算（2桁や3桁）',
+        'subtraction': 'ひき算（2桁や3桁）',
+        'shapes': '図形（三角形、四角形、直角、対称な形）',
+        'measurement': '長さ・かさの単位と測定（cm、m、L、dL、mL）',
+        'time': '時刻と時間の計算',
+        'counting': 'ものの個数の数え方や分類',
+        'multiplication': 'かけ算九九の完成',
+        'division': 'わり算の導入と計算',
         'fractions': '分数',
         'decimals': '小数',
         'area': '面積',
         'volume': '体積',
-        'statistics': '統計',
+        'statistics': '表とグラフ（棒グラフ）',
         'proportion': '比例',
         'large_numbers': '大きな数',
         'rounding': '概数と四捨五入',
@@ -167,10 +167,10 @@ SUBCATEGORY_NAMES = {
         'algebra': '文字を使った式'
     },
     'science': {
-        'living_things': '生き物の観察',
-        'plants': '植物の観察',
-        'weather': '天気と気温',
-        'materials': '物の性質',
+        'living_things': '昆虫と植物の観察',
+        'plants': '植物の育ち方',
+        'weather': '天気の様子',
+        'materials': '物の重さと体積',
         'magnets': '磁石の性質',
         'electricity': '電気の働き',
         'sound': '音の性質',
@@ -191,13 +191,13 @@ SUBCATEGORY_NAMES = {
         'water_flow': '流れる水の働き'
     },
     'society': {
-        'community': '地域社会',
-        'industry': '産業',
+        'community': '身近な地域の様子',
+        'industry': '商店街と大型店',
         'history': '歴史',
-        'geography': '地理',
+        'geography': '地図の読み方の基礎',
         'government': '政治',
         'economy': '経済',
-        'culture': '文化',
+        'culture': '昔の道具と暮らし',
         'international': '国際理解',
         'prefectures': '都道府県',
         'map_symbols': '地図記号',
@@ -212,13 +212,13 @@ SUBCATEGORY_NAMES = {
         'un': '国際連合'
     },
     'life': {
-        'school': '学校生活',
-        'family': '家族と地域',
-        'seasons': '季節の変化',
-        'nature': '自然との関わり',
-        'safety': '安全な生活',
-        'growth': '成長の記録',
-        'community': '地域社会'
+        'school': '学校生活（施設・規則・友達）',
+        'family': '家族や地域との関わり',
+        'seasons': '季節と生活の関わり',
+        'nature': '動植物の飼育・栽培',
+        'safety': '安全な生活（交通・生活習慣）',
+        'growth': '自分の成長（できるようになったこと）',
+        'community': '町探検（地域の様子や働く人々）'
     }
 }
 
@@ -353,81 +353,130 @@ GRADE_CATEGORIES = {
     5: {
         'japanese': [
             'kanji',
-            'literature',
-            'explanation',
-            'summary',
-            'comparison',
+            'reading',
+            'grammar',
+            'writing',
             'vocabulary',
             'composition',
             'discussion',
-            'language'
+            'comparison',
+            'explanation',
+            'summary',
+            'literature',
+            'language',
+            'idioms',
+            'hyakuninishu'
         ],
         'math': [
-            'fractions',
+            'integers',
             'decimals',
+            'fractions',
             'area',
             'volume',
-            'statistics',
-            'proportion'
+            'congruence',
+            'percentage',
+            'proportion',
+            'geometry',
+            'graph',
+            'measurement',
+            'calculation',
+            'figure'
         ],
         'science': [
-            'plants',
-            'living_things',
-            'weather',
-            'force',
-            'earth',
-            'electromagnet',
             'pendulum',
-            'water_flow'
+            'electromagnet',
+            'weather',
+            'water',
+            'animals',
+            'fish',
+            'flowers',
+            'plants',
+            'earth_science',
+            'biology',
+            'chemistry',
+            'physics'
         ],
         'society': [
-            'geography',
+            'agriculture',
+            'manufacturing',
+            'disaster',
+            'environment',
+            'transportation',
+            'climate',
             'industry',
-            'economy',
-            'international',
-            'environment'
+            'information',
+            'current_events',
+            'prefectures',
+            'civics',
+            'history',
+            'geography'
         ]
     },
     6: {
         'japanese': [
             'kanji',
-            'literature',
-            'explanation',
-            'comparison',
-            'expression',
+            'reading',
+            'grammar',
+            'writing',
             'composition',
             'discussion',
-            'language'
+            'expression',
+            'language',
+            'comparison',
+            'explanation',
+            'literature',
+            'hyakuninishu'
         ],
         'math': [
             'fractions',
-            'algebra',
-            'circle_area',
             'volume',
+            'circle_area',
             'scale',
             'ratio',
             'proportion',
+            'algebra',
             'data',
-            'probability'
+            'probability',
+            'graph',
+            'measurement',
+            'calculation',
+            'figure'
         ],
         'science': [
-            'plants',
+            'earth',
+            'electricity',
+            'lever',
+            'moon',
+            'combustion',
             'ecosystem',
             'human_body',
-            'combustion',
             'solution',
-            'lever',
-            'electricity',
-            'earth',
-            'moon_stars'
+            'plants',
+            'earth_science',
+            'biology',
+            'chemistry',
+            'physics'
         ],
         'society': [
-            'history',
             'constitution',
-            'government',
             'local',
             'un',
-            'international'
+            'government',
+            'modern',
+            'taisho',
+            'meiji',
+            'edo',
+            'kamakura',
+            'muromachi',
+            'azuchi',
+            'asuka',
+            'heian',
+            'jomon',
+            'prefectures',
+            'civics',
+            'current_events',
+            'geography',
+            'history'
         ]
     }
 }
@@ -1027,7 +1076,6 @@ def quiz_history(grade, category, subcategory, difficulty):
             difficulty=difficulty,
             category_name=CATEGORY_NAMES.get(category, category),
             subcategory_name=SUBCATEGORY_NAMES.get(category, {}).get(subcategory, subcategory)
-        )
 
     except Exception as e:
         logger.error(f"Error in quiz_history route: {e}")

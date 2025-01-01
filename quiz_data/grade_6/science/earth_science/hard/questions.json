@@ -1,1 +1,10 @@
-[]
+{
+  "questions": [],
+  "metadata": {
+    "grade": 6,
+    "subject": "science",
+    "category": "earth_science",
+    "difficulty": "hard",
+    "total_questions": 0
+  }
+}

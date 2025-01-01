@@ -1,1 +1,10 @@
-[]
+{
+  "questions": [],
+  "metadata": {
+    "grade": 6,
+    "subject": "math",
+    "category": "circle_area",
+    "difficulty": "medium",
+    "total_questions": 0
+  }
+}
