@@ -5,7 +5,7 @@ import random
 import logging
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, g
 from models import db, QuizAttempt, User
-from config import Config, supabase
+from config import Config, supabase, is_development
 from dotenv import load_dotenv
 from sqlalchemy.exc import SQLAlchemyError
 from functools import wraps
@@ -705,23 +705,45 @@ def signup():
             password = request.form['password']
             username = request.form['username']
             
-            # Supabaseでユーザー登録
-            response = supabase.auth.sign_up({
-                "email": email,
-                "password": password
-            })
+            # メールアドレスの重複チェック
+            existing_user = User.query.filter_by(email=email).first()
+            if existing_user:
+                flash('このメールアドレスは既に登録されています。', 'error')
+                return render_template('signup.html')
+            
+            # ユーザー名の重複チェック
+            existing_username = User.query.filter_by(username=username).first()
+            if existing_username:
+                flash('このユーザー名は既に使用されています。', 'error')
+                return render_template('signup.html')
+            
+            if is_development():
+                # 開発環境では認証をスキップ
+                user_id = f'dev-{username}'
+            else:
+                # Supabaseでユーザー登録
+                try:
+                    response = supabase.auth.sign_up({
+                        "email": email,
+                        "password": password
+                    })
+                    user_id = response.user.id
+                except Exception as auth_error:
+                    logger.error(f"Supabase signup error: {auth_error}")
+                    flash('アカウント登録に失敗しました。', 'error')
+                    return render_template('signup.html')
             
             # ユーザーをデータベースに保存
             user = User(
-                id=response.user.id,
-                email=response.user.email,
+                id=user_id,
+                email=email,
                 username=username,
-                is_admin=False  # デフォルトで一般ユーザー
+                is_admin=False
             )
             db.session.add(user)
             db.session.commit()
             
-            flash('登録確認メールを送信しました。メールを確認してください。', 'success')
+            flash('アカウントが登録されました。ログインしてください。', 'success')
             return redirect(url_for('login'))
             
         except Exception as e:
@@ -738,23 +760,34 @@ def login():
             email = request.form['email']
             password = request.form['password']
             
-            # Supabaseでログイン認証
-            try:
-                response = supabase.auth.sign_in_with_password({
-                    "email": email,
-                    "password": password
-                })
-            except Exception as auth_error:
-                logger.error(f"Authentication error: {auth_error}")
-                flash('メールアドレスまたはパスワードが正しくありません。', 'error')
-                return render_template('login.html')
-            
-            # ユーザー情報を取得
-            user = User.query.get(response.user.id)
-            if not user:
-                logger.error(f"User not found in database: {email}")
-                flash('ユーザーが見つかりません。先にアカウント登録を行ってください。', 'error')
-                return redirect(url_for('signup'))
+            if is_development():
+                # 開発環境では認証をスキップ
+                user = User.query.filter_by(email=email).first()
+                if not user:
+                    # 開発環境用のテストユーザーを作成
+                    user = User(
+                        id='dev-user-id',
+                        email=email,
+                        username=email.split('@')[0],
+                        is_admin=False
+                    )
+                    db.session.add(user)
+                    db.session.commit()
+            else:
+                # 本番環境での認証処理
+                try:
+                    response = supabase.auth.sign_in_with_password({
+                        "email": email,
+                        "password": password
+                    })
+                    user = User.query.filter_by(email=email).first()
+                    if not user:
+                        flash('ユーザーが見つかりません。先にアカウント登録を行ってください。', 'error')
+                        return redirect(url_for('signup'))
+                except Exception as auth_error:
+                    logger.error(f"Authentication error: {auth_error}")
+                    flash('メールアドレスまたはパスワードが正しくありません。', 'error')
+                    return render_template('login.html')
             
             # セッションにユーザー情報を保存
             session['user'] = {
