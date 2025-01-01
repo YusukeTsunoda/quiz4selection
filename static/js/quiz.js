@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const options = document.querySelectorAll('.option');
         
         try {
-            const selectedIndex = selectedOption.dataset.index;
+            const selectedIndex = parseInt(selectedOption.dataset.index);
             console.log('Selected index:', selectedIndex);
             
             options.forEach(option => option.classList.remove('selected'));

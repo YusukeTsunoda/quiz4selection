@@ -24,7 +24,13 @@
         data-question-data="{{ question_data|tojson|safe }}"
       >
         {% for option in options %}
-        <div class="option" data-index="{{ loop.index0 }}">{{ option }}</div>
+        <div
+          class="option"
+          data-index="{{ loop.index0 }}"
+          data-value="{{ option }}"
+        >
+          {{ option }}
+        </div>
         {% endfor %}
       </div>
     </div>
