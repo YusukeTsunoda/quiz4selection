@@ -23,7 +23,7 @@
           </div>
           {% endif %} {% if not stats.easy.has_questions %}
           <div class="no-questions">
-            <p>問題が準備中です</p>
+            <p><span class="preparing-badge">準備中</span></p>
           </div>
           {% endif %}
         </div>
@@ -47,7 +47,7 @@
           </div>
           {% endif %} {% if not stats.medium.has_questions %}
           <div class="no-questions">
-            <p>問題が準備中です</p>
+            <p><span class="preparing-badge">準備中</span></p>
           </div>
           {% endif %}
         </div>
@@ -71,7 +71,7 @@
           </div>
           {% endif %} {% if not stats.hard.has_questions %}
           <div class="no-questions">
-            <p>問題が準備中です</p>
+            <p><span class="preparing-badge">準備中</span></p>
           </div>
           {% endif %}
         </div>
@@ -118,8 +118,9 @@
   }
 
   .difficulty-button.disabled {
-    opacity: 0.5;
+    opacity: 0.7;
     cursor: not-allowed;
+    background-color: #f8f9fa;
   }
 
   .difficulty-button.easy {
@@ -153,9 +154,16 @@
   }
 
   .no-questions {
-    margin-top: 10px;
-    font-size: 0.9em;
-    color: #666;
+    margin-top: 15px;
+    font-size: 1em;
+  }
+
+  .preparing-badge {
+    background-color: #6c757d;
+    color: white;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-weight: bold;
   }
 </style>
 {% endblock %}

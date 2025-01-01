@@ -1,132 +1,59 @@
 {% extends "base.html" %} {% block content %}
-<div class="container mt-4 quiz-container">
-  <div class="progress mb-4">
-    <div
-      class="progress-fill"
-      style="width: {{ (current_question + 1) / total_questions * 100 }}%"
-    ></div>
-  </div>
-
-  <div class="progress-info">
-    <span>問題 {{ current_question + 1 }}/{{ total_questions }}</span>
-    <span>正答数: {{ score }}問</span>
-  </div>
-
-  <div class="question-container">
-    <h2 class="question-text mb-4">{{ question }}</h2>
-
-    <div class="options-container" data-correct="{{ question_data.correct }}">
-      {% for option in options %}
-      <div class="option mb-3 p-3 rounded" data-index="{{ loop.index0 }}">
-        {{ option }}
+<div class="container mt-4">
+  <div class="quiz-container">
+    <div class="progress-info">
+      <div class="progress mb-2">
+        <div
+          class="progress-fill"
+          style="width: {{ (current_question / total_questions * 100)|round }}%"
+        ></div>
       </div>
-      {% endfor %}
+      <div class="status-info">
+        <span class="question-counter"
+          >問題 {{ current_question + 1 }}/{{ total_questions }}</span
+        >
+        <span class="score-display">スコア: {{ score }}問</span>
+      </div>
     </div>
-  </div>
 
-  <!-- ボタンコンテナとヒント -->
-  <div class="bottom-container">
-    <div class="buttons-container">
-      <!-- ヒントボタンとテキスト -->
-      <div class="hint-section">
-        <button id="hintButton" class="btn hint-button">
-          <i class="fas fa-lightbulb"></i> ヒントを見る
-        </button>
-        <div id="hintText" class="hint-text mt-2"></div>
+    <div class="question-container">
+      <p class="question-text">{{ question }}</p>
+      <div
+        class="options-container"
+        data-correct="{{ question_data.correct }}"
+        data-question-data="{{ question_data|tojson|safe }}"
+      >
+        {% for option in options %}
+        <div class="option" data-index="{{ loop.index0 }}">{{ option }}</div>
+        {% endfor %}
       </div>
-      <!-- 戻るボタン -->
-      <a href="{{ url_for('grade_select') }}" class="btn back-button">
-        <i class="fas fa-arrow-left"></i>学年選択に戻る
-      </a>
     </div>
   </div>
 </div>
 
 <style>
   .quiz-container {
-    position: relative;
     max-width: 800px;
     margin: 0 auto;
     padding: 20px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
   }
 
-  .bottom-container {
-    margin-top: 40px;
-    padding-bottom: 20px;
+  .quiz-container.show {
+    opacity: 1;
   }
 
-  .buttons-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+  .quiz-container.fade {
+    opacity: 0;
   }
 
-  .hint-section {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .back-button {
-    display: inline-flex;
-    align-items: center;
-    padding: 8px 16px;
-    background-color: #6c757d;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    text-decoration: none;
-    transition: background-color 0.3s ease;
-  }
-
-  .back-button:hover {
-    background-color: #5a6268;
-    color: white;
-    text-decoration: none;
-  }
-
-  .back-button i {
-    margin-right: 8px;
-  }
-
-  .hint-button {
-    background-color: #17a2b8;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    transition: background-color 0.3s ease;
-  }
-
-  .hint-button:hover {
-    background-color: #138496;
-  }
-
-  .hint-button:disabled {
-    background-color: #6c757d;
-    cursor: not-allowed;
-  }
-
-  .hint-text {
-    display: none;
-    padding: 10px;
-    background-color: #f8f9fa;
-    border-radius: 4px;
-    color: #495057;
-    font-size: 0.95em;
-    line-height: 1.5;
-    margin-top: 10px;
-    max-width: 400px;
-  }
-
-  /* 既存のスタイル */
   .progress {
     width: 100%;
     height: 10px;
     background-color: #e9ecef;
     border-radius: 5px;
     overflow: hidden;
-    margin-bottom: 20px;
   }
 
   .progress-fill {
@@ -135,182 +62,93 @@
     transition: width 0.3s ease;
   }
 
-  .progress-info {
+  .status-info {
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-size: 1.1em;
     font-weight: 600;
     color: #495057;
-    margin-bottom: 20px;
     padding: 0 10px;
   }
 
+  .question-counter,
+  .score-display {
+    white-space: nowrap;
+  }
+
   .question-container {
-    width: 100%;
+    background-color: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-top: 1rem;
   }
 
   .question-text {
-    font-size: 1.4em;
-    color: #212529;
-    text-align: left;
-    margin-bottom: 30px;
+    font-size: 1.2em;
+    color: #2c3e50;
+    margin-bottom: 20px;
     line-height: 1.6;
-    font-weight: 600;
+    white-space: pre-wrap;
+  }
+
+  .options-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
   }
 
   .option {
-    background-color: #fff;
-    border: 2px solid #6c757d;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border: 2px solid #dee2e6;
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.3s ease;
-    padding: 15px 20px;
-    margin-bottom: 15px;
     font-size: 1.1em;
-    color: #333;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    display: block;
-    width: 100%;
-    text-align: left;
+    color: #495057;
   }
 
   .option:hover {
-    background-color: #f8f9fa;
+    background-color: #e9ecef;
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    border-color: #495057;
+  }
+
+  .option.selected {
+    border-color: #007bff;
+    background-color: #e7f1ff;
   }
 
   .option.correct {
-    background-color: #d4edda;
     border-color: #28a745;
+    background-color: #d4edda;
     color: #155724;
-    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
   }
 
   .option.incorrect {
-    background-color: #f8d7da;
     border-color: #dc3545;
+    background-color: #f8d7da;
     color: #721c24;
-    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);
   }
 
   .explanation {
     margin-top: 20px;
     padding: 15px;
+    border-radius: 8px;
+    font-size: 1.05em;
+    line-height: 1.6;
     background-color: #e7f1ff;
-    border-radius: 4px;
     color: #004085;
-    font-size: 0.95em;
-    line-height: 1.5;
+    border: 1px solid #b8daff;
+  }
+
+  .explanation.correct-message {
+    background-color: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
   }
 </style>
 
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const optionsContainer = document.querySelector(".options-container");
-    const options = document.querySelectorAll(".option");
-    const hintButton = document.getElementById("hintButton");
-    const hintText = document.getElementById("hintText");
-    let isAnswered = false;
-    let isProcessing = false;
-    const startTime = Date.now();
-    let questionData = {{ question_data | tojson | safe }};
-
-    // ヒントボタンのイベントリスナー
-    if (hintButton && hintText) {
-      hintButton.addEventListener("click", function () {
-        const hint = questionData.hint;
-        if (hint) {
-          if (hintText.style.display === "none") {
-            hintText.textContent = hint;
-            hintText.style.display = "block";
-            hintButton.innerHTML = '<i class="fas fa-lightbulb"></i> ヒントを隠す';
-          } else {
-            hintText.style.display = "none";
-            hintButton.innerHTML = '<i class="fas fa-lightbulb"></i> ヒントを見る';
-          }
-        } else {
-          hintText.textContent = 'このクイズにはヒントがありません。';
-          hintText.style.display = "block";
-          setTimeout(() => {
-            hintText.style.display = "none";
-          }, 3000);
-        }
-      });
-    }
-
-    options.forEach((option) => {
-      option.addEventListener(
-        "click",
-        async function (event) {
-          event.preventDefault();
-          event.stopPropagation();
-
-          if (isAnswered || isProcessing) return;
-          isProcessing = true;
-          isAnswered = true;
-
-          try {
-            const selectedIndex = this.dataset.index;
-            const timeTaken = (Date.now() - startTime) / 1000;
-
-            const response = await fetch("/submit_answer", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                selected: selectedIndex,
-                time_taken: timeTaken,
-              }),
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-              const correctIndex = optionsContainer.dataset.correct;
-              const selectedOption = this;
-              const correctOption = options[correctIndex];
-
-              if (result.isCorrect) {
-                selectedOption.classList.add("correct");
-              } else {
-                selectedOption.classList.add("incorrect");
-                correctOption.classList.add("correct");
-              }
-
-              if (questionData.explanation) {
-                const explanationDiv = document.createElement('div');
-                explanationDiv.className = 'explanation';
-                explanationDiv.textContent = questionData.explanation;
-                optionsContainer.insertAdjacentElement('afterend', explanationDiv);
-              }
-
-              if (hintButton) {
-                hintButton.disabled = true;
-              }
-
-              await new Promise((resolve) => setTimeout(resolve, 1500));
-
-              if (result.isLastQuestion) {
-                window.location.href = result.redirectUrl;
-              } else {
-                window.location.href = "/next_question";
-              }
-            } else {
-              console.error("Error from server:", result.error);
-            }
-          } catch (error) {
-            console.error("Error:", error);
-          } finally {
-            isProcessing = false;
-          }
-        },
-        { once: true }
-      );
-    });
-  });
-</script>
+<script src="{{ url_for('static', filename='js/quiz.js') }}"></script>
 {% endblock %}

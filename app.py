@@ -11,6 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from functools import wraps
 import commands  # コマンドをインポート
 from extensions import db, migrate
+from flask_login import LoginManager, current_user, login_user, logout_user, login_required
 
 # .envファイルを読み込む
 load_dotenv()
@@ -71,8 +72,8 @@ def get_db():
         return g.db_conn
     except Exception as e:
         logger.error(f"Database connection error: {e}")
-        raise
-
+    raise
+            
 @app.teardown_appcontext
 def close_db(error):
     """データベース接続を閉じる関数"""
@@ -107,53 +108,207 @@ CATEGORY_NAMES = {
     'japanese': '国語',
     'math': '算数',
     'science': '理科',
-    'society': '社会'
+    'society': '社会',
+    'life': '生活'
 }
 
 # サブカテゴリーの日本語名
 SUBCATEGORY_NAMES = {
-    # 国語
-    'kanji': '漢字の読み書き',
-    'reading_comprehension': '文章の要旨',
-    'character_understanding': '登場人物の心情',
-    'paragraph_structure': '段落と中心文',
-    'idioms': '慣用句・ことわざ',
-    'letter_writing': '手紙の書き方',
-    'essay_writing': '作文・感想文',
-    
-    # 算数
-    'large_numbers': '大きな数',
-    'rounding': '概数と四捨五入',
-    'decimals': '小数',
-    'fractions': '分数',
-    'angles': '角度',
-    'area': '面積',
-    'parallel_lines': '垂直と平行',
-    'patterns': '変わり方調べ',
-    'line_graphs': '折れ線グラフ',
-    
-    # 理科
-    'weather': '天気と気温',
-    'moon_stars': '月と星',
-    'electricity': '電気の働き',
-    'properties': '空気と水の性質',
-    'metals': '金属の性質',
-    'living_things': '生き物の成長',
-    'seasonal_changes': '季節と生き物',
-    
-    # 社会
-    'prefectures': '都道府県',
-    'map_symbols': '地図記号',
-    'local_geography': '県の地理と産業',
-    'water_resources': '水源と水道',
-    'environment': 'ごみと環境',
-    'disaster_prevention': '災害対策',
-    'traditional_culture': '伝統文化',
-    'regional_industry': '地域の産業'
+    'japanese': {
+        'hiragana': 'ひらがな・カタカナの読み書き',
+        'kanji': '漢字の読み書き',
+        'story': '物語文の読解',
+        'explanation': '説明文の読解',
+        'speech': 'スピーチや挨拶',
+        'composition': '作文',
+        'grammar': '文法',
+        'reading': '音読と朗読',
+        'vocabulary': '語彙',
+        'literature': '文学的な文章',
+        'summary': '要約',
+        'discussion': '話し合い',
+        'language': '日本語の特質',
+        'reading_comprehension': '読解力',
+        'character_understanding': '文字の理解',
+        'paragraph_structure': '段落構成',
+        'letter_writing': '手紙の書き方',
+        'essay_writing': '作文',
+        'idioms': '慣用句・ことわざ',
+        'expression': '表現の工夫',
+        'comparison': '複数資料の関連付け'
+    },
+    'math': {
+        'numbers': '数と計算',
+        'addition': 'たし算',
+        'subtraction': 'ひき算',
+        'shapes': '図形',
+        'measurement': '測定',
+        'time': '時計と時間',
+        'counting': '数え方',
+        'multiplication': 'かけ算',
+        'division': 'わり算',
+        'fractions': '分数',
+        'decimals': '小数',
+        'area': '面積',
+        'volume': '体積',
+        'statistics': '統計',
+        'proportion': '比例',
+        'large_numbers': '大きな数',
+        'rounding': '概数と四捨五入',
+        'angles': '角度',
+        'parallel_lines': '垂直と平行',
+        'patterns': '変わり方調べ',
+        'line_graphs': '折れ線グラフ',
+        'circle_area': '円の面積',
+        'scale': '縮図と拡大図',
+        'ratio': '比とその利用',
+        'data': 'データの調べ方',
+        'probability': '場合の数と確率',
+        'algebra': '文字を使った式'
+    },
+    'science': {
+        'living_things': '生き物の観察',
+        'plants': '植物の観察',
+        'weather': '天気と気温',
+        'materials': '物の性質',
+        'magnets': '磁石の性質',
+        'electricity': '電気の働き',
+        'sound': '音の性質',
+        'light': '光の性質',
+        'force': '力の働き',
+        'earth': '地球と天体',
+        'human_body': '人の体',
+        'moon_stars': '月と星',
+        'properties': '物の性質',
+        'metals': '金属の性質',
+        'seasonal_changes': '季節と生き物',
+        'ecosystem': '生物のつながり',
+        'combustion': '燃焼の仕組み',
+        'solution': '水溶液の性質',
+        'lever': 'てこの規則性',
+        'pendulum': '振り子の運動',
+        'electromagnet': '電磁石の性質',
+        'water_flow': '流れる水の働き'
+    },
+    'society': {
+        'community': '地域社会',
+        'industry': '産業',
+        'history': '歴史',
+        'geography': '地理',
+        'government': '政治',
+        'economy': '経済',
+        'culture': '文化',
+        'international': '国際理解',
+        'prefectures': '都道府県',
+        'map_symbols': '地図記号',
+        'local_geography': '地域の地理',
+        'water_resources': '水源と水道',
+        'environment': '環境保護',
+        'disaster_prevention': '災害対策',
+        'traditional_culture': '伝統文化',
+        'regional_industry': '地域の産業',
+        'constitution': '日本国憲法',
+        'local': '地方自治',
+        'un': '国際連合'
+    },
+    'life': {
+        'school': '学校生活',
+        'family': '家族と地域',
+        'seasons': '季節の変化',
+        'nature': '自然との関わり',
+        'safety': '安全な生活',
+        'growth': '成長の記録',
+        'community': '地域社会'
+    }
 }
 
 # 学年ごとのカテゴリーとサブカテゴリー
 GRADE_CATEGORIES = {
+    1: {
+        'japanese': [
+            'hiragana',
+            'kanji',
+            'story',
+            'explanation',
+            'speech',
+            'composition'
+        ],
+        'math': [
+            'numbers',
+            'addition',
+            'subtraction',
+            'shapes',
+            'measurement',
+            'time',
+            'counting'
+        ],
+        'life': [
+            'school',
+            'family',
+            'seasons',
+            'nature',
+            'safety',
+            'growth'
+        ]
+    },
+    2: {
+        'japanese': [
+            'story',
+            'explanation',
+            'kanji',
+            'composition',
+            'speech'
+        ],
+        'math': [
+            'addition',
+            'subtraction',
+            'multiplication',
+            'measurement',
+            'time',
+            'shapes'
+        ],
+        'life': [
+            'seasons',
+            'community',
+            'nature',
+            'growth'
+        ]
+    },
+    3: {
+        'japanese': [
+            'kanji',
+            'story',
+            'explanation',
+            'speech',
+            'reading',
+            'composition',
+            'vocabulary',
+            'grammar'
+        ],
+        'math': [
+            'multiplication',
+            'division',
+            'time',
+            'measurement',
+            'shapes',
+            'statistics'
+        ],
+        'science': [
+            'living_things',
+            'plants',
+            'light',
+            'sound',
+            'magnets',
+            'force',
+            'materials'
+        ],
+        'society': [
+            'community',
+            'geography',
+            'industry',
+            'culture'
+        ]
+    },
     4: {
         'japanese': [
             'kanji',
@@ -193,6 +348,86 @@ GRADE_CATEGORIES = {
             'disaster_prevention',
             'traditional_culture',
             'regional_industry'
+        ]
+    },
+    5: {
+        'japanese': [
+            'kanji',
+            'literature',
+            'explanation',
+            'summary',
+            'comparison',
+            'vocabulary',
+            'composition',
+            'discussion',
+            'language'
+        ],
+        'math': [
+            'fractions',
+            'decimals',
+            'area',
+            'volume',
+            'statistics',
+            'proportion'
+        ],
+        'science': [
+            'plants',
+            'living_things',
+            'weather',
+            'force',
+            'earth',
+            'electromagnet',
+            'pendulum',
+            'water_flow'
+        ],
+        'society': [
+            'geography',
+            'industry',
+            'economy',
+            'international',
+            'environment'
+        ]
+    },
+    6: {
+        'japanese': [
+            'kanji',
+            'literature',
+            'explanation',
+            'comparison',
+            'expression',
+            'composition',
+            'discussion',
+            'language'
+        ],
+        'math': [
+            'fractions',
+            'algebra',
+            'circle_area',
+            'volume',
+            'scale',
+            'ratio',
+            'proportion',
+            'data',
+            'probability'
+        ],
+        'science': [
+            'plants',
+            'ecosystem',
+            'human_body',
+            'combustion',
+            'solution',
+            'lever',
+            'electricity',
+            'earth',
+            'moon_stars'
+        ],
+        'society': [
+            'history',
+            'constitution',
+            'government',
+            'local',
+            'un',
+            'international'
         ]
     }
 }
@@ -271,65 +506,73 @@ def select_subcategory(grade, category):
                            category=category,
                            category_name=CATEGORY_NAMES[category],
                            subcategories=subcategories,
-                           subcategory_names=SUBCATEGORY_NAMES)
+                           subcategory_names=SUBCATEGORY_NAMES[category])
 
 @app.route('/grade/<int:grade>/category/<category>/subcategory/<subcategory>/difficulty')
 def select_difficulty(grade, category, subcategory):
     """難易度選択画面を表示する"""
     try:
+        if not current_user.is_authenticated:
+            flash('ログインが必要です。', 'error')
+            return redirect(url_for('login'))
+
         # 各難易度のクイズ統計を取得
         stats = {}
         for difficulty in ['easy', 'medium', 'hard']:
-            # 問題データの存在確認
+            # 問題データの存在確認と形式チェック
             file_path = f'quiz_data/grade_{grade}/{category}/{subcategory}/{difficulty}/questions.json'
-            has_questions = os.path.exists(file_path)
+            has_questions = False
+            
+            if os.path.exists(file_path):
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        questions = json.load(f)
+                        if questions and isinstance(questions, list) and len(questions) > 0:
+                            # 各問題の形式を確認
+                            valid_format = all(
+                                isinstance(q, dict) and 
+                                'question' in q and 
+                                'options' in q and 
+                                ('correct' in q or 'correct_answer' in q) and 
+                                isinstance(q['options'], list) 
+                                for q in questions
+                            )
+                            has_questions = valid_format
+                except Exception as e:
+                    logger.error(f"Error reading questions from {file_path}: {e}")
+                    has_questions = False
 
-            attempts = QuizAttempt.query.filter_by(
-                grade=grade,
-                category=category,
-                subcategory=subcategory,
-                difficulty=difficulty
-            ).all()
+            # 統計情報の初期化
+            stats[difficulty] = {
+                'has_questions': has_questions,
+                'attempts': 0,
+                'avg_score': 0,
+                'highest_score': 0
+            }
 
-            if attempts:
-                total_attempts = len(attempts)
-                total_score_percentage = sum(
-                    attempt.score / attempt.total_questions * 100
-                    for attempt in attempts
-                )
-                highest_score_percentage = max(
-                    attempt.score / attempt.total_questions * 100
-                    for attempt in attempts
-                )
-                stats[difficulty] = {
-                    'attempts': total_attempts,
-                    'avg_score': total_score_percentage / total_attempts,
-                    'highest_score': highest_score_percentage,
-                    'has_questions': has_questions
-                }
-            else:
-                stats[difficulty] = {
-                    'attempts': 0,
-                    'avg_score': 0,
-                    'highest_score': 0,
-                    'has_questions': has_questions
-                }
+            if has_questions:
+                # クイズ履歴から統計を計算
+                attempts = QuizAttempt.query.filter_by(
+                    user_id=current_user.id,
+                    grade=grade,
+                    category=category,
+                    subcategory=subcategory,
+                    difficulty=difficulty
+                ).all()
 
-        # 難易度の日本語名
-        difficulty_names = {
-            'easy': '初級',
-            'medium': '中級',
-            'hard': '上級'
-        }
+                if attempts:
+                    stats[difficulty]['attempts'] = len(attempts)
+                    total_score_percentage = sum((attempt.score / attempt.total_questions) * 100 for attempt in attempts)
+                    stats[difficulty]['avg_score'] = total_score_percentage / len(attempts)
+                    stats[difficulty]['highest_score'] = max((attempt.score / attempt.total_questions) * 100 for attempt in attempts)
 
         return render_template('difficulty_select.html',
-                            grade=grade,
-                            category=category,
-                            subcategory=subcategory,
-                            category_name=CATEGORY_NAMES[category],
-                            subcategory_name=SUBCATEGORY_NAMES[subcategory],
-                            difficulty_names=difficulty_names,
-                            stats=stats)
+                           grade=grade,
+                           category=category,
+                           subcategory=subcategory,
+                           category_name=CATEGORY_NAMES[category],
+                           subcategory_name=SUBCATEGORY_NAMES[category][subcategory],
+                           stats=stats)
 
     except Exception as e:
         logger.error(f"Error in select_difficulty: {e}")
@@ -394,89 +637,86 @@ def start_quiz(grade, category, subcategory, difficulty):
 @app.route('/submit_answer', methods=['POST'])
 def submit_answer():
     try:
-        data = request.get_json()
-        selected_index = data.get('selected')
-        time_taken = data.get('time_taken', 0)
+        if not current_user.is_authenticated:
+            return jsonify({'success': False, 'error': 'User not logged in'})
 
+        data = request.get_json()
+        selected_index = data.get('answer')
+        logger.info(f"Received answer data: {data}")
+        
         current_question = session.get('current_question', 0)
         questions = session.get('questions', [])
-        current_score = session.get('score', 0)
         quiz_history = session.get('quiz_history', [])
-        answered_questions = session.get('answered_questions', [])  # リストとして取得
+        current_score = session.get('score', 0)
 
-        # 既に回答済みの問題かチェック
-        if current_question in answered_questions:
-            logger.warning(f"Duplicate answer detected for question {current_question + 1}")
-            return jsonify({
-                'success': False,
-                'error': '既にこの問題は回答済みです'
-            })
+        if not questions or current_question >= len(questions):
+            logger.error("Invalid question state")
+            return jsonify({'success': False, 'error': 'Invalid question'})
 
-        if current_question >= len(questions):
-            logger.error("Question index out of range")
-            return jsonify({'success': False, 'error': '問題が見つかりません'})
-
-        question = questions[current_question]
-        correct_index = question['correct']
-
-        is_correct = str(selected_index) == str(correct_index)
-        is_last_question = current_question >= len(questions) - 1
-
-        # スコアの更新
+        current_q = questions[current_question]
+        correct_index = current_q.get('correct')
+        logger.info(f"Question data: {current_q}")
+        logger.info(f"Selected index: {selected_index}, Correct index: {correct_index}")
+        
+        # 型を合わせて比較
+        is_correct = int(selected_index) == int(correct_index)
+        logger.info(f"Is correct: {is_correct}")
+        
         if is_correct:
             current_score += 1
             session['score'] = current_score
 
-        # 履歴の保存
+        # 回答履歴を保存
         quiz_history.append({
-            'question': question['question'],
-            'selected_option': question['options'][int(selected_index)],
-            'correct_option': question['options'][int(correct_index)],
+            'question': current_q.get('question', ''),
+            'user_answer': current_q['options'][int(selected_index)],
+            'correct_answer': current_q['options'][int(correct_index)],
             'is_correct': is_correct,
-            'time_taken': time_taken
+            'options': current_q.get('options', []),
+            'explanation': current_q.get('explanation', '')  # 解説を追加
         })
         session['quiz_history'] = quiz_history
-        
-        # 回答済みの問題として記録（リストに追加）
-        if current_question not in answered_questions:
-            answered_questions.append(current_question)
-            session['answered_questions'] = answered_questions
+
+        is_last_question = current_question == len(questions) - 1
+        logger.info(f"Is last question: {is_last_question}")
 
         # 最後の問題の場合、QuizAttemptを保存
         if is_last_question:
             try:
                 quiz_attempt = QuizAttempt(
+                    user_id=current_user.id,
                     grade=session.get('grade'),
                     category=session.get('category'),
                     subcategory=session.get('subcategory'),
                     difficulty=session.get('difficulty'),
                     score=current_score,
                     total_questions=len(questions),
-                    quiz_history=quiz_history
+                    _quiz_history=json.dumps(quiz_history)
                 )
                 db.session.add(quiz_attempt)
                 db.session.commit()
-                logger.info(f"Quiz attempt saved - Final score: {current_score}/{len(questions)}")
+                logger.info(f"Quiz attempt saved - User: {current_user.id}, Final score: {current_score}/{len(questions)}")
             except Exception as e:
                 logger.error(f"Error saving quiz attempt: {e}")
-                db.session.rollback()
+                return jsonify({'success': False, 'error': 'Failed to save quiz attempt'})
 
         response_data = {
             'success': True,
             'isCorrect': is_correct,
             'currentScore': current_score,
-            'isLastQuestion': is_last_question
+            'isLastQuestion': is_last_question,
+            'redirectUrl': url_for('result') if is_last_question else None
         }
+        logger.info(f"Sending response: {response_data}")
 
-        if is_last_question:
-            response_data['redirectUrl'] = '/result'
-        else:
+        if not is_last_question:
             session['current_question'] = current_question + 1
-
+                
         return jsonify(response_data)
-
+        
     except Exception as e:
         logger.error(f"Error in submit_answer: {e}")
+        logger.exception("Full traceback:")
         return jsonify({'success': False, 'error': str(e)})
 
 
@@ -513,36 +753,60 @@ def next_question():
         logger.error(f"Error in next_question route: {e}")
         logger.exception("Full traceback:")
         return redirect(url_for('grade_select'))
-
+    
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
     """学習成績ダッシュボードを表示"""
     try:
-        # クイズの試行履歴を取得
-        quiz_attempts = QuizAttempt.query.order_by(QuizAttempt.timestamp.desc()).all()
+        if not current_user.is_authenticated:
+            flash('ログインが必要です。', 'error')
+            return redirect(url_for('login'))
 
+        # セッションからユーザーIDを取得
+        user_id = session.get('user', {}).get('id')
+        if not user_id:
+            flash('セッションが無効です。再度ログインしてください。', 'error')
+            return redirect(url_for('login'))
+            
+        # クイズの試行履歴を取得
+        quiz_attempts = QuizAttempt.query.filter_by(user_id=user_id).order_by(QuizAttempt.timestamp.desc()).all()
+        
         # 進捗データの初期化
         progress = {grade: {} for grade in range(1, 7)}
 
         # 各学年、カテゴリー、サブカテゴリーごとの進捗を集計
         for grade in range(1, 7):
-            for category in CATEGORY_NAMES.keys():
-                progress[grade][category] = {
-                    'name': CATEGORY_NAMES[category],
-                    'subcategories': {}
-                }
-
-                for subcategory in get_subcategories(grade, category):
-                    progress[grade][category]['subcategories'][subcategory] = {
-                        'name': SUBCATEGORY_NAMES[subcategory],
-                        'levels': {
-                            'easy': {'attempts': 0, 'avg_score': 0, 'highest_score': 0},
-                            'medium': {'attempts': 0, 'avg_score': 0, 'highest_score': 0},
-                            'hard': {'attempts': 0, 'avg_score': 0, 'highest_score': 0}
-                        }
+            # 学年ごとの利用可能なカテゴリーを取得
+            available_categories = GRADE_CATEGORIES.get(grade, {}).keys()
+            
+            for category in available_categories:
+                if category in CATEGORY_NAMES:
+                    progress[grade][category] = {
+                        'name': CATEGORY_NAMES[category],
+                        'subcategories': {}
                     }
+
+                    # 利用可能なサブカテゴリーを取得
+                    for subcategory in get_subcategories(grade, category):
+                        # クイズデータが存在するか確認
+                        has_quiz_data = False
+                        for difficulty in ['easy', 'medium', 'hard']:
+                            file_path = f'quiz_data/grade_{grade}/{category}/{subcategory}/{difficulty}/questions.json'
+                            if os.path.exists(file_path):
+                                has_quiz_data = True
+                                break
+                        
+                        if has_quiz_data:
+                            progress[grade][category]['subcategories'][subcategory] = {
+                                'name': SUBCATEGORY_NAMES[category][subcategory],
+                                'levels': {
+                                    'easy': {'attempts': 0, 'avg_score': 0, 'highest_score': 0},
+                                    'medium': {'attempts': 0, 'avg_score': 0, 'highest_score': 0},
+                                    'hard': {'attempts': 0, 'avg_score': 0, 'highest_score': 0}
+                                }
+                            }
 
         # 試行履歴から統計を計算
         for attempt in quiz_attempts:
@@ -550,17 +814,21 @@ def dashboard():
             category = attempt.category
             subcategory = attempt.subcategory
             difficulty = attempt.difficulty
-            score_percentage = (attempt.score / attempt.total_questions) * 100
+            
+            # カテゴリーとサブカテゴリーが存在する場合のみ統計を更新
+            if (category in progress.get(grade, {}) and 
+                subcategory in progress[grade][category].get('subcategories', {})):
+                
+                score_percentage = (attempt.score / attempt.total_questions) * 100
+                stats = progress[grade][category]['subcategories'][subcategory]['levels'][difficulty]
+                stats['attempts'] += 1
 
-            stats = progress[grade][category]['subcategories'][subcategory]['levels'][difficulty]
-            stats['attempts'] += 1
+                # 平均スコアの更新
+                current_total = stats['avg_score'] * (stats['attempts'] - 1)
+                stats['avg_score'] = (current_total + score_percentage) / stats['attempts']
 
-            # 平均スコアの更新
-            current_total = stats['avg_score'] * (stats['attempts'] - 1)
-            stats['avg_score'] = (current_total + score_percentage) / stats['attempts']
-
-            # 最高スコアの更新
-            stats['highest_score'] = max(stats['highest_score'], score_percentage)
+                # 最高スコアの更新
+                stats['highest_score'] = max(stats['highest_score'], score_percentage)
 
         # 難易度の日本語名
         difficulty_names = {
@@ -570,14 +838,14 @@ def dashboard():
         }
 
         return render_template('dashboard.html',
-                            progress=progress,
-                            difficulty_names=difficulty_names,
-                            quiz_attempts=quiz_attempts)
+                           progress=progress,
+                           difficulty_names=difficulty_names,
+                           quiz_attempts=quiz_attempts)
 
     except Exception as e:
         logger.error(f"Error in dashboard route: {e}")
         flash('ダッシュボードの表示中にエラーが発生しました。', 'error')
-        return redirect(url_for('grade_select'))
+        return redirect(url_for('login'))
     
 
 @app.route('/result')
@@ -591,19 +859,21 @@ def result():
 
         if not quiz_history:
             logger.error("No quiz history found")
+            flash('クイズ履歴が見つかりません。', 'error')
             return redirect(url_for('grade_select'))
-
+    
         logger.info(f"Showing result page - Score: {score}/{total_questions}")
 
         return render_template('result.html',
-                               correct_answers=score,
-            total_questions=total_questions,
-                               quiz_history=quiz_history)
+                           score=score,
+                           total_questions=total_questions,
+                           quiz_history=quiz_history)
 
     except Exception as e:
         logger.error(f"Error in result route: {e}")
+        flash('結果の表示中にエラーが発生しました。', 'error')
         return redirect(url_for('grade_select'))
-
+    
 
 def get_questions(grade, category, subcategory, difficulty):
     """指定された条件に基づいて問題を取得する"""
@@ -681,51 +951,83 @@ def get_quiz_data(grade, category, subcategory, difficulty):
 def quiz_history(grade, category, subcategory, difficulty):
     """特定の条件でのクイズ履歴を表示"""
     try:
-        # 指定された条件での試行履歴を取得
+        # クイズ履歴を取得
         attempts = QuizAttempt.query.filter_by(
+            user_id=current_user.id,
             grade=grade,
             category=category,
             subcategory=subcategory,
             difficulty=difficulty
-        ).order_by(QuizAttempt.id.desc()).all()
+        ).order_by(QuizAttempt.timestamp.desc()).all()
 
-        # 問題ごとの統計情報を集計
-        question_stats = {}
+        logger.info(f"Found {len(attempts)} attempts for user {current_user.id}")
+        
+        history_data = []
         for attempt in attempts:
-            if hasattr(attempt, 'quiz_history') and attempt.quiz_history:
-                for question in attempt.quiz_history:
-                    q_text = question['question']
-                    if q_text not in question_stats:
-                        question_stats[q_text] = {
-                            'total': 0,
-                            'correct': 0,
-                            'percentage': 0
-                        }
+            logger.info(f"Processing attempt {attempt.id}")
+            try:
+                if attempt._quiz_history:
+                    # 文字列の場合はJSONとしてパース
+                    if isinstance(attempt._quiz_history, str):
+                        quiz_history = json.loads(attempt._quiz_history)
+                    else:
+                        quiz_history = attempt._quiz_history
+                    
+                    logger.info(f"Quiz history for attempt {attempt.id}: {quiz_history}")
+                    
+                    history_data.append({
+                        'timestamp': attempt.timestamp,
+                        'score': attempt.score,
+                        'total_questions': attempt.total_questions,
+                        'questions': quiz_history
+                    })
+            except json.JSONDecodeError as e:
+                logger.error(f"Error decoding quiz history for attempt {attempt.id}: {e}")
+                continue
+            except Exception as e:
+                logger.error(f"Unexpected error processing attempt {attempt.id}: {e}")
+                continue
 
-                    question_stats[q_text]['total'] += 1
-                    if question['is_correct']:
-                        question_stats[q_text]['correct'] += 1
+        logger.info(f"Processed {len(history_data)} history entries")
 
-                    # 正答率を更新
-                    question_stats[q_text]['percentage'] = (
-                        question_stats[q_text]['correct'] /
-                        question_stats[q_text]['total'] * 100
-                    )
+        # 問題データを取得して問題別統計を計算
+        questions = get_questions(grade, category, subcategory, difficulty)
+        question_stats = {}
+        
+        # 問題ごとの統計を初期化
+        for question in questions:
+            question_text = question.get('question', '')
+            question_stats[question_text] = {
+                'total_attempts': 0,
+                'correct_attempts': 0,
+                'percentage': 0
+            }
+        
+        # 履歴から統計を計算
+        for entry in history_data:
+            for question in entry['questions']:
+                question_text = question.get('question', '')
+                if question_text in question_stats:
+                    question_stats[question_text]['total_attempts'] += 1
+                    if question.get('is_correct', False):
+                        question_stats[question_text]['correct_attempts'] += 1
+        
+        # 正答率を計算
+        for stats in question_stats.values():
+            if stats['total_attempts'] > 0:
+                stats['percentage'] = (stats['correct_attempts'] / stats['total_attempts']) * 100
 
-        # 難易度の日本語名を設定
-        difficulty_name = {
-            'easy': '初級',
-            'medium': '中級',
-            'hard': '上級'
-        }.get(difficulty, difficulty)
-
-        return render_template('quiz_history.html',
-                               attempts=attempts,
-                               grade=grade,
-                               category_name=CATEGORY_NAMES[category],
-                               subcategory_name=SUBCATEGORY_NAMES[subcategory],
-                               difficulty_name=difficulty_name,
-                               question_stats=question_stats)
+        return render_template(
+            'quiz_history.html',
+            history_data=history_data,
+            question_stats=question_stats,
+            grade=grade,
+            category=category,
+            subcategory=subcategory,
+            difficulty=difficulty,
+            category_name=CATEGORY_NAMES.get(category, category),
+            subcategory_name=SUBCATEGORY_NAMES.get(category, {}).get(subcategory, subcategory)
+        )
 
     except Exception as e:
         logger.error(f"Error in quiz_history route: {e}")
@@ -733,8 +1035,11 @@ def quiz_history(grade, category, subcategory, difficulty):
         return redirect(url_for('dashboard'))
 
 
-@app.route('/signup', methods=['GET', 'POST'])
+@app.route('/signup', methods=['GET', 'POST'], endpoint='signup')
 def signup():
+    # セッションをクリア
+    session.clear()
+    
     if request.method == 'POST':
         try:
             email = request.form['email']
@@ -781,12 +1086,11 @@ def signup():
             
             flash('アカウントが登録されました。ログインしてください。', 'success')
             return redirect(url_for('login'))
-            
         except Exception as e:
             logger.error(f"Error in signup: {e}")
             db.session.rollback()
             flash('登録に失敗しました。', 'error')
-            
+            return render_template('signup.html')
     return render_template('signup.html')
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -824,6 +1128,9 @@ def login():
                     logger.error(f"Authentication error: {auth_error}")
                     flash('メールアドレスまたはパスワードが正しくありません。', 'error')
                     return render_template('login.html')
+            
+            # Flask-Loginでユーザーをログイン
+            login_user(user)
             
             # セッションにユーザー情報を保存
             session['user'] = {
@@ -982,3 +1289,12 @@ def admin_user_detail(user_id):
                          quiz_attempts=quiz_attempts,
                          CATEGORY_NAMES=CATEGORY_NAMES,
                          SUBCATEGORY_NAMES=SUBCATEGORY_NAMES)
+
+# LoginManagerの初期化
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(user_id)

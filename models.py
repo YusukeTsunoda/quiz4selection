@@ -3,13 +3,14 @@ import json
 import logging
 from flask_sqlalchemy import SQLAlchemy
 from extensions import db
+from flask_login import UserMixin
 
 logger = logging.getLogger(__name__)
 
-class User(db.Model):
+class User(db.Model, UserMixin):
     __tablename__ = 'users'
     
-    id = db.Column(db.String, primary_key=True)
+    id = db.Column(db.String(36), primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
@@ -22,6 +23,9 @@ class User(db.Model):
     })
     allowed_grades = db.Column(db.JSON, default=lambda: list(range(1, 7)))
     quiz_attempts = db.relationship('QuizAttempt', backref='user', lazy=True)
+
+    def get_id(self):
+        return str(self.id)
 
     @staticmethod
     def create_user(id, username, email):
@@ -59,15 +63,15 @@ class QuizAttempt(db.Model):
     __tablename__ = 'quiz_attempts'
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.String, db.ForeignKey('users.id'), nullable=True)
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
     grade = db.Column(db.Integer, nullable=False)
     category = db.Column(db.String(50), nullable=False)
     subcategory = db.Column(db.String(50), nullable=False)
     difficulty = db.Column(db.String(20), nullable=False)
-    score = db.Column(db.Integer, default=0)
-    total_questions = db.Column(db.Integer, default=0)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    _quiz_history = db.Column('quiz_history', db.Text)
+    score = db.Column(db.Integer, nullable=False, default=0)
+    total_questions = db.Column(db.Integer, nullable=False, default=0)
+    _quiz_history = db.Column(db.JSON)
+    timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
 
     @property
     def quiz_history(self):

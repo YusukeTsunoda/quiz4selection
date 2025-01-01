@@ -1,377 +1,344 @@
 {% extends "base.html" %} {% block content %}
 <div class="container mt-4">
-  <div class="quiz-history-container fade show">
-    <h2 class="text-center mb-4">クイズ履歴</h2>
-
-    <!-- 戻るボタン -->
-    <div class="back-button-container mb-4">
-      <div class="grade-info">
-        {{ grade }}年生 - {{ category_name }} - {{ subcategory_name }} - {{
-        difficulty_name }}
-      </div>
-      <a href="{{ url_for('dashboard') }}" class="btn back-button">
-        <i class="fas fa-arrow-left"></i>ダッシュボードに戻る
-      </a>
+  <h2 class="mb-4">クイズ履歴</h2>
+  <div class="quiz-info mb-4">
+    <div class="quiz-path">
+      {{ grade }}年生 - {{ category_name }} - {{ subcategory_name }} - {{
+      {'easy': '初級', 'medium': '中級', 'hard': '上級'}[difficulty] }}
     </div>
+  </div>
 
-    <!-- タブナビゲーション -->
-    <ul class="nav nav-tabs mb-4" id="historyTabs" role="tablist">
-      <li class="nav-item" role="presentation">
-        <button
-          class="nav-link active"
-          id="attempts-tab"
-          data-bs-toggle="tab"
-          data-bs-target="#attempts"
-          type="button"
-          role="tab"
-          aria-controls="attempts"
-          aria-selected="true"
-        >
-          テスト履歴
-        </button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button
-          class="nav-link"
-          id="questions-tab"
-          data-bs-toggle="tab"
-          data-bs-target="#questions"
-          type="button"
-          role="tab"
-        >
-          問題別の回答履歴
-        </button>
-      </li>
-    </ul>
+  <!-- 表示切り替えタブ -->
+  <ul class="nav nav-tabs mb-4" id="historyTabs" role="tablist">
+    <li class="nav-item">
+      <a
+        class="nav-link active"
+        id="attempts-tab"
+        data-toggle="tab"
+        href="#attempts"
+        role="tab"
+      >
+        実施履歴
+      </a>
+    </li>
+    <li class="nav-item">
+      <a
+        class="nav-link"
+        id="questions-tab"
+        data-toggle="tab"
+        href="#questions"
+        role="tab"
+      >
+        問題別統計
+      </a>
+    </li>
+  </ul>
 
-    <!-- タブコンテンツ -->
-    <div class="tab-content" id="historyTabContent">
-      <!-- 試行履歴タブ -->
-      <div class="tab-pane fade show active" id="attempts" role="tabpanel">
-        {% for attempt in attempts %}
-        <div class="attempt-card mb-4">
-          <div class="attempt-header">
-            <span class="attempt-date"
-              >{{ attempt.timestamp.strftime('%Y-%m-%d %H:%M') }}</span
+  <!-- タブコンテンツ -->
+  <div class="tab-content" id="historyTabContent">
+    <!-- 実施履歴タブ -->
+    <div class="tab-pane fade show active" id="attempts" role="tabpanel">
+      {% if history_data %} {% for entry in history_data %}
+      <div class="attempt-card mb-4">
+        <div class="attempt-header">
+          <h3>実施日時: {{ entry.timestamp.strftime('%Y-%m-%d %H:%M') }}</h3>
+          <div class="score-info">
+            <span class="score"
+              >スコア: {{ entry.score }}/{{ entry.total_questions }}</span
             >
-            <span class="score-info"
-              >スコア: {{ attempt.score }}/{{ attempt.total_questions }}</span
+            <span class="percentage"
+              >({{ "%.1f"|format(entry.score/entry.total_questions*100)
+              }}%)</span
             >
           </div>
-          {% if attempt.quiz_history %}
-          <div class="question-review">
-            {% for question in attempt.quiz_history %}
-            <div
-              class="card mb-4 {% if not question.is_correct %}incorrect-card{% endif %}"
-            >
-              <div class="card-body">
-                <p class="question-text">
-                  {{ loop.index }}. {{ question.question }}
-                </p>
-                <div class="selected-answer mt-3">
-                  <div
-                    class="answer-text {% if question.is_correct %}correct-text{% else %}incorrect-text{% endif %}"
-                  >
-                    あなたの回答: {{ question.selected_option }}
-                  </div>
-                </div>
-                {% if not question.is_correct %}
-                <div class="correct-answer mt-2">
-                  正解: {{ question.correct_option }}
-                </div>
-                {% endif %}
-              </div>
-            </div>
-            {% endfor %}
-          </div>
-          {% endif %}
         </div>
-        {% endfor %}
-      </div>
 
-      <!-- 問題別統計タブ -->
-      <div class="tab-pane fade" id="questions" role="tabpanel">
-        <div class="accordion" id="questionAccordion">
-          {% for question, stats in question_stats.items() %}
-          <div class="accordion-item mb-3">
-            <h2 class="accordion-header">
-              <button
-                class="accordion-button collapsed"
-                type="button"
-                data-bs-toggle="collapse"
-                data-bs-target="#question{{ loop.index }}"
-              >
-                <div
-                  class="d-flex w-100 justify-content-between align-items-center"
+        <div class="questions-list">
+          {% for question in entry.questions %}
+          <div
+            class="question-item {% if question.is_correct %}correct{% else %}incorrect{% endif %}"
+          >
+            <p class="question-text">
+              {{ loop.index }}. {{ question.question }}
+            </p>
+            <div class="answer-info">
+              <p class="user-answer">
+                あなたの回答:
+                <span
+                  class="{% if question.is_correct %}text-success{% else %}text-danger{% endif %}"
                 >
-                  <div class="question-title">{{ question }}</div>
-                  <div class="stats-summary">
-                    <span class="badge bg-info me-2"
-                      >試行: {{ stats.total }}回</span
-                    >
-                    <span
-                      class="badge {% if stats.percentage > 70 %}bg-success{% elif stats.percentage > 40 %}bg-warning{% else %}bg-danger{% endif %}"
-                    >
-                      正答率: {{ "%.1f"|format(stats.percentage) }}%
-                    </span>
-                  </div>
-                </div>
-              </button>
-            </h2>
-            <div
-              id="question{{ loop.index }}"
-              class="accordion-collapse collapse"
-            >
-              <div class="accordion-body">
-                <div class="history-stats mb-3">
-                  <div>正解: {{ stats.correct }}回 / 全{{ stats.total }}回</div>
-                </div>
-                <div class="question-history-details">
-                  {% for attempt in attempts %} {% for q in attempt.quiz_history
-                  %} {% if q.question == question %}
-                  <div
-                    class="history-entry {% if q.is_correct %}correct-entry{% else %}incorrect-entry{% endif %}"
-                  >
-                    <div class="history-date">
-                      {{ attempt.timestamp.strftime('%Y-%m-%d %H:%M') }}
-                    </div>
-                    <div class="history-answer">
-                      <div
-                        class="selected-option {% if not q.is_correct %}incorrect-answer{% endif %}"
-                      >
-                        <span
-                          class="answer-label {% if not q.is_correct %}incorrect-text{% endif %}"
-                          >回答:</span
-                        >
-                        <span
-                          class="answer-value {% if not q.is_correct %}incorrect-text{% endif %}"
-                          >{{ q.selected_option }}</span
-                        >
-                        {% if q.is_correct %}
-                        <span class="correct-mark"
-                          ><i class="fas fa-check"></i
-                        ></span>
-                        {% else %}
-                        <span class="incorrect-mark"
-                          ><i class="fas fa-times"></i
-                        ></span>
-                        {% endif %}
-                      </div>
-                      {% if not q.is_correct %}
-                      <div class="correct-option">
-                        正解: {{ q.correct_option }}
-                      </div>
-                      {% endif %}
-                    </div>
-                  </div>
-                  {% endif %} {% endfor %} {% endfor %}
-                </div>
+                  {{ question.user_answer }}
+                </span>
+              </p>
+              {% if not question.is_correct %}
+              <p class="correct-answer text-success">
+                正解: {{ question.correct_answer }}
+              </p>
+              {% endif %} {% if question.explanation %}
+              <div class="explanation mt-2">
+                <h5>解説:</h5>
+                <p>{{ question.explanation }}</p>
               </div>
+              {% endif %}
             </div>
           </div>
           {% endfor %}
         </div>
       </div>
+      {% endfor %} {% else %}
+      <p>まだクイズの実施履歴がありません。</p>
+      {% endif %}
+    </div>
+
+    <!-- 問題別統計タブ -->
+    <div class="tab-pane fade" id="questions" role="tabpanel">
+      {% if question_stats %} {% for question, stats in question_stats.items()
+      %}
+      <div class="question-stats-card mb-4">
+        <div class="question-header">
+          <h4 class="question-text">{{ question }}</h4>
+          <div class="stats-info">
+            <span class="attempts">実施回数: {{ stats.total_attempts }}回</span>
+            <span class="correct-rate"
+              >正答率: {{ "%.1f"|format(stats.percentage) }}%</span
+            >
+          </div>
+        </div>
+
+        <!-- 問題の実施履歴 -->
+        <div class="question-history mt-3">
+          {% for entry in history_data %} {% for q in entry.questions %} {% if
+          q.question == question %}
+          <div
+            class="attempt-detail {% if q.is_correct %}correct{% else %}incorrect{% endif %}"
+          >
+            <div class="attempt-time">
+              実施日時: {{ entry.timestamp.strftime('%Y-%m-%d %H:%M') }}
+            </div>
+            <div class="attempt-answers">
+              <p class="user-answer">
+                あなたの回答:
+                <span
+                  class="{% if q.is_correct %}text-success{% else %}text-danger{% endif %}"
+                >
+                  {{ q.user_answer }}
+                </span>
+              </p>
+              {% if not q.is_correct %}
+              <p class="correct-answer text-success">
+                正解: {{ q.correct_answer }}
+              </p>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %} {% endfor %} {% endfor %}
+        </div>
+      </div>
+      {% endfor %} {% else %}
+      <p>問題別統計データがありません。</p>
+      {% endif %}
     </div>
   </div>
 </div>
 
 <style>
-  .quiz-history-container {
-    max-width: 900px;
-    margin: 0 auto;
+  .quiz-info {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
   }
 
-  .back-button-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 10px;
-  }
-
-  .grade-info {
-    font-size: 1.1em;
+  .quiz-path {
+    font-size: 1.1rem;
     color: #495057;
+    font-weight: 500;
   }
 
-  .back-button {
-    display: inline-flex;
-    align-items: center;
-    padding: 8px 16px;
-    background-color: #6c757d;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    text-decoration: none;
-    transition: background-color 0.3s ease;
-  }
-
-  .back-button:hover {
-    background-color: #5a6268;
-    color: white;
-    text-decoration: none;
-  }
-
-  .back-button i {
-    margin-right: 8px;
+  .attempt-card {
+    background-color: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   }
 
   .attempt-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
     border-bottom: 1px solid #dee2e6;
   }
 
-  .attempt-date {
-    color: #6c757d;
-    font-size: 0.9rem;
+  .attempt-header h3 {
+    font-size: 1.2rem;
+    margin: 0;
   }
 
   .score-info {
-    font-weight: bold;
-    color: #3498db;
+    font-size: 1.1rem;
+    font-weight: 600;
   }
 
-  .question-review {
-    max-width: 800px;
-    margin: 0 auto;
-  }
-
-  .card {
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    margin: 20px 0;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    transition: box-shadow 0.3s ease;
-  }
-
-  .card:hover {
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  }
-
-  .incorrect-card {
-    border: 2px solid #dc3545;
-  }
-
-  .incorrect-card:hover {
-    border: 2px solid #dc3545;
-  }
-
-  .question-text {
-    font-size: 1.1em;
-    font-weight: bold;
-    color: #2c3e50;
-    margin-bottom: 15px;
-  }
-
-  .selected-answer {
-    margin-bottom: 10px;
-  }
-
-  .answer-text {
-    font-size: 1.05em;
-  }
-
-  .correct-text {
-    color: #28a745;
-  }
-
-  .incorrect-text {
-    color: #dc3545;
-  }
-
-  .correct-answer {
-    font-size: 1.05em;
-    color: #28a745;
-  }
-
-  .question-stats-card {
-    background-color: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  }
-
-  .stats-info {
-    color: #6c757d;
-    font-size: 0.9rem;
-  }
-
-  .spacer {
-    display: inline-block;
-    width: 20px;
-  }
-
-  .nav-tabs .nav-link {
-    color: #495057;
-    font-weight: 500;
-  }
-
-  /* 新しい履歴エントリのスタイル */
-  .question-history-details {
-    margin-top: 15px;
-  }
-
-  .history-entry {
-    padding: 12px;
-    border: 1px solid #dee2e6;
+  .question-item {
+    padding: 1rem;
+    margin-bottom: 1rem;
     border-radius: 6px;
-    margin-bottom: 10px;
     background-color: #f8f9fa;
   }
 
-  .history-entry.correct-entry {
+  .question-item.correct {
     border-left: 4px solid #28a745;
   }
 
-  .history-entry.incorrect-entry {
+  .question-item.incorrect {
     border-left: 4px solid #dc3545;
   }
 
-  .history-date {
-    font-size: 0.9em;
-    color: #6c757d;
-    margin-bottom: 5px;
+  .question-text {
+    font-size: 1.1rem;
+    margin-bottom: 0.8rem;
   }
 
-  .history-answer {
-    margin-left: 10px;
+  .answer-info {
+    padding-left: 1rem;
   }
 
-  .selected-option {
+  .user-answer,
+  .correct-answer {
+    margin-bottom: 0.3rem;
+  }
+
+  .explanation {
+    background-color: #e7f1ff;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-top: 1rem;
+  }
+
+  .explanation h5 {
+    color: #004085;
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .explanation p {
+    margin-bottom: 0;
+    color: #004085;
+  }
+
+  .question-stats-card {
+    background-color: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+
+  .question-header {
     display: flex;
-    align-items: center;
-    gap: 10px;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
   }
 
-  .correct-mark {
-    color: #28a745;
+  .stats-info {
+    text-align: right;
   }
 
-  .incorrect-mark {
-    color: #dc3545;
+  .stats-info span {
+    display: block;
+    margin-bottom: 0.3rem;
   }
 
-  .correct-option {
-    margin-top: 5px;
-    color: #28a745;
-    font-size: 0.95em;
+  .nav-tabs {
+    border-bottom: 2px solid #dee2e6;
   }
 
-  .incorrect-answer {
-    color: #dc3545;
-  }
-
-  .answer-label {
+  .nav-tabs .nav-link {
+    border: none;
+    color: #495057;
     font-weight: 500;
+    padding: 0.8rem 1.5rem;
+    transition: all 0.3s ease;
   }
 
-  .answer-value {
-    margin-left: 5px;
+  .nav-tabs .nav-link:hover {
+    border: none;
+    color: #007bff;
+  }
+
+  .nav-tabs .nav-link.active {
+    color: #007bff;
+    border-bottom: 2px solid #007bff;
+    background-color: transparent;
+  }
+
+  .tab-content {
+    padding-top: 1.5rem;
+  }
+
+  .question-history {
+    border-top: 1px solid #dee2e6;
+    padding-top: 1rem;
+  }
+
+  .attempt-detail {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 6px;
+    border-left: 4px solid #6c757d;
+  }
+
+  .attempt-detail.correct {
+    border-left-color: #28a745;
+  }
+
+  .attempt-detail.incorrect {
+    border-left-color: #dc3545;
+  }
+
+  .attempt-time {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+  }
+
+  .attempt-answers {
+    padding-left: 1rem;
+  }
+
+  .attempt-answers p {
+    margin-bottom: 0.3rem;
   }
 </style>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    // タブの切り替え処理
+    const tabs = document.querySelectorAll(".nav-link");
+    const tabContents = document.querySelectorAll(".tab-pane");
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", (e) => {
+        e.preventDefault();
+
+        // アクティブなタブを更新
+        tabs.forEach((t) => t.classList.remove("active"));
+        tab.classList.add("active");
+
+        // タブコンテンツを更新
+        const target = document.querySelector(tab.getAttribute("href"));
+        tabContents.forEach((content) => {
+          content.classList.remove("show", "active");
+        });
+        target.classList.add("show", "active");
+      });
+    });
+  });
+</script>
+
 {% endblock %}
