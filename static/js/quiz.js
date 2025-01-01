@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const quizContainer = document.querySelector('.quiz-container');
                     if (quizContainer) {
                         quizContainer.classList.add('fade');
-                        await new Promise(resolve => setTimeout(resolve, 500));
+                        await new Promise(resolve => setTimeout(resolve, 200));
                         
                         // 次の問題または結果ページへ遷移
                         if (response.isLastQuestion && response.redirectUrl) {
