@@ -280,8 +280,18 @@ def select_difficulty(grade, category, subcategory):
 def start_quiz(grade, category, subcategory, difficulty):
     """クイズを開始する"""
     try:
-        # セッションをクリア
-        session.clear()
+        # ログイン情報を一時保存
+        user_info = session.get('user')
+        
+        # クイズ関連のセッション情報のみをクリア
+        quiz_keys = ['questions', 'current_question', 'score', 'quiz_history', 
+                    'answered_questions', 'grade', 'category', 'subcategory', 'difficulty']
+        for key in quiz_keys:
+            if key in session:
+                session.pop(key)
+        
+        # ログイン情報を復元
+        session['user'] = user_info
 
         # 問題を取得
         questions = get_questions(grade, category, subcategory, difficulty)
@@ -296,7 +306,7 @@ def start_quiz(grade, category, subcategory, difficulty):
         session['current_question'] = 0
         session['score'] = 0
         session['quiz_history'] = []
-        session['answered_questions'] = []  # リストとして初期化
+        session['answered_questions'] = []
         session['grade'] = grade
         session['category'] = category
         session['subcategory'] = subcategory
