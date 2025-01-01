@@ -738,25 +738,23 @@ def login():
             email = request.form['email']
             password = request.form['password']
             
-            # Supabaseでログイン
-            response = supabase.auth.sign_in_with_password({
-                "email": email,
-                "password": password
-            })
+            # Supabaseでログイン認証
+            try:
+                response = supabase.auth.sign_in_with_password({
+                    "email": email,
+                    "password": password
+                })
+            except Exception as auth_error:
+                logger.error(f"Authentication error: {auth_error}")
+                flash('メールアドレスまたはパスワードが正しくありません。', 'error')
+                return render_template('login.html')
             
             # ユーザー情報を取得
             user = User.query.get(response.user.id)
             if not user:
-                # 初回ログイン時にユーザーを作成
-                username = email.split('@')[0]  # メールアドレスのローカル部分をユーザー名として使用
-                user = User(
-                    id=response.user.id,
-                    email=response.user.email,
-                    username=username,
-                    is_admin=False
-                )
-                db.session.add(user)
-                db.session.commit()
+                logger.error(f"User not found in database: {email}")
+                flash('ユーザーが見つかりません。先にアカウント登録を行ってください。', 'error')
+                return redirect(url_for('signup'))
             
             # セッションにユーザー情報を保存
             session['user'] = {
