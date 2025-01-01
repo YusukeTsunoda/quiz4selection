@@ -862,3 +862,27 @@ def admin_setup():
     except Exception as e:
         logger.error(f"Error in admin setup: {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/reset-password', methods=['GET', 'POST'])
+def reset_password():
+    if request.method == 'POST':
+        try:
+            email = request.form.get('email')
+            
+            # メールアドレスの存在確認
+            user = User.get_by_email(email)
+            if not user:
+                flash('指定されたメールアドレスは登録されていません。', 'error')
+                return redirect(url_for('reset_password'))
+            
+            # Supabaseでパスワードリセットメールを送信
+            supabase.auth.reset_password_email(email)
+            
+            flash('パスワードリセットの手順をメールで送信しました。', 'success')
+            return redirect(url_for('login'))
+            
+        except Exception as e:
+            logger.error(f"Error in reset_password: {e}")
+            flash('パスワードリセットメールの送信に失敗しました。', 'error')
+            
+    return render_template('reset_password.html')
