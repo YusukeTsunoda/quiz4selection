@@ -70,33 +70,33 @@ class QuizAttempt(db.Model):
     difficulty = db.Column(db.String(20), nullable=False)
     score = db.Column(db.Integer, nullable=False, default=0)
     total_questions = db.Column(db.Integer, nullable=False, default=0)
-    _quiz_history = db.Column(db.JSON)
+    quiz_history = db.Column(db.JSON)
     timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
 
     @property
-    def quiz_history(self):
+    def quiz_history_prop(self):
         """クイズ履歴をJSONとして取得"""
-        if self._quiz_history is None:
+        if self.quiz_history is None:
             return []
         
         # すでにリスト型の場合はそのまま返す
-        if isinstance(self._quiz_history, list):
-            return self._quiz_history
+        if isinstance(self.quiz_history, list):
+            return self.quiz_history
             
         # 文字列の場合はJSONとしてパース
         try:
-            return json.loads(self._quiz_history)
+            return json.loads(self.quiz_history)
         except (TypeError, json.JSONDecodeError) as e:
             logger.error(f"Error parsing quiz history: {e}")
             return []
 
-    @quiz_history.setter
-    def quiz_history(self, value):
+    @quiz_history_prop.setter
+    def quiz_history_prop(self, value):
         """クイズ履歴をJSON形式で保存"""
         if isinstance(value, str):
-            self._quiz_history = value
+            self.quiz_history = value
         else:
-            self._quiz_history = json.dumps(value)
+            self.quiz_history = json.dumps(value)
 
     @staticmethod
     def get_stats(grade, category, subcategory, difficulty):

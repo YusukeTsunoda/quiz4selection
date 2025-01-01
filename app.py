@@ -732,15 +732,20 @@ def submit_answer():
         # 最後の問題の場合、QuizAttemptを保存
         if is_last_question:
             try:
+                grade = session.get('grade')
+                category = session.get('category')
+                subcategory = session.get('subcategory')
+                difficulty = session.get('difficulty')
+                
                 quiz_attempt = QuizAttempt(
                     user_id=current_user.id,
-                    grade=session.get('grade'),
-                    category=session.get('category'),
-                    subcategory=session.get('subcategory'),
-                    difficulty=session.get('difficulty'),
+                    grade=grade,
+                    category=category,
+                    subcategory=subcategory,
+                    difficulty=difficulty,
                     score=current_score,
                     total_questions=len(questions),
-                    _quiz_history=json.dumps(quiz_history)
+                    quiz_history=json.dumps(quiz_history)
                 )
                 db.session.add(quiz_attempt)
                 db.session.commit()
@@ -1017,12 +1022,12 @@ def quiz_history(grade, category, subcategory, difficulty):
         for attempt in attempts:
             logger.info(f"Processing attempt {attempt.id}")
             try:
-                if attempt._quiz_history:
+                if attempt.quiz_history:
                     # 文字列の場合はJSONとしてパース
-                    if isinstance(attempt._quiz_history, str):
-                        quiz_history = json.loads(attempt._quiz_history)
+                    if isinstance(attempt.quiz_history, str):
+                        quiz_history = json.loads(attempt.quiz_history)
                     else:
-                        quiz_history = attempt._quiz_history
+                        quiz_history = attempt.quiz_history
                     
                     logger.info(f"Quiz history for attempt {attempt.id}: {quiz_history}")
                     
