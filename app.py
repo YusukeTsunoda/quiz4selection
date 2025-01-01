@@ -848,8 +848,10 @@ def dashboard():
                                 break
                         
                         if has_quiz_data:
+                            # サブカテゴリー名の取得を安全に行う
+                            subcategory_name = SUBCATEGORY_NAMES.get(category, {}).get(subcategory, subcategory)
                             progress[grade][category]['subcategories'][subcategory] = {
-                                'name': SUBCATEGORY_NAMES[category][subcategory],
+                                'name': subcategory_name,
                                 'levels': {
                                     'easy': {'attempts': 0, 'avg_score': 0, 'highest_score': 0},
                                     'medium': {'attempts': 0, 'avg_score': 0, 'highest_score': 0},
@@ -1040,31 +1042,32 @@ def quiz_history(grade, category, subcategory, difficulty):
         logger.info(f"Processed {len(history_data)} history entries")
 
         # 問題データを取得して問題別統計を計算
-        questions = get_questions(grade, category, subcategory, difficulty)
+        questions_data, error = get_quiz_data(grade, category, subcategory, difficulty)
         question_stats = {}
         
-        # 問題ごとの統計を初期化
-        for question in questions:
-            question_text = question.get('question', '')
-            question_stats[question_text] = {
-                'total_attempts': 0,
-                'correct_attempts': 0,
-                'percentage': 0
-            }
-        
-        # 履歴から統計を計算
-        for entry in history_data:
-            for question in entry['questions']:
+        if questions_data:
+            # 問題ごとの統計を初期化
+            for question in questions_data:
                 question_text = question.get('question', '')
-                if question_text in question_stats:
-                    question_stats[question_text]['total_attempts'] += 1
-                    if question.get('is_correct', False):
-                        question_stats[question_text]['correct_attempts'] += 1
+                question_stats[question_text] = {
+                    'total_attempts': 0,
+                    'correct_attempts': 0,
+                    'percentage': 0
+                }
         
-        # 正答率を計算
-        for stats in question_stats.values():
-            if stats['total_attempts'] > 0:
-                stats['percentage'] = (stats['correct_attempts'] / stats['total_attempts']) * 100
+            # 履歴から統計を計算
+            for entry in history_data:
+                for question in entry['questions']:
+                    question_text = question.get('question', '')
+                    if question_text in question_stats:
+                        question_stats[question_text]['total_attempts'] += 1
+                        if question.get('is_correct', False):
+                            question_stats[question_text]['correct_attempts'] += 1
+        
+            # 正答率を計算
+            for stats in question_stats.values():
+                if stats['total_attempts'] > 0:
+                    stats['percentage'] = (stats['correct_attempts'] / stats['total_attempts']) * 100
 
         return render_template(
             'quiz_history.html',
