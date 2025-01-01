@@ -846,15 +846,22 @@ def admin_user_edit(user_id):
     if request.method == 'POST':
         try:
             # 許可する学年を更新
-            allowed_grades = request.form.getlist('grades[]')
-            user.allowed_grades = [int(grade) for grade in allowed_grades]
+            allowed_grades = [int(grade) for grade in request.form.getlist('grades[]')]
+            user.allowed_grades = allowed_grades
             
             # 許可する科目とサブカテゴリを更新
             allowed_subjects = {}
-            for category in CATEGORY_NAMES.keys():
-                subcategories = request.form.getlist(f'{category}[]')
-                if subcategories:
-                    allowed_subjects[category] = subcategories
+            for grade in range(1, 7):
+                for category in CATEGORY_NAMES.keys():
+                    subcategories = request.form.getlist(f'subjects[{grade}][{category}][]')
+                    if subcategories:
+                        if category not in allowed_subjects:
+                            allowed_subjects[category] = []
+                        allowed_subjects[category].extend(subcategories)
+            
+            # 重複を除去
+            for category in allowed_subjects:
+                allowed_subjects[category] = list(set(allowed_subjects[category]))
             
             user.allowed_subjects = allowed_subjects
             db.session.commit()
@@ -867,16 +874,10 @@ def admin_user_edit(user_id):
             db.session.rollback()
             flash('ユーザー権限の更新に失敗しました。', 'error')
     
-    # 各カテゴリのサブカテゴリを取得
-    all_subcategories = {}
-    for category in CATEGORY_NAMES.keys():
-        all_subcategories[category] = get_subcategories(1, category)
-    
     return render_template('admin/user_edit.html',
                          user=user,
-                         categories=CATEGORY_NAMES,
-                         subcategories=SUBCATEGORY_NAMES,
-                         all_subcategories=all_subcategories)
+                         CATEGORY_NAMES=CATEGORY_NAMES,
+                         SUBCATEGORY_NAMES=SUBCATEGORY_NAMES)
 
 @app.route('/admin/setup', methods=['POST'])
 def admin_setup():
@@ -934,3 +935,25 @@ def reset_password():
             flash('パスワードリセットメールの送信に失敗しました。', 'error')
             
     return render_template('reset_password.html')
+
+@app.route('/user/profile')
+@login_required
+def user_profile():
+    """ユーザープロフィールページを表示"""
+    user = User.query.get(session['user']['id'])
+    return render_template('user_profile.html',
+                         user=user,
+                         CATEGORY_NAMES=CATEGORY_NAMES,
+                         SUBCATEGORY_NAMES=SUBCATEGORY_NAMES)
+
+@app.route('/admin/user/<user_id>/detail')
+@admin_required
+def admin_user_detail(user_id):
+    """ユーザー詳細ページを表示（管理者用）"""
+    user = User.query.get_or_404(user_id)
+    quiz_attempts = QuizAttempt.query.filter_by(user_id=user_id).order_by(QuizAttempt.timestamp.desc()).limit(10).all()
+    return render_template('admin/user_detail.html',
+                         user=user,
+                         quiz_attempts=quiz_attempts,
+                         CATEGORY_NAMES=CATEGORY_NAMES,
+                         SUBCATEGORY_NAMES=SUBCATEGORY_NAMES)

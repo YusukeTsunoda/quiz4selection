@@ -1,0 +1,90 @@
+{% extends "base.html" %} {% block content %}
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title h5 mb-0">プロフィール</h2>
+        </div>
+        <div class="card-body">
+          <div class="mb-4">
+            <h3 class="h6">基本情報</h3>
+            <p><strong>ユーザー名:</strong> {{ user.username }}</p>
+            <p><strong>メールアドレス:</strong> {{ user.email }}</p>
+            <p>
+              <strong>アカウントタイプ:</strong> {% if user.is_admin %}管理者{%
+              else %}一般ユーザー{% endif %}
+            </p>
+            <p>
+              <strong>登録日時:</strong> {{ user.created_at.strftime('%Y-%m-%d
+              %H:%M') }}
+            </p>
+          </div>
+
+          {% if not user.is_admin %}
+          <div class="mb-4">
+            <h3 class="h6">利用可能な学年</h3>
+            <ul class="list-unstyled">
+              {% for grade in user.allowed_grades %}
+              <li>{{ grade }}年生</li>
+              {% endfor %}
+            </ul>
+          </div>
+
+          <div class="mb-4">
+            <h3 class="h6">利用可能な科目</h3>
+            {% for category, subcategories in user.allowed_subjects.items() %}
+            <div class="mb-3">
+              <h4 class="h6 mb-2">{{ CATEGORY_NAMES[category] }}</h4>
+              <ul class="list-unstyled">
+                {% for subcategory in subcategories %}
+                <li>{{ SUBCATEGORY_NAMES[subcategory] }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          <div class="d-grid gap-2">
+            <a href="{{ url_for('logout') }}" class="btn btn-danger">
+              <i class="fas fa-sign-out-alt"></i> ログアウト
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  }
+
+  .h6 {
+    color: #2c3e50;
+    font-weight: 600;
+    margin-bottom: 1rem;
+  }
+
+  .list-unstyled li {
+    padding: 0.25rem 0;
+    color: #495057;
+  }
+
+  .btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+  }
+
+  .btn-danger:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+  }
+
+  .btn i {
+    margin-right: 0.5rem;
+  }
+</style>
+{% endblock %}

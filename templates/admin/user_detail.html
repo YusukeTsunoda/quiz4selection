@@ -1,0 +1,148 @@
+{% extends "base.html" %} {% block content %}
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card">
+        <div
+          class="card-header d-flex justify-content-between align-items-center"
+        >
+          <h2 class="card-title h5 mb-0">ユーザー詳細</h2>
+          <a
+            href="{{ url_for('admin_user_edit', user_id=user.id) }}"
+            class="btn btn-primary btn-sm"
+          >
+            <i class="fas fa-edit"></i> 設定を変更
+          </a>
+        </div>
+        <div class="card-body">
+          <div class="mb-4">
+            <h3 class="h6">基本情報</h3>
+            <p><strong>ユーザー名:</strong> {{ user.username }}</p>
+            <p><strong>メールアドレス:</strong> {{ user.email }}</p>
+            <p>
+              <strong>登録日時:</strong> {{ user.created_at.strftime('%Y-%m-%d
+              %H:%M') }}
+            </p>
+          </div>
+
+          <div class="mb-4">
+            <h3 class="h6">利用可能な学年</h3>
+            {% if user.allowed_grades %}
+            <ul class="list-unstyled">
+              {% for grade in user.allowed_grades %}
+              <li>{{ grade }}年生</li>
+              {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-muted">未設定</p>
+            {% endif %}
+          </div>
+
+          <div class="mb-4">
+            <h3 class="h6">利用可能な科目</h3>
+            {% if user.allowed_subjects %} {% for category, subcategories in
+            user.allowed_subjects.items() %}
+            <div class="mb-3">
+              <h4 class="h6 mb-2">{{ CATEGORY_NAMES[category] }}</h4>
+              <ul class="list-unstyled">
+                {% for subcategory in subcategories %}
+                <li>{{ SUBCATEGORY_NAMES[subcategory] }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+            {% endfor %} {% else %}
+            <p class="text-muted">未設定</p>
+            {% endif %}
+          </div>
+
+          <div class="mb-4">
+            <h3 class="h6">クイズ履歴</h3>
+            {% if quiz_attempts %}
+            <div class="table-responsive">
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>日時</th>
+                    <th>科目</th>
+                    <th>スコア</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for attempt in quiz_attempts %}
+                  <tr>
+                    <td>{{ attempt.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>
+                      {{ CATEGORY_NAMES[attempt.category] }} ({{
+                      SUBCATEGORY_NAMES[attempt.subcategory] }})
+                    </td>
+                    <td>{{ attempt.score }}/{{ attempt.total_questions }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+            <p class="text-muted">クイズ履歴はありません</p>
+            {% endif %}
+          </div>
+
+          <div class="d-grid gap-2">
+            <a
+              href="{{ url_for('admin_dashboard') }}"
+              class="btn btn-secondary"
+            >
+              <i class="fas fa-arrow-left"></i> 管理者ダッシュボードに戻る
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  }
+
+  .h6 {
+    color: #2c3e50;
+    font-weight: 600;
+    margin-bottom: 1rem;
+  }
+
+  .list-unstyled li {
+    padding: 0.25rem 0;
+    color: #495057;
+  }
+
+  .btn-primary {
+    background-color: #4caf50;
+    border-color: #4caf50;
+  }
+
+  .btn-primary:hover {
+    background-color: #45a049;
+    border-color: #45a049;
+  }
+
+  .btn-secondary {
+    background-color: #6c757d;
+    border-color: #6c757d;
+  }
+
+  .btn-secondary:hover {
+    background-color: #5a6268;
+    border-color: #545b62;
+  }
+
+  .btn i {
+    margin-right: 0.5rem;
+  }
+
+  .table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+  }
+</style>
+{% endblock %}
