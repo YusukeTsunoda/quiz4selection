@@ -92,8 +92,10 @@
 
     <!-- 問題別統計タブ -->
     <div class="tab-pane fade" id="questions" role="tabpanel">
-      {% if question_stats %} {% for question, stats in question_stats.items()
-      %}
+      {% if question_stats %}
+      <!-- 回答済み問題 -->
+      {% for question, stats in question_stats.items() %} {% if
+      stats.has_attempts %}
       <div class="question-stats-card mb-4">
         <div class="question-header">
           <h4 class="question-text">{{ question }}</h4>
@@ -104,7 +106,6 @@
             >
           </div>
         </div>
-
         <!-- 問題の実施履歴 -->
         <div class="question-history mt-3">
           {% for entry in history_data %} {% for q in entry.questions %} {% if
@@ -134,7 +135,23 @@
           {% endif %} {% endfor %} {% endfor %}
         </div>
       </div>
-      {% endfor %} {% else %}
+      {% endif %} {% endfor %}
+
+      <!-- 未回答問題のセクション -->
+      {% set unanswered = namespace(exists=false) %} {% for question, stats in
+      question_stats.items() %} {% if not stats.has_attempts %} {% if not
+      unanswered.exists %}
+      <h3 class="mt-5 mb-4">未回答の問題</h3>
+      {% set unanswered.exists = true %} {% endif %}
+      <div class="question-stats-card mb-4 unanswered">
+        <div class="question-header">
+          <h4 class="question-text">{{ question }}</h4>
+          <div class="stats-info">
+            <span class="status-badge">未回答</span>
+          </div>
+        </div>
+      </div>
+      {% endif %} {% endfor %} {% else %}
       <p>問題別統計データがありません。</p>
       {% endif %}
     </div>
@@ -313,6 +330,26 @@
 
   .attempt-answers p {
     margin-bottom: 0.3rem;
+  }
+
+  .unanswered {
+    background-color: #f8f9fa;
+    border-left: 4px solid #6c757d;
+    opacity: 0.8;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.25rem;
+    background-color: #6c757d;
+    color: white;
   }
 </style>
 

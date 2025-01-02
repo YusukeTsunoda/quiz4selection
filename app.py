@@ -1070,7 +1070,8 @@ def quiz_history(grade, category, subcategory, difficulty):
                 question_stats[question_text] = {
                     'total_attempts': 0,
                     'correct_attempts': 0,
-                    'percentage': 0
+                    'percentage': 0,
+                    'has_attempts': False  # 回答有無を追跡
                 }
         
             # 履歴から統計を計算
@@ -1079,6 +1080,7 @@ def quiz_history(grade, category, subcategory, difficulty):
                     question_text = question.get('question', '')
                     if question_text in question_stats:
                         question_stats[question_text]['total_attempts'] += 1
+                        question_stats[question_text]['has_attempts'] = True
                         if question.get('is_correct', False):
                             question_stats[question_text]['correct_attempts'] += 1
         
@@ -1087,6 +1089,23 @@ def quiz_history(grade, category, subcategory, difficulty):
                 if stats['total_attempts'] > 0:
                     stats['percentage'] = (stats['correct_attempts'] / stats['total_attempts']) * 100
 
+            # 回答済みと未回答の問題に分類
+            answered_questions = {q: stats for q, stats in question_stats.items() if stats['has_attempts']}
+            unanswered_questions = {q: stats for q, stats in question_stats.items() if not stats['has_attempts']}
+
+            # 回答済み問題を正答率でソート（降順）
+            sorted_answered = dict(sorted(
+                answered_questions.items(),
+                key=lambda x: (x[1]['percentage'], x[1]['total_attempts']),
+                reverse=True
+            ))
+
+            # 未回答問題をアルファベット順でソート
+            sorted_unanswered = dict(sorted(unanswered_questions.items()))
+
+            # 回答済み問題と未回答問題を結合
+            question_stats = {**sorted_answered, **sorted_unanswered}
+        
         return render_template(
             'quiz_history.html',
             history_data=history_data,

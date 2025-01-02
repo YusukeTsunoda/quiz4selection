@@ -21,7 +21,7 @@
       <div
         class="options-container"
         data-correct="{{ question_data.correct }}"
-        data-question-data="{{ question_data|tojson|safe }}"
+        data-question-data='{{ question_data|tojson|safe }}'
       >
         {% for option in options %}
         <div
@@ -144,9 +144,6 @@
     border-radius: 8px;
     font-size: 1.05em;
     line-height: 1.6;
-    background-color: #e7f1ff;
-    color: #004085;
-    border: 1px solid #b8daff;
   }
 
   .explanation.correct-message {
@@ -154,7 +151,13 @@
     color: #155724;
     border-color: #c3e6cb;
   }
+
+  .explanation.incorrect-message {
+    background-color: #f8d7da;
+    color: #721c24;
+    border-color: #f5c6cb;
+  }
 </style>
 
 <script src="{{ url_for('static', filename='js/quiz.js') }}"></script>
-{% endblock %}
+{% endblock %} 

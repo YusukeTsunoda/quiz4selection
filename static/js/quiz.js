@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Quiz.js loaded and initialized'); // 初期化確認用ログ
     const optionsContainer = document.querySelector('.options-container');
     console.log('Options container:', optionsContainer);
     if (!optionsContainer) return;
@@ -55,10 +56,12 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('Submit response:', response);
             
             if (response.success) {
+                console.log('Starting answer feedback display'); // 表示開始ログ
                 // 正解・不正解の表示
                 if (response.isCorrect) {
                     selectedOption.classList.add('correct');
                     scoreDisplay.textContent = `スコア: ${response.currentScore}問`;
+                    console.log('Showing correct answer feedback');
                 } else {
                     selectedOption.classList.add('incorrect');
                     // 正解の選択肢を取得して緑色で表示
@@ -66,19 +69,31 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (options[correctIndex]) {
                         options[correctIndex].classList.add('correct');
                     }
+                    console.log('Showing incorrect answer feedback');
                 }
-                
-                // 解説文の表示（不正解の場合は必ず表示）
+
+                // 表示時間の処理を Promise でラップ
+                const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
                 try {
-                    const questionData = JSON.parse(optionsContainer.dataset.questionData);
-                    console.log('Question data for explanation:', questionData);
+                    // データセットから問題データを取得
+                    const rawQuestionData = optionsContainer.dataset.questionData;
+                    console.log('Raw question data:', rawQuestionData);
                     
-                    // 不正解の場合、または解説がある場合に表示
-                    if (!response.isCorrect || (questionData && questionData.explanation)) {
+                    // JSONデータをパース（エラーハンドリング付き）
+                    let questionData = null;
+                    try {
+                        questionData = JSON.parse(rawQuestionData.replace(/^"/, '').replace(/"$/, ''));
+                        console.log('Parsed question data:', questionData);
+                    } catch (parseError) {
+                        console.error('JSON parse error:', parseError);
+                    }
+                    
+                    // 解説の表示（questionDataが正しくパースできた場合のみ）
+                    if (questionData && (!response.isCorrect || questionData.explanation)) {
                         const explanationDiv = document.createElement('div');
                         explanationDiv.className = 'explanation mt-3 p-3 rounded';
                         
-                        // 正解・不正解に応じて異なるスタイルとメッセージを表示
                         if (response.isCorrect) {
                             explanationDiv.classList.add('correct-message');
                             explanationDiv.innerHTML = `
@@ -93,51 +108,46 @@ document.addEventListener('DOMContentLoaded', function() {
                             `;
                         }
                         
-                        // 既存の解説があれば削除
                         const existingExplanation = document.querySelector('.explanation');
                         if (existingExplanation) {
                             existingExplanation.remove();
                         }
                         
-                        // 新しい解説を追加
                         optionsContainer.insertAdjacentElement('afterend', explanationDiv);
+                        console.log('Explanation added to DOM');
                     }
-                    
-                    // 解説を表示してから遷移処理を実行
-                    setTimeout(async () => {
-                        const quizContainer = document.querySelector('.quiz-container');
-                        if (quizContainer) {
-                            quizContainer.classList.add('fade');
-                            
-                            // 確実に遷移処理を実行
-                            setTimeout(() => {
-                                try {
-                                    if (response.isLastQuestion && response.redirectUrl) {
-                                        console.log('Quiz completed, redirecting to:', response.redirectUrl);
-                                        window.location.replace(response.redirectUrl);
-                                    } else {
-                                        console.log('Moving to next question');
-                                        window.location.replace('/next_question');
-                                    }
-                                } catch (error) {
-                                    console.error('Redirect error:', error);
-                                    // フォールバック：直接URLに遷移
-                                    if (response.isLastQuestion) {
-                                        window.location.href = '/result';
-                                    } else {
-                                        window.location.href = '/next_question';
-                                    }
-                                }
-                            }, 500);
-                        }
-                    }, 3000);
+
                 } catch (error) {
                     console.error('Error handling explanation:', error);
-                    // エラー時は即座に遷移
-                    if (response.isLastQuestion && response.redirectUrl) {
-                        window.location.replace(response.redirectUrl);
+                    console.error('Error details:', error.stack);
+                }
+
+                // 解説の表示有無に関わらず、1.5秒の表示時間を確保
+                console.log('Starting display timer (1.5s)');
+                const displayStartTime = Date.now();
+                
+                await wait(1500);
+                
+                const actualDisplayDuration = Date.now() - displayStartTime;
+                console.log(`Actual display duration: ${actualDisplayDuration}ms`);
+                
+                // フェードアウトと遷移
+                console.log('Starting transition');
+                const quizContainer = document.querySelector('.quiz-container');
+                if (quizContainer) {
+                    quizContainer.classList.add('fade');
+                    
+                    // フェードアウト完了を待機
+                    await wait(100);
+                    
+                    console.log('Fade out complete, redirecting...');
+                    
+                    if (response.isLastQuestion) {
+                        console.log('Quiz completed, redirecting to result page');
+                        window.location.href = '/result';
                     } else {
-                        window.location.replace('/next_question');
+                        console.log('Moving to next question');
+                        window.location.href = '/next_question';
                     }
                 }
             } else {
@@ -157,5 +167,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const quizContainer = document.querySelector('.quiz-container');
     if (quizContainer) {
         quizContainer.classList.add('show');
+        console.log('Quiz container shown');
     }
 });
