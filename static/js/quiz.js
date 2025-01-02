@@ -1,16 +1,20 @@
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Quiz.js loaded and initialized'); // 初期化確認用ログ
+    console.log('[Init] Quiz.js loaded and initialized');
     const optionsContainer = document.querySelector('.options-container');
-    console.log('Options container:', optionsContainer);
-    if (!optionsContainer) return;
+    console.log('[Init] Options container:', optionsContainer);
+    if (!optionsContainer) {
+        console.error('[Init] Options container not found');
+        return;
+    }
 
     const progressFill = document.querySelector('.progress-fill');
     const scoreDisplay = document.querySelector('.score-display');
     let isAnswered = false;
 
     async function submitAnswer(selectedIndex) {
-        console.log('Submitting answer:', selectedIndex);
+        console.log('[Submit] Submitting answer:', selectedIndex);
         try {
+            console.log('[Submit] Sending request to server...');
             const response = await fetch('/submit_answer', {
                 method: 'POST',
                 headers: {
@@ -20,24 +24,27 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             if (!response.ok) {
+                console.error('[Submit] Server returned error status:', response.status);
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             
             const data = await response.json();
-            console.log('Server response:', data);
+            console.log('[Submit] Server response:', data);
+            console.log('[Submit] Is last question:', data.isLastQuestion);
+            console.log('[Submit] Redirect URL:', data.redirectUrl);
             return data;
         } catch (error) {
-            console.error('Error submitting answer:', error);
+            console.error('[Submit] Error submitting answer:', error);
             return { success: false, error: error.message };
         }
     }
 
     async function handleOptionClick(event) {
         const clickedElement = event.target;
-        console.log('Clicked element:', clickedElement);
+        console.log('[Click] Clicked element:', clickedElement);
         
         if (!clickedElement.classList.contains('option') || isAnswered) {
-            console.log('Click ignored - not an option or already answered');
+            console.log('[Click] Click ignored - not an option or already answered');
             return;
         }
         
@@ -47,50 +54,51 @@ document.addEventListener('DOMContentLoaded', function() {
         
         try {
             const selectedIndex = parseInt(selectedOption.dataset.index);
-            console.log('Selected index:', selectedIndex);
+            console.log('[Click] Selected index:', selectedIndex);
             
             options.forEach(option => option.classList.remove('selected'));
             selectedOption.classList.add('selected');
             
             const response = await submitAnswer(selectedIndex);
-            console.log('Submit response:', response);
+            console.log('[Response] Full response object:', response);
             
             if (response.success) {
-                console.log('Starting answer feedback display'); // 表示開始ログ
-                // 正解・不正解の表示
+                console.log('[Feedback] Starting answer feedback display');
                 if (response.isCorrect) {
                     selectedOption.classList.add('correct');
                     scoreDisplay.textContent = `スコア: ${response.currentScore}問`;
-                    console.log('Showing correct answer feedback');
+                    console.log('[Feedback] Showing correct answer');
                 } else {
                     selectedOption.classList.add('incorrect');
-                    // 正解の選択肢を取得して緑色で表示
                     const correctIndex = optionsContainer.dataset.correct;
                     if (options[correctIndex]) {
                         options[correctIndex].classList.add('correct');
                     }
-                    console.log('Showing incorrect answer feedback');
+                    console.log('[Feedback] Showing incorrect answer');
                 }
 
-                // 表示時間の処理を Promise でラップ
-                const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+                const wait = (ms) => new Promise(resolve => {
+                    console.log(`[Timer] Starting ${ms}ms wait`);
+                    setTimeout(() => {
+                        console.log(`[Timer] ${ms}ms wait completed`);
+                        resolve();
+                    }, ms);
+                });
 
                 try {
-                    // データセットから問題データを取得
                     const rawQuestionData = optionsContainer.dataset.questionData;
-                    console.log('Raw question data:', rawQuestionData);
+                    console.log('[Data] Raw question data:', rawQuestionData);
                     
-                    // JSONデータをパース（エラーハンドリング付き）
                     let questionData = null;
                     try {
-                        questionData = JSON.parse(rawQuestionData.replace(/^"/, '').replace(/"$/, ''));
-                        console.log('Parsed question data:', questionData);
+                        questionData = JSON.parse(rawQuestionData);
+                        console.log('[Data] Parsed question data:', questionData);
                     } catch (parseError) {
-                        console.error('JSON parse error:', parseError);
+                        console.error('[Data] JSON parse error:', parseError);
                     }
                     
-                    // 解説の表示（questionDataが正しくパースできた場合のみ）
                     if (questionData && (!response.isCorrect || questionData.explanation)) {
+                        console.log('[Explanation] Adding explanation to DOM');
                         const explanationDiv = document.createElement('div');
                         explanationDiv.className = 'explanation mt-3 p-3 rounded';
                         
@@ -114,59 +122,61 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         
                         optionsContainer.insertAdjacentElement('afterend', explanationDiv);
-                        console.log('Explanation added to DOM');
+                        console.log('[Explanation] Explanation added successfully');
                     }
 
                 } catch (error) {
-                    console.error('Error handling explanation:', error);
-                    console.error('Error details:', error.stack);
+                    console.error('[Error] Error handling explanation:', error);
+                    console.error('[Error] Stack trace:', error.stack);
                 }
 
-                // 解説の表示有無に関わらず、1.5秒の表示時間を確保
-                console.log('Starting display timer (1.5s)');
+                console.log('[Timer] Starting 1.5s display timer');
                 const displayStartTime = Date.now();
                 
-                await wait(1500);
+                try {
+                    await wait(1500);
+                    const actualDisplayDuration = Date.now() - displayStartTime;
+                    console.log(`[Timer] Actual display duration: ${actualDisplayDuration}ms`);
+                } catch (error) {
+                    console.error('[Timer] Error in wait:', error);
+                }
                 
-                const actualDisplayDuration = Date.now() - displayStartTime;
-                console.log(`Actual display duration: ${actualDisplayDuration}ms`);
-                
-                // フェードアウトと遷移
-                console.log('Starting transition');
+                console.log('[Transition] Starting transition');
                 const quizContainer = document.querySelector('.quiz-container');
                 if (quizContainer) {
                     quizContainer.classList.add('fade');
                     
-                    // フェードアウト完了を待機
-                    await wait(100);
-                    
-                    console.log('Fade out complete, redirecting...');
-                    
-                    if (response.isLastQuestion) {
-                        console.log('Quiz completed, redirecting to result page');
-                        window.location.href = '/result';
-                    } else {
-                        console.log('Moving to next question');
-                        window.location.href = '/next_question';
+                    try {
+                        await wait(500);
+                        console.log('[Transition] Fade out complete');
+                        
+                        if (response.isLastQuestion) {
+                            console.log('[Navigation] Redirecting to result page');
+                            window.location.href = '/result';
+                        } else {
+                            console.log('[Navigation] Moving to next question');
+                            window.location.href = '/next_question';
+                        }
+                    } catch (error) {
+                        console.error('[Transition] Error during transition:', error);
                     }
                 }
             } else {
-                console.error('Server returned error:', response.error);
+                console.error('[Error] Server returned error:', response.error);
                 isAnswered = false;
             }
         } catch (error) {
-            console.error('Error in click handler:', error);
-            console.error('Error details:', error.stack);
+            console.error('[Error] Error in click handler:', error);
+            console.error('[Error] Stack trace:', error.stack);
             isAnswered = false;
         }
     }
 
     optionsContainer.addEventListener('click', handleOptionClick);
     
-    // 初期表示時のフェードイン
     const quizContainer = document.querySelector('.quiz-container');
     if (quizContainer) {
         quizContainer.classList.add('show');
-        console.log('Quiz container shown');
+        console.log('[Init] Quiz container shown');
     }
 });
