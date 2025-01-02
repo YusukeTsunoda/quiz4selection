@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     quizContainer.classList.add('fade');
                     
                     try {
-                        await wait(200);
+                        await wait(100);
                         console.log('[Transition] Fade out complete');
                         
                         if (response.isLastQuestion) {
