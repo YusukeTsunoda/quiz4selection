@@ -103,36 +103,41 @@ document.addEventListener('DOMContentLoaded', function() {
                         optionsContainer.insertAdjacentElement('afterend', explanationDiv);
                     }
                     
-                    // 解説を表示してから3秒待機
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                    
-                    // フェードアウトして遷移
-                    const quizContainer = document.querySelector('.quiz-container');
-                    if (quizContainer) {
-                        quizContainer.classList.add('fade');
-                        
-                        // 遷移処理を関数化
-                        const handleRedirect = () => {
-                            if (response.isLastQuestion && response.redirectUrl) {
-                                console.log('Redirecting to result page:', response.redirectUrl);
-                                window.location.href = response.redirectUrl;
-                            } else {
-                                console.log('Moving to next question');
-                                window.location.href = '/next_question';
-                            }
-                        };
-
-                        // フェードアウト完了後に遷移
-                        setTimeout(handleRedirect, 500);
-                    }
+                    // 解説を表示してから遷移処理を実行
+                    setTimeout(async () => {
+                        const quizContainer = document.querySelector('.quiz-container');
+                        if (quizContainer) {
+                            quizContainer.classList.add('fade');
+                            
+                            // 確実に遷移処理を実行
+                            setTimeout(() => {
+                                try {
+                                    if (response.isLastQuestion && response.redirectUrl) {
+                                        console.log('Quiz completed, redirecting to:', response.redirectUrl);
+                                        window.location.replace(response.redirectUrl);
+                                    } else {
+                                        console.log('Moving to next question');
+                                        window.location.replace('/next_question');
+                                    }
+                                } catch (error) {
+                                    console.error('Redirect error:', error);
+                                    // フォールバック：直接URLに遷移
+                                    if (response.isLastQuestion) {
+                                        window.location.href = '/result';
+                                    } else {
+                                        window.location.href = '/next_question';
+                                    }
+                                }
+                            }, 500);
+                        }
+                    }, 3000);
                 } catch (error) {
                     console.error('Error handling explanation:', error);
-                    // エラー時は短い待機時間で遷移
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    // エラー時は即座に遷移
                     if (response.isLastQuestion && response.redirectUrl) {
-                        window.location.href = response.redirectUrl;
+                        window.location.replace(response.redirectUrl);
                     } else {
-                        window.location.href = '/next_question';
+                        window.location.replace('/next_question');
                     }
                 }
             } else {
