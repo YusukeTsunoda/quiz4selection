@@ -110,14 +110,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     const quizContainer = document.querySelector('.quiz-container');
                     if (quizContainer) {
                         quizContainer.classList.add('fade');
-                        await new Promise(resolve => setTimeout(resolve, 200));
                         
-                        // 次の問題または結果ページへ遷移
-                        if (response.isLastQuestion && response.redirectUrl) {
-                            window.location.href = response.redirectUrl;
-                        } else {
-                            window.location.href = '/next_question';
-                        }
+                        // 遷移処理を関数化
+                        const handleRedirect = () => {
+                            if (response.isLastQuestion && response.redirectUrl) {
+                                console.log('Redirecting to result page:', response.redirectUrl);
+                                window.location.href = response.redirectUrl;
+                            } else {
+                                console.log('Moving to next question');
+                                window.location.href = '/next_question';
+                            }
+                        };
+
+                        // フェードアウト完了後に遷移
+                        setTimeout(handleRedirect, 500);
                     }
                 } catch (error) {
                     console.error('Error handling explanation:', error);
