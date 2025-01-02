@@ -115,110 +115,137 @@ CATEGORY_NAMES = {
 # サブカテゴリーの日本語名
 SUBCATEGORY_NAMES = {
     'japanese': {
-        'hiragana': 'ひらがな・カタカナの読み書き',
-        'kanji': '漢字の読み書き（配当漢字約200字）',
-        'story': '物語文の読解（あらすじ、登場人物）',
-        'explanation': '説明文の読解（段落、要点）',
+        'hiragana': 'ひらがな・カタカナの読み書き（清音、濁音、半濁音、長音、促音、拗音）',
+        'kanji': '漢字の読み書き',
+        'story': '物語文の読解',
+        'explanation': '説明文の読解',
         'speech': 'スピーチの仕方',
-        'composition': '作文の書き方',
-        'grammar': '主語と述語の関係',
+        'composition': '作文',
+        'letter': '手紙の書き方',
+        'diary': '日記の書き方',
         'reading': '音読と朗読',
-        'vocabulary': '熟語の意味と使い方',
-        'literature': '文学的な文章',
-        'summary': '要約',
-        'discussion': '話し合い',
+        'compound': '熟語の意味と使い方',
+        'grammar': '主語と述語の関係',
+        'summary': '文章の要旨をとらえる',
+        'idioms': '慣用句・ことわざの理解と使用',
+        'literature': '文学的な文章の読解',
+        'comparison': '複数の資料を比較して読む',
+        'discussion': '討論や話し合いの進め方',
         'language': '日本語の特質',
-        'reading_comprehension': '読解力',
-        'character_understanding': '文字の理解',
-        'paragraph_structure': '段落構成',
-        'letter_writing': '手紙の書き方',
-        'essay_writing': '作文',
-        'idioms': '慣用句・ことわざ',
-        'expression': '表現の工夫',
-        'comparison': '複数資料の関連付け'
+        'expression': '表現の工夫'
     },
     'math': {
-        'numbers': '数と計算（1から100まで）',
-        'addition': 'たし算（2桁や3桁）',
-        'subtraction': 'ひき算（2桁や3桁）',
-        'shapes': '図形（三角形、四角形、直角、対称な形）',
-        'measurement': '長さ・かさの単位と測定（cm、m、L、dL、mL）',
-        'time': '時刻と時間の計算',
+        'numbers': '数と計算（1から100までの数の理解）',
+        'addition': 'たし算',
+        'subtraction': 'ひき算',
+        'multiplication': 'かけ算',
+        'division': 'わり算',
+        'mult_2digit': '2桁×1桁の計算',
+        'div_remainder': 'あまりのあるわり算',
+        'shapes': '図形',
+        'measurement': '長さ・かさの単位と測定',
+        'time': '時刻と時間',
         'counting': 'ものの個数の数え方や分類',
-        'multiplication': 'かけ算九九の完成',
-        'division': 'わり算の導入と計算',
-        'fractions': '分数',
-        'decimals': '小数',
-        'area': '面積',
-        'volume': '体積',
-        'statistics': '表とグラフ（棒グラフ）',
-        'proportion': '比例',
         'large_numbers': '大きな数',
         'rounding': '概数と四捨五入',
+        'decimals': '小数',
+        'fractions': '分数',
         'angles': '角度',
+        'area': '面積',
+        'volume': '体積',
         'parallel_lines': '垂直と平行',
         'patterns': '変わり方調べ',
         'line_graphs': '折れ線グラフ',
+        'integers': '整数の性質',
+        'mult_div': '分数のかけ算・わり算',
+        'congruence': '合同な図形',
+        'percentage': '百分率とグラフ',
+        'proportion': '比例',
         'circle_area': '円の面積',
         'scale': '縮図と拡大図',
         'ratio': '比とその利用',
         'data': 'データの調べ方',
         'probability': '場合の数と確率',
-        'algebra': '文字を使った式'
+        'algebra': '文字を使った式',
+        'abacus': 'そろばん'
     },
     'science': {
-        'living_things': '昆虫と植物の観察',
+        'insects': '昆虫と植物の観察',
         'plants': '植物の育ち方',
-        'weather': '天気の様子',
-        'materials': '物の重さと体積',
-        'magnets': '磁石の性質',
-        'electricity': '電気の働き',
-        'sound': '音の性質',
         'light': '光の性質',
-        'force': '力の働き',
-        'earth': '地球と天体',
-        'human_body': '人の体',
-        'moon_stars': '月と星',
-        'properties': '物の性質',
-        'metals': '金属の性質',
+        'sound': '音の性質',
+        'magnets': '磁石の性質',
+        'electricity': '電気のはたらき',
+        'force': '風やゴムの働き',
+        'materials': '物の重さと体積',
+        'sun': '太陽と地面の様子',
         'seasonal_changes': '季節と生き物',
+        'weather': '天気の様子',
+        'moon_stars': '月と星',
+        'human_body': '人の体のつくりと運動',
+        'volume_temp': '物の体積と温度',
+        'water_states': '水のすがた',
+        'flowers': '花のつくりと実',
+        'animals': '動物の誕生',
+        'fish': '魚のたんじょう',
+        'typhoon': '台風と気象情報',
+        'water_flow': '流れる水の働き',
+        'electromagnet': '電磁石の性質',
+        'pendulum': '振り子の運動',
         'ecosystem': '生物のつながり',
         'combustion': '燃焼の仕組み',
         'solution': '水溶液の性質',
         'lever': 'てこの規則性',
-        'pendulum': '振り子の運動',
-        'electromagnet': '電磁石の性質',
-        'water_flow': '流れる水の働き'
+        'earth': '大地のつくりと変化'
     },
     'society': {
         'community': '身近な地域の様子',
-        'industry': '商店街と大型店',
-        'history': '歴史',
-        'geography': '地図の読み方の基礎',
-        'government': '政治',
-        'economy': '経済',
+        'map': '地図の読み方の基礎',
+        'city': '市の様子と特徴',
+        'public_service': '消防署や警察署の働き',
+        'supermarket': 'スーパーマーケットの仕組み',
+        'shopping': '商店街と大型店',
+        'industry': '農家や工場の仕事',
         'culture': '昔の道具と暮らし',
-        'international': '国際理解',
-        'prefectures': '都道府県',
-        'map_symbols': '地図記号',
-        'local_geography': '地域の地理',
+        'prefectures': '都道府県と地方区分',
+        'map_symbols': '地図記号の読み方',
+        'local_geography': '自分たちの県の地理と産業',
         'water_resources': '水源と水道',
-        'environment': '環境保護',
-        'disaster_prevention': '災害対策',
-        'traditional_culture': '伝統文化',
-        'regional_industry': '地域の産業',
-        'constitution': '日本国憲法',
-        'local': '地方自治',
-        'un': '国際連合'
+        'environment': 'ごみ処理と環境保護',
+        'disaster_prevention': '災害から人々を守る工夫',
+        'traditional_culture': '伝統文化と地域の発展',
+        'regional_industry': '特色ある地域の産業',
+        'geography': '国土の位置と地形の特色',
+        'agriculture': '気候と農業や水産業との関係',
+        'information': '情報産業とわたしたちの生活',
+        'transportation': '運輸・通信と貿易',
+        'disaster': '国土の自然災害の防止',
+        'fishery': '我が国の農業や水産業',
+        'manufacturing': '我が国の工業生産',
+        'history_ancient': '歴史：縄文～古墳時代',
+        'history_asuka': '歴史：飛鳥～奈良時代',
+        'history_heian': '歴史：平安時代',
+        'history_kamakura': '歴史：鎌倉時代',
+        'history_muromachi': '歴史：室町時代',
+        'history_azuchi': '歴史：安土桃山時代',
+        'history_edo': '歴史：江戸時代',
+        'history_meiji': '歴史：明治時代',
+        'history_taisho': '歴史：大正時代',
+        'history_modern': '歴史：昭和・平成時代',
+        'constitution': '政治：日本国憲法',
+        'government': '政治：国会・内閣・裁判所',
+        'local': '政治：地方自治',
+        'un': '政治：国際連合の働き',
+        'international': '政治：世界の中の日本'
     },
     'life': {
-        'school': '学校生活（施設・規則・友達）',
-        'family': '家族や地域との関わり',
-        'seasons': '季節と生活の関わり',
-        'nature': '動植物の飼育・栽培',
-        'safety': '安全な生活（交通・生活習慣）',
-        'growth': '自分の成長（できるようになったこと）',
-        'community': '町探検（地域の様子や働く人々）'
+        'school': '学校生活に慣れる（学校の施設や規則、友達との関わり）',
+        'family': '家族や地域との関わり（自分の家族、通学路、公共施設）',
+        'seasons': '季節と生活',
+        'nature': '自然との触れ合い',
+        'safety': '安全な生活',
+        'growth': '自分の成長',
+        'community': '地域との関わり'
     }
 }
 
@@ -226,257 +253,235 @@ SUBCATEGORY_NAMES = {
 GRADE_CATEGORIES = {
     1: {
         'japanese': [
-            'hiragana',
-            'kanji',
-            'story',
-            'explanation',
-            'speech',
-            'composition'
+            'hiragana',    # ひらがな・カタカナの読み書き（清音、濁音、半濁音、長音、促音、拗音）
+            'kanji',       # 漢字の読み書き（80字程度の基本的な漢字）
+            'story',       # 物語文の読解（場面の様子や登場人物の気持ちを考える）
+            'explanation', # 簡単な説明文の読解（文章の順序を理解する）
+            'speech',      # スピーチや挨拶の仕方
+            'composition'  # 簡単な作文（経験したことを書く）
         ],
         'math': [
-            'numbers',
-            'addition',
-            'subtraction',
-            'shapes',
-            'measurement',
-            'time',
-            'counting'
+            'numbers',     # 数と計算（1から100までの数の理解）
+            'addition',    # たし算（1桁同士の計算）
+            'subtraction', # ひき算（1桁同士の計算）
+            'shapes',      # 図形（身の回りにある形、まる・さんかく・しかく）
+            'measurement', # 大きさくらべ（長さ、かさの比較）
+            'time',        # 時計の読み方（時刻の理解）
+            'counting'     # ものの個数の数え方や分類の仕方
         ],
         'life': [
-            'school',
-            'family',
-            'seasons',
-            'nature',
-            'safety',
-            'growth'
+            'school',      # 学校生活に慣れる（学校の施設や規則、友達との関わり）
+            'family',      # 家族や地域との関わり（自分の家族、通学路、公共施設）
+            'seasons',     # 季節と生活
+            'nature',      # 自然との触れ合い
+            'safety',      # 安全な生活
+            'growth'       # 自分の成長
         ]
     },
     2: {
         'japanese': [
-            'story',
-            'explanation',
-            'kanji',
-            'composition',
-            'speech'
+            'story',       # 物語文の読解（場面の様子、登場人物の行動）
+            'explanation', # 説明文の読解（主な内容、つながり）
+            'kanji',       # 漢字の読み書き（160字程度）
+            'composition', # 作文（順序を考えて書く）
+            'letter',      # 手紙の書き方
+            'diary',       # 日記の書き方
+            'speech'       # スピーチの仕方
         ],
         'math': [
-            'addition',
-            'subtraction',
-            'multiplication',
-            'measurement',
-            'time',
-            'shapes'
+            'addition',       # たし算（2桁、3桁の計算）
+            'subtraction',    # ひき算（2桁、3桁の計算）
+            'multiplication', # かけ算（九九の導入）
+            'measurement',    # 長さ・かさの単位（cm、m、L、dL、mL）
+            'time',          # 時間の計算
+            'shapes'         # 図形（三角形、四角形、箱の形）
         ],
         'life': [
-            'seasons',
-            'community',
-            'nature',
-            'growth'
+            'seasons',     # 季節と生活の変化
+            'community',   # 地域との関わり
+            'nature',      # 動植物の観察
+            'growth'       # 成長の記録
         ]
     },
     3: {
         'japanese': [
-            'kanji',
-            'story',
-            'explanation',
-            'speech',
-            'reading',
-            'composition',
-            'vocabulary',
-            'grammar'
+            'kanji',       # 漢字の読み書き（配当漢字約200字）
+            'story',       # 物語文の読解（あらすじ、登場人物）
+            'explanation', # 説明文の読解（段落、要点）
+            'speech',      # スピーチの仕方
+            'reading',     # 音読と朗読
+            'composition', # 作文の書き方
+            'compound',    # 熟語の意味と使い方
+            'grammar'      # 主語と述語の関係
         ],
         'math': [
-            'multiplication',
-            'division',
-            'time',
-            'measurement',
-            'shapes',
-            'statistics'
+            'multiplication', # かけ算九九の完成
+            'division',      # わり算の導入と計算
+            'mult_2digit',   # 2桁×1桁の計算
+            'div_remainder', # あまりのあるわり算
+            'time',          # 時間の計算
+            'measurement',   # 長さ・重さの単位
+            'shapes',        # 円と球
+            'statistics',    # 表とグラフ（棒グラフ）
+            'abacus'        # そろばん
         ],
         'science': [
-            'living_things',
-            'plants',
-            'light',
-            'sound',
-            'magnets',
-            'force',
-            'materials'
+            'insects',     # 昆虫と植物の観察
+            'plants',      # 植物の育ち方
+            'light',       # 光の性質
+            'sound',       # 音の性質
+            'magnets',     # 磁石の性質
+            'sun',         # 太陽と地面の様子
+            'force',       # 風やゴムの働き
+            'materials'    # 物の重さと体積
         ],
         'society': [
-            'community',
-            'geography',
-            'industry',
-            'culture'
+            'community',     # 身近な地域の様子
+            'map',          # 地図の読み方の基礎
+            'city',         # 市の様子と特徴
+            'public_service', # 消防署や警察署の働き
+            'supermarket',   # スーパーマーケットの仕組み
+            'shopping',      # 商店街と大型店
+            'industry',      # 農家や工場の仕事
+            'culture'        # 昔の道具と暮らし
         ]
     },
     4: {
         'japanese': [
-            'kanji',
-            'reading_comprehension',
-            'character_understanding',
-            'paragraph_structure',
-            'idioms',
-            'letter_writing',
-            'essay_writing'
+            'kanji',       # 漢字の読み書き（配当漢字約200字）
+            'summary',     # 文章の要旨をとらえる
+            'story',       # 物語文の登場人物の心情理解
+            'explanation', # 説明文の段落構成と中心文
+            'idioms',      # 慣用句・ことわざの理解と使用
+            'letter',      # 手紙の書き方
+            'composition'  # 作文・感想文の書き方
         ],
         'math': [
-            'large_numbers',
-            'rounding',
-            'decimals',
-            'fractions',
-            'angles',
-            'area',
-            'parallel_lines',
-            'patterns',
-            'line_graphs'
+            'large_numbers',  # 大きな数（1億までの数）
+            'rounding',      # 概数と四捨五入
+            'decimals',      # 小数（小数第3位まで）
+            'fractions',     # 分数（真分数・仮分数・帯分数）
+            'angles',        # 角度の測定と作図
+            'area',          # 面積（正方形・長方形）
+            'parallel_lines', # 垂直と平行
+            'patterns',      # 変わり方調べ（数量関係）
+            'line_graphs'    # 折れ線グラフ
         ],
         'science': [
-            'weather',
-            'moon_stars',
-            'electricity',
-            'properties',
-            'metals',
-            'living_things',
-            'seasonal_changes'
+            'seasonal_changes', # 季節と生き物（春夏秋冬の生き物の活動、1年を通した変化）
+            'weather',         # 天気の様子（1日の気温変化、天気の変化と気温、水の蒸発と結露、雲と雨の関係）
+            'electricity',     # 電気のはたらき（回路、光・音・熱・動き、乾電池の直列・並列）
+            'moon_stars',      # 月と星（月の満ち欠け、星の明るさや色、星座の観察）
+            'human_body',      # 人の体のつくりと運動（骨と筋肉、呼吸、血液循環）
+            'volume_temp',     # 物の体積と温度（温度による体積変化、水の三態変化）
+            'water_states',    # 水のすがた（固体・液体・気体、水の循環）
+            'materials'        # 物の重さと体積（物の形と重さ、空気の重さ、水に溶けた物）
         ],
         'society': [
-            'prefectures',
-            'map_symbols',
-            'local_geography',
-            'water_resources',
-            'environment',
-            'disaster_prevention',
-            'traditional_culture',
-            'regional_industry'
+            'prefectures',        # 都道府県と地方区分
+            'map_symbols',        # 地図記号の読み方
+            'local_geography',    # 自分たちの県の地理と産業
+            'water_resources',    # 水源と水道
+            'environment',        # ごみ処理と環境保護
+            'disaster_prevention', # 災害から人々を守る工夫
+            'traditional_culture', # 伝統文化と地域の発展
+            'regional_industry'    # 特色ある地域の産業
         ]
     },
     5: {
         'japanese': [
-            'kanji',
-            'reading',
-            'grammar',
-            'writing',
-            'vocabulary',
-            'composition',
-            'discussion',
-            'comparison',
-            'explanation',
-            'summary',
-            'literature',
-            'language',
-            'idioms',
-            'hyakuninishu'
+            'kanji',       # 漢字の読み書き（配当漢字約185字）
+            'literature',  # 文学的な文章の読解（登場人物の心情、情景描写）
+            'explanation', # 説明文の論理的な構成の理解
+            'summary',     # 要約文の作成
+            'comparison',  # 複数の資料を比較して読む
+            'language',    # 和語・漢語・外来語の使い分け
+            'composition', # 文章の構成を考えた作文
+            'discussion'   # 討論や話し合いの進め方
         ],
         'math': [
-            'integers',
-            'decimals',
-            'fractions',
-            'area',
-            'volume',
-            'congruence',
-            'percentage',
-            'proportion',
-            'geometry',
-            'graph',
-            'measurement',
-            'calculation',
-            'figure'
+            'integers',     # 整数の性質（約数・倍数）
+            'fractions',    # 分数のたし算・ひき算
+            'mult_div',     # 分数のかけ算・わり算
+            'decimals',     # 小数のかけ算・わり算
+            'congruence',   # 合同な図形
+            'area',         # 図形の面積（三角形、平行四辺形）
+            'volume',       # 体積（立方体、直方体）
+            'percentage',   # 百分率とグラフ
+            'proportion'    # 比例の考え方
         ],
         'science': [
-            'pendulum',
-            'electromagnet',
-            'weather',
-            'water',
-            'animals',
-            'fish',
-            'flowers',
-            'plants',
-            'earth_science',
-            'biology',
-            'chemistry',
-            'physics'
+            'plants',         # 植物の発芽と成長
+            'flowers',        # 花のつくりと実
+            'animals',        # 動物の誕生
+            'fish',          # 魚のたんじょう
+            'weather',        # 雲と天気の変化
+            'typhoon',       # 台風と気象情報
+            'water_flow',     # 流れる水の働き
+            'electromagnet',  # 電磁石の性質
+            'pendulum'       # 振り子の運動
         ],
         'society': [
-            'agriculture',
-            'manufacturing',
-            'disaster',
-            'environment',
-            'transportation',
-            'climate',
-            'industry',
-            'information',
-            'current_events',
-            'prefectures',
-            'civics',
-            'history',
-            'geography'
+            'geography',      # 国土の位置と地形の特色
+            'agriculture',    # 気候と農業や水産業との関係
+            'industry',      # 工業生産と工業地域
+            'information',   # 情報産業とわたしたちの生活
+            'transportation', # 運輸・通信と貿易
+            'environment',   # わたしたちの生活と環境
+            'disaster',      # 国土の自然災害の防止
+            'fishery',       # 我が国の農業や水産業
+            'manufacturing'  # 我が国の工業生産
         ]
     },
     6: {
         'japanese': [
-            'kanji',
-            'reading',
-            'grammar',
-            'writing',
-            'composition',
-            'discussion',
-            'expression',
-            'language',
-            'comparison',
-            'explanation',
-            'literature',
-            'hyakuninishu'
+            'kanji',       # 漢字の読み書き（配当漢字約190字）
+            'literature',  # 文学的な文章の批評的な読み方
+            'explanation', # 説明文や論説文の論理的な構造理解
+            'comparison',  # 複数の資料を関連付けて読む
+            'expression',  # 表現の工夫（比喩、反復など）
+            'composition', # 文章の構成を工夫した作文
+            'discussion', # 話し合いの効果的な進め方
+            'language'    # 日本語の特質（語感、敬語）
         ],
         'math': [
-            'fractions',
-            'volume',
-            'circle_area',
-            'scale',
-            'ratio',
-            'proportion',
-            'algebra',
-            'data',
-            'probability',
-            'graph',
-            'measurement',
-            'calculation',
-            'figure'
+            'fractions',     # 分数の計算（加減乗除）
+            'algebra',       # 文字を使った式
+            'circle_area',   # 円の面積
+            'volume',        # 角柱と円柱の体積
+            'scale',         # 縮図と拡大図
+            'ratio',         # 比とその利用
+            'proportion',    # 比例と反比例
+            'data',          # データの調べ方（平均値、中央値など）
+            'probability'    # 場合の数と確率
         ],
         'science': [
-            'earth',
-            'electricity',
-            'lever',
-            'moon',
-            'combustion',
-            'ecosystem',
-            'human_body',
-            'solution',
-            'plants',
-            'earth_science',
-            'biology',
-            'chemistry',
-            'physics'
+            'plants',        # 植物の養分と水の通り道
+            'ecosystem',     # 生物のつながり（食物連鎖）
+            'human_body',    # 人の体のつくりと働き
+            'combustion',    # 燃焼の仕組み
+            'solution',      # 水溶液の性質
+            'lever',         # てこの規則性
+            'electricity',   # 電気の利用
+            'earth',         # 大地のつくりと変化
+            'moon_stars'     # 月と太陽（月の満ち欠け）
         ],
         'society': [
-            'constitution',
-            'local',
-            'un',
-            'government',
-            'modern',
-            'taisho',
-            'meiji',
-            'edo',
-            'kamakura',
-            'muromachi',
-            'azuchi',
-            'asuka',
-            'heian',
-            'jomon',
-            'prefectures',
-            'civics',
-            'current_events',
-            'geography',
-            'history'
+            'history_ancient',     # 歴史：縄文～古墳時代
+            'history_asuka',       # 歴史：飛鳥～奈良時代
+            'history_heian',       # 歴史：平安時代
+            'history_kamakura',    # 歴史：鎌倉時代
+            'history_muromachi',   # 歴史：室町時代
+            'history_azuchi',      # 歴史：安土桃山時代
+            'history_edo',         # 歴史：江戸時代
+            'history_meiji',       # 歴史：明治時代
+            'history_taisho',      # 歴史：大正時代
+            'history_modern',      # 歴史：昭和・平成時代
+            'constitution',        # 政治：日本国憲法
+            'government',          # 政治：国会・内閣・裁判所
+            'local',              # 政治：地方自治
+            'un',                 # 政治：国際連合の働き
+            'international'       # 政治：世界の中の日本
         ]
     }
 }
