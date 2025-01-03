@@ -831,11 +831,10 @@ def submit_answer():
             except Exception as db_error:
                 logger.error(f"[Debug] Error saving quiz attempt: {db_error}")
                 db.session.rollback()
-                # データベース保存エラーでもクイズ自体は完了させる
 
         # 現在の問題番号を更新（次の問題用）
-        next_question = current_question + 1 if not is_last_question else current_question
-        session['current_question'] = next_question
+        next_question_index = current_question + 1 if not is_last_question else current_question
+        session['current_question'] = next_question_index
 
         # 現在の問題番号（1-based）を計算
         display_question = current_question + 1
@@ -846,7 +845,7 @@ def submit_answer():
             'currentScore': current_score,
             'totalQuestions': len(questions),
             'currentQuestion': display_question,  # 現在の問題番号（1-based）
-            'nextQuestion': next_question + 1,    # 次の問題番号（1-based）
+            'nextQuestion': next_question_index + 1,    # 次の問題番号（1-based）
             'isLastQuestion': is_last_question,
             'redirectUrl': url_for('result') if is_last_question else None,
             'questionData': {
@@ -856,6 +855,17 @@ def submit_answer():
                 'explanation': current_q.get('explanation', '')
             }
         }
+
+        # 次の問題のデータを追加（最後の問題でない場合）
+        if not is_last_question:
+            next_q = questions[next_question_index]
+            response_data['nextQuestionData'] = {
+                'question': next_q.get('question', ''),
+                'options': next_q.get('options', []),
+                'correct': next_q.get('correct'),
+                'explanation': next_q.get('explanation', '')
+            }
+        
         logger.info(f"[Debug] Sending response: {response_data}")
                 
         return jsonify(response_data)

@@ -118,18 +118,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (responseData.isLastQuestion) {
                     console.log('[Debug] Last question completed');
                     setTimeout(() => {
-                        window.location.href = '/result';
+                        window.location.href = responseData.redirectUrl;
                     }, 2000);
                 } else {
-                    setTimeout(() => {
-                        const quizContainer = document.querySelector('.quiz-container');
-                        if (quizContainer) {
-                            quizContainer.classList.add('fade');
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 500);
-                        }
-                    }, 2000);
+                    // 次の問題データが含まれている場合、直接更新
+                    if (responseData.nextQuestionData) {
+                        setTimeout(() => {
+                            updateQuestionDisplay(responseData.nextQuestionData);
+                        }, 1500);
+                    } else {
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    }
                 }
 
             } catch (error) {
@@ -189,5 +190,108 @@ function updateProgress(currentQuestion, totalQuestions) {
     const optionsContainer = document.querySelector('.options-container');
     if (optionsContainer) {
         optionsContainer.dataset.currentQuestion = currentQuestion;
+    }
+}
+
+// 問題表示を更新する関数
+function updateQuestionDisplay(questionData) {
+    console.log('[Debug] Updating question display:', questionData);
+
+    // 問題文の更新
+    const questionText = document.querySelector('.question-text');
+    if (questionText) {
+        questionText.textContent = questionData.question;
+    }
+
+    // 選択肢の更新
+    const optionsContainer = document.querySelector('.options-container');
+    if (optionsContainer) {
+        // 既存の選択肢をクリア
+        optionsContainer.innerHTML = '';
+        
+        // データ属性を更新
+        optionsContainer.dataset.correct = questionData.correct;
+
+        // 新しい選択肢を追加
+        questionData.options.forEach((optionText, index) => {
+            const option = document.createElement('button');
+            option.className = 'option';
+            option.textContent = optionText;
+            
+            // クリックイベントの設定
+            option.addEventListener('click', async function() {
+                if (option.classList.contains('selected') || option.classList.contains('disabled')) {
+                    return;
+                }
+
+                // 他のオプションを無効化
+                const allOptions = optionsContainer.querySelectorAll('.option');
+                allOptions.forEach(opt => opt.classList.add('disabled'));
+
+                // 選択したオプションをマーク
+                option.classList.add('selected');
+
+                try {
+                    const response = await fetch('/submit_answer', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            selected: index
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const responseData = await response.json();
+                    if (!responseData.success) {
+                        console.error('[Debug] Server error:', responseData.error);
+                        return;
+                    }
+
+                    // 正解・不正解の表示
+                    if (responseData.isCorrect) {
+                        option.classList.add('correct');
+                        showExplanation(true, responseData.questionData.explanation);
+                    } else {
+                        option.classList.add('incorrect');
+                        const correctOption = allOptions[questionData.correct];
+                        if (correctOption) {
+                            correctOption.classList.add('correct');
+                        }
+                        showExplanation(false, responseData.questionData.explanation);
+                    }
+
+                    // スコアと進捗状況の更新
+                    updateScore(responseData.currentScore, responseData.totalQuestions);
+                    updateProgress(responseData.currentQuestion, responseData.totalQuestions);
+
+                    // 最後の問題の場合
+                    if (responseData.isLastQuestion) {
+                        setTimeout(() => {
+                            window.location.href = responseData.redirectUrl;
+                        }, 2000);
+                    } else if (responseData.nextQuestionData) {
+                        setTimeout(() => {
+                            updateQuestionDisplay(responseData.nextQuestionData);
+                        }, 1500);
+                    }
+
+                } catch (error) {
+                    console.error('[Debug] Error submitting answer:', error);
+                }
+            });
+
+            optionsContainer.appendChild(option);
+        });
+    }
+
+    // 問題データ要素の更新
+    const questionDataElement = document.getElementById('question-data');
+    if (questionDataElement) {
+        questionDataElement.textContent = JSON.stringify(questionData);
     }
 }
