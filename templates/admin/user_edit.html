@@ -51,8 +51,8 @@
                 >
                   <div class="accordion-body">
                     <div class="row">
-                      {% for category, category_name in CATEGORY_NAMES.items()
-                      %}
+                      {% for subject, subject_data in
+                      subjects_by_grade[grade].items() %}
                       <div class="col-md-6 mb-3">
                         <div class="card">
                           <div class="card-header bg-light">
@@ -60,49 +60,48 @@
                               <input
                                 class="form-check-input category-checkbox"
                                 type="checkbox"
-                                id="category{{ grade }}_{{ category }}"
+                                id="category{{ grade }}_{{ subject }}"
                                 data-grade="{{ grade }}"
-                                data-category="{{ category }}"
+                                data-category="{{ subject }}"
                                 onclick="toggleSubcategories(this);"
                               />
                               <label
                                 class="form-check-label"
-                                for="category{{ grade }}_{{ category }}"
+                                for="category{{ grade }}_{{ subject }}"
                               >
-                                {{ category_name }}
+                                {{ subject_data.name }}
                               </label>
                             </div>
                           </div>
                           <div class="card-body">
-                            {% for subcategory in get_subcategories(grade,
-                            category) %}
+                            {% for subcategory in subject_data.subcategories %}
                             <div class="form-check">
                               <input
                                 class="form-check-input subcategory-checkbox"
                                 type="checkbox"
-                                name="subjects[{{ grade }}][{{ category }}][]"
-                                value="{{ subcategory }}"
-                                id="subcategory{{ grade }}_{{ category }}_{{ subcategory }}"
+                                name="subjects[{{ grade }}][{{ subject }}][]"
+                                value="{{ subcategory.id }}"
+                                id="subcategory{{ grade }}_{{ subject }}_{{ subcategory.id }}"
                                 data-grade="{{ grade }}"
-                                data-category="{{ category }}"
+                                data-category="{{ subject }}"
                                 {%
                                 if
-                                category
+                                subject
                                 in
                                 user.allowed_subjects
                                 and
-                                subcategory
+                                subcategory.id
                                 in
-                                user.allowed_subjects[category]
+                                user.allowed_subjects[subject]
                                 %}checked{%
                                 endif
                                 %}
                               />
                               <label
                                 class="form-check-label"
-                                for="subcategory{{ grade }}_{{ category }}_{{ subcategory }}"
+                                for="subcategory{{ grade }}_{{ subject }}_{{ subcategory.id }}"
                               >
-                                {{ SUBCATEGORY_NAMES[subcategory] }}
+                                {{ subcategory.name }}
                               </label>
                             </div>
                             {% endfor %}

@@ -1333,19 +1333,18 @@ def admin_dashboard():
             available_subjects = GRADE_CATEGORIES[grade].keys()
             
             for subject in available_subjects:
-                if subject in CATEGORY_NAMES:
-                    subjects_by_grade[grade][subject] = {
-                        'name': CATEGORY_NAMES[subject],
-                        'subcategories': []
-                    }
-                    # その学年・教科で利用可能な単元のみを取得
-                    for subcategory in GRADE_CATEGORIES[grade][subject]:
-                        # 単元の日本語名を取得
-                        subcategory_name = SUBCATEGORY_NAMES[subject].get(subcategory, subcategory)
-                        subjects_by_grade[grade][subject]['subcategories'].append({
-                            'id': subcategory,
-                            'name': subcategory_name
-                        })
+                subjects_by_grade[grade][subject] = {
+                    'name': CATEGORY_NAMES.get(subject, subject),
+                    'subcategories': []
+                }
+                # その学年・教科で利用可能な単元のみを取得
+                for subcategory in GRADE_CATEGORIES[grade][subject]:
+                    # 単元の日本語名を取得（教科ごとのサブカテゴリー名を参照）
+                    subcategory_name = SUBCATEGORY_NAMES.get(subject, {}).get(subcategory, subcategory)
+                    subjects_by_grade[grade][subject]['subcategories'].append({
+                        'id': subcategory,
+                        'name': subcategory_name
+                    })
 
         return render_template('admin/dashboard.html',
                            users=users,
@@ -1376,12 +1375,11 @@ def admin_user_edit(user_id):
                     # その学年で利用可能な教科のみを処理
                     available_subjects = GRADE_CATEGORIES[grade].keys()
                     for category in available_subjects:
-                        if category in CATEGORY_NAMES:
-                            subcategories = request.form.getlist(f'subjects[{grade}][{category}][]')
-                            if subcategories:
-                                if category not in allowed_subjects:
-                                    allowed_subjects[category] = []
-                                allowed_subjects[category].extend(subcategories)
+                        subcategories = request.form.getlist(f'subjects[{grade}][{category}][]')
+                        if subcategories:
+                            if category not in allowed_subjects:
+                                allowed_subjects[category] = []
+                            allowed_subjects[category].extend(subcategories)
                 
                 # 重複を除去
                 for category in allowed_subjects:
@@ -1406,19 +1404,18 @@ def admin_user_edit(user_id):
             available_subjects = GRADE_CATEGORIES[grade].keys()
             
             for subject in available_subjects:
-                if subject in CATEGORY_NAMES:
-                    subjects_by_grade[grade][subject] = {
-                        'name': CATEGORY_NAMES[subject],
-                        'subcategories': []
-                    }
-                    # その学年・教科で利用可能な単元のみを取得
-                    for subcategory in GRADE_CATEGORIES[grade][subject]:
-                        # 単元の日本語名を取得
-                        subcategory_name = SUBCATEGORY_NAMES[subject].get(subcategory, subcategory)
-                        subjects_by_grade[grade][subject]['subcategories'].append({
-                            'id': subcategory,
-                            'name': subcategory_name
-                        })
+                subjects_by_grade[grade][subject] = {
+                    'name': CATEGORY_NAMES.get(subject, subject),
+                    'subcategories': []
+                }
+                # その学年・教科で利用可能な単元のみを取得
+                for subcategory in GRADE_CATEGORIES[grade][subject]:
+                    # 単元の日本語名を取得（教科ごとのサブカテゴリー名を参照）
+                    subcategory_name = SUBCATEGORY_NAMES.get(subject, {}).get(subcategory, subcategory)
+                    subjects_by_grade[grade][subject]['subcategories'].append({
+                        'id': subcategory,
+                        'name': subcategory_name
+                    })
         
         return render_template('admin/user_edit.html',
                            user=user,
