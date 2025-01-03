@@ -18,6 +18,10 @@
       </div>
     </div>
 
+    <!-- 現在の問題番号と総問題数を保持する隠しフィールド -->
+    <input type="hidden" id="current_question" value="{{ current_question }}" />
+    <input type="hidden" id="total_questions" value="{{ total_questions }}" />
+
     <div class="question-container">
       <p class="question-text">{{ question }}</p>
       <div

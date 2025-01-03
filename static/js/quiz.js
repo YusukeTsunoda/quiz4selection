@@ -1,143 +1,50 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // 問題データの取得と解析
+    console.log('[Debug] DOM Content Loaded');
+    
+    // 問題データを取得
     const questionDataElement = document.getElementById('question-data');
     if (!questionDataElement) {
         console.error('[Debug] Question data element not found');
         return;
     }
 
-    // クイズコンテナを表示
-    const quizContainer = document.querySelector('.quiz-container');
-    if (quizContainer) {
-        quizContainer.classList.add('show');
-    }
-
-    const jsonContent = questionDataElement.textContent.trim();
-    console.log('[Debug] Raw JSON content:', jsonContent);
-
-    let questionData;
     try {
-        questionData = JSON.parse(jsonContent);
+        console.log('[Debug] Raw JSON content:', questionDataElement.textContent);
+        const questionData = JSON.parse(questionDataElement.textContent);
         console.log('[Debug] Parsed question data:', questionData);
-    } catch (e) {
-        console.error('[Debug] Error parsing question data:', e);
-        return;
-    }
 
-    // 問題データの検証
-    if (!questionData || !questionData.options || !Array.isArray(questionData.options)) {
-        console.error('[Debug] Invalid question data structure:', questionData);
-        return;
-    }
+        // 正解のインデックスを保存
+        const optionsContainer = document.querySelector('.options-container');
+        if (optionsContainer) {
+            const correctIndex = questionData.correct;
+            optionsContainer.dataset.correct = correctIndex;
+            console.log('[Debug] Correct index:', correctIndex);
+        }
 
-    // 正解のインデックスを取得
-    const correctIndex = parseInt(questionData.correct);
-    console.log('[Debug] Correct index:', correctIndex);
-
-    // オプションコンテナの設定
-    const optionsContainer = document.querySelector('.options-container');
-    if (!optionsContainer) {
-        console.error('[Debug] Options container not found');
-        return;
-    }
-
-    // データ属性の設定
-    optionsContainer.dataset.correct = correctIndex;
-    const currentQuestion = parseInt(optionsContainer.dataset.currentQuestion) || 1;
-    const totalQuestions = parseInt(optionsContainer.dataset.totalQuestions) || 10;
-    console.log('[Debug] Initial progress setup:', { currentQuestion, totalQuestions });
-
-    // 進捗状況の初期設定
-    updateProgress(currentQuestion, totalQuestions);
-
-    // クリック処理の設定
-    const options = document.querySelectorAll('.option');
-    options.forEach((option, index) => {
-        option.addEventListener('click', async function() {
-            if (option.classList.contains('selected') || option.classList.contains('disabled')) {
-                console.log('[Debug] Option already selected or disabled');
-                return;
-            }
-
-            console.log('[Debug] Option clicked:', {
-                index: index,
-                text: option.textContent.trim(),
-                correctIndex: correctIndex
-            });
-
-            // 他のオプションを無効化
-            options.forEach(opt => opt.classList.add('disabled'));
-
-            // 選択したオプションをマーク
-            option.classList.add('selected');
-
-            try {
-                // サーバーに回答を送信
-                const response = await fetch('/submit_answer', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        selected: index
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const responseData = await response.json();
-                console.log('[Debug] Server response:', responseData);
-
-                if (!responseData.success) {
-                    console.error('[Debug] Server error:', responseData.error);
-                    return;
-                }
-
-                // 正解・不正解の表示
-                if (responseData.isCorrect) {
-                    option.classList.add('correct');
-                    console.log('[Debug] Correct answer selected');
-                    showExplanation(true, responseData.questionData.explanation);
-                } else {
-                    option.classList.add('incorrect');
-                    const correctOption = options[correctIndex];
-                    if (correctOption) {
-                        correctOption.classList.add('correct');
-                        console.log('[Debug] Showing correct answer:', correctIndex);
-                    }
-                    showExplanation(false, responseData.questionData.explanation);
-                }
-
-                // スコアと進捗状況の更新
-                updateScore(responseData.currentScore, responseData.totalQuestions);
-                updateProgress(responseData.currentQuestion, responseData.totalQuestions);
-
-                // 最後の問題の場合
-                if (responseData.isLastQuestion) {
-                    console.log('[Debug] Last question completed');
-                    setTimeout(() => {
-                        window.location.href = responseData.redirectUrl;
-                    }, 2000);
-                } else {
-                    // 次の問題データが含まれている場合、直接更新
-                    if (responseData.nextQuestionData) {
-                        setTimeout(() => {
-                            updateQuestionDisplay(responseData.nextQuestionData);
-                        }, 1500);
-                    } else {
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1500);
-                    }
-                }
-
-            } catch (error) {
-                console.error('[Debug] Error submitting answer:', error);
-            }
+        // 初期の進捗状況を設定
+        const currentQuestion = parseInt(document.getElementById('current_question').value);
+        const totalQuestions = parseInt(document.getElementById('total_questions').value);
+        console.log('[Debug] Initial progress setup:', {
+            currentQuestion: currentQuestion,
+            totalQuestions: totalQuestions
         });
-    });
+
+        // 進捗状況を更新（0-basedのcurrentQuestionを使用）
+        updateProgress(currentQuestion, totalQuestions);
+
+        // 選択肢のイベントリスナーを設定
+        setupOptionEventListeners();
+
+        // クイズコンテナを表示
+        const quizContainer = document.querySelector('.quiz-container');
+        if (quizContainer) {
+            setTimeout(() => {
+                quizContainer.classList.add('show');
+            }, 100);
+        }
+    } catch (error) {
+        console.error('[Debug] Error initializing quiz:', error);
+    }
 });
 
 // 解説を表示する関数
@@ -173,68 +80,127 @@ function updateScore(currentScore, totalQuestions) {
 
 // 進捗状況を更新する関数
 function updateProgress(currentQuestion, totalQuestions) {
-    console.log('[Debug] Updating progress:', { currentQuestion, totalQuestions });
-    
-    // 問題番号の更新
-    const questionCounter = document.querySelector('.question-counter');
-    if (questionCounter) {
-        questionCounter.textContent = `問題 ${currentQuestion}/${totalQuestions}`;
-        console.log('[Debug] Question counter updated:', questionCounter.textContent);
+    console.log('[Debug] updateProgress called with:', {
+        currentQuestion: currentQuestion,
+        totalQuestions: totalQuestions
+    });
+
+    // 最後の問題の場合は更新しない
+    if (currentQuestion >= totalQuestions) {
+        console.log('[Debug] Reached last question, skipping progress update');
+        return;
     }
+
+    // 1-basedの表示用の問題番号を計算（currentQuestionは0-based）
+    const displayQuestion = currentQuestion + 1;
+    console.log('[Debug] Display question number:', displayQuestion);
 
     // プログレスバーの更新
     const progressFill = document.querySelector('.progress-fill');
     if (progressFill) {
-        const percentage = (currentQuestion / totalQuestions) * 100;
+        const percentage = Math.min((displayQuestion / totalQuestions) * 100, 100);
         progressFill.style.width = `${percentage}%`;
-        console.log('[Debug] Progress bar updated:', percentage + '%');
+        console.log('[Debug] Progress bar updated:', {
+            percentage: percentage,
+            width: progressFill.style.width
+        });
+    } else {
+        console.warn('[Debug] Progress fill element not found');
     }
 
-    // データ属性の更新
-    const optionsContainer = document.querySelector('.options-container');
-    if (optionsContainer) {
-        optionsContainer.dataset.currentQuestion = currentQuestion;
+    // 問題番号の更新
+    const questionCounter = document.querySelector('.question-counter');
+    if (questionCounter) {
+        const oldText = questionCounter.textContent;
+        questionCounter.textContent = `問題 ${displayQuestion}/${totalQuestions}`;
+        console.log('[Debug] Question counter updated:', {
+            from: oldText,
+            to: questionCounter.textContent,
+            displayQuestion: displayQuestion,
+            totalQuestions: totalQuestions
+        });
+    } else {
+        console.warn('[Debug] Question counter element not found');
+    }
+
+    // 隠しフィールドの更新（0-basedの値を保存）
+    const currentQuestionInput = document.getElementById('current_question');
+    if (currentQuestionInput) {
+        currentQuestionInput.value = currentQuestion;
+        console.log('[Debug] Updated hidden current_question field:', {
+            value: currentQuestion,
+            displayValue: displayQuestion
+        });
     }
 }
 
 // 問題表示を更新する関数
 function updateQuestionDisplay(questionData) {
-    console.log('[Debug] Updating question display:', questionData);
+    console.log('[Debug] updateQuestionDisplay called with:', questionData);
+    
+    // 現在の問題番号を取得
+    const currentQuestionInput = document.getElementById('current_question');
+    const totalQuestionsInput = document.getElementById('total_questions');
+    
+    const currentQuestion = parseInt(currentQuestionInput.value);
+    const totalQuestions = parseInt(totalQuestionsInput.value);
+    
+    console.log('[Debug] Question numbers:', {
+        current: currentQuestion,
+        total: totalQuestions
+    });
 
-    // 既存の解説を削除
-    const existingExplanation = document.querySelector('.explanation');
-    if (existingExplanation) {
-        existingExplanation.remove();
+    // 問題文を更新
+    const questionElement = document.querySelector('.question-text');
+    if (questionElement) {
+        const oldText = questionElement.textContent;
+        questionElement.textContent = questionData.question;
+        console.log('[Debug] Question text updated:', {
+            from: oldText,
+            to: questionData.question
+        });
+    } else {
+        console.warn('[Debug] Question text element not found');
     }
 
-    // 問題文の更新
-    const questionText = document.querySelector('.question-text');
-    if (questionText) {
-        questionText.textContent = questionData.question;
-    }
-
-    // 選択肢の更新
+    // 選択肢を更新
     const optionsContainer = document.querySelector('.options-container');
     if (optionsContainer) {
-        // 既存の選択肢をクリア
+        console.log('[Debug] Updating options container');
         optionsContainer.innerHTML = '';
-        
-        // データ属性を更新
-        optionsContainer.dataset.correct = questionData.correct;
-
-        // サーバーから受け取った選択肢をそのまま表示（順序を維持）
-        questionData.options.forEach((optionText, index) => {
-            const option = document.createElement('div');
-            option.className = 'option';
-            option.dataset.index = index;
-            option.dataset.value = optionText;
-            option.textContent = optionText;
-            optionsContainer.appendChild(option);
+        questionData.options.forEach((option, index) => {
+            const button = document.createElement('div');
+            button.className = 'option';
+            button.textContent = option;
+            button.dataset.index = index;
+            button.dataset.value = option;
+            optionsContainer.appendChild(button);
+            console.log('[Debug] Added option:', {
+                index: index,
+                text: option
+            });
         });
 
-        // イベントリスナーを設定
-        setupOptionEventListeners();
+        // データ属性を更新
+        optionsContainer.dataset.currentQuestion = currentQuestion;
+        optionsContainer.dataset.totalQuestions = totalQuestions;
+        
+        // 進捗状況を更新
+        updateProgress(currentQuestion, totalQuestions);
+    } else {
+        console.warn('[Debug] Options container not found');
     }
+
+    // 説明文をクリア
+    const explanationElement = document.querySelector('.explanation');
+    if (explanationElement) {
+        console.log('[Debug] Removing explanation element');
+        explanationElement.remove();
+    }
+
+    // 選択肢のイベントリスナーを再設定
+    console.log('[Debug] Setting up option event listeners');
+    setupOptionEventListeners();
 }
 
 // 選択肢のイベントリスナーを設定する関数
@@ -275,13 +241,13 @@ function setupOptionEventListeners() {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'  // AJAXリクエストであることを示す
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify({
                         selected: index
                     }),
-                    credentials: 'include',  // すべてのリクエストでクッキーを送信
-                    mode: 'same-origin'      // 同一オリジンのみ許可
+                    credentials: 'same-origin'
                 });
 
                 // レスポンスの詳細をログ出力
@@ -317,9 +283,8 @@ function setupOptionEventListeners() {
                     showExplanation(false, responseData.questionData.explanation);
                 }
 
-                // スコアと進捗状況の更新
+                // スコアの更新
                 updateScore(responseData.currentScore, responseData.totalQuestions);
-                updateProgress(responseData.currentQuestion, responseData.totalQuestions);
 
                 // 最後の問題の場合
                 if (responseData.isLastQuestion) {
@@ -330,8 +295,11 @@ function setupOptionEventListeners() {
                 } else {
                     // 次の問題データが含まれている場合、直接更新
                     if (responseData.nextQuestionData) {
+                        // 進捗状況の更新は次の問題の表示後に行う
                         setTimeout(() => {
                             updateQuestionDisplay(responseData.nextQuestionData);
+                            // 問題表示が完了してから進捗を更新
+                            updateProgress(responseData.currentQuestion, responseData.totalQuestions);
                         }, 1500);
                     } else {
                         setTimeout(() => {

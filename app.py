@@ -775,18 +775,18 @@ def start_quiz(grade, category, subcategory, difficulty):
 def submit_answer():
     """回答を提出するエンドポイント"""
     try:
+        logger.info("[Debug] === Submit Answer Start ===")
+        logger.info(f"[Debug] Session data before processing: {dict(session)}")
+
         # 認証チェック
         if not current_user.is_authenticated:
             logger.error("[Debug] User not authenticated")
             return jsonify({'error': 'ログインが必要です', 'code': 'AUTH_REQUIRED'}), 401
 
-        # AJAXリクエストかどうかを確認
-        if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
-            logger.error("[Debug] Not an AJAX request")
-            return jsonify({'error': '不正なリクエストです', 'code': 'INVALID_REQUEST_TYPE'}), 400
-
         # リクエストデータの検証
         data = request.get_json()
+        logger.info(f"[Debug] Received request data: {data}")
+        
         if not data:
             logger.error("[Debug] No JSON data in request")
             return jsonify({'error': 'リクエストデータが不正です', 'code': 'INVALID_REQUEST'}), 400
@@ -795,123 +795,77 @@ def submit_answer():
             logger.error("[Debug] No 'selected' field in request data")
             return jsonify({'error': '選択された回答が含まれていません', 'code': 'MISSING_SELECTED'}), 400
 
-        # セッションの有効性を確認
-        if 'questions' not in session:
-            logger.error("[Debug] No questions in session")
-            return jsonify({'error': 'セッションが無効です。ページを更新してください。', 'code': 'INVALID_SESSION'}), 400
-
-        # 型変換を安全に行う
-        try:
-            selected_index = int(data['selected'])
-        except (ValueError, TypeError):
-            logger.error("[Debug] Invalid selected index format")
-            return jsonify({'error': '選択された回答の形式が不正です', 'code': 'INVALID_INDEX_FORMAT'}), 400
-
+        # セッションデータの取得と検証
         questions = session.get('questions', [])
         current_question = session.get('current_question', 0)
         quiz_history = session.get('quiz_history', [])
         score = session.get('score', 0)
 
-        # 問題データの検証
-        if not questions:
-            logger.error("[Debug] Questions list is empty")
-            return jsonify({'error': '問題データが見つかりません', 'code': 'NO_QUESTIONS'}), 400
+        logger.info(f"[Debug] Current state: question={current_question}, score={score}, total={len(questions)}")
 
+        # 問題データの検証
         if current_question >= len(questions):
             logger.error(f"[Debug] Invalid question index: {current_question} >= {len(questions)}")
             return jsonify({'error': '無効な問題番号です', 'code': 'INVALID_QUESTION_INDEX'}), 400
 
         current_q = questions[current_question]
-        if 'correct' not in current_q:
-            logger.error("[Debug] No correct answer index in current question")
-            return jsonify({'error': '正解データが不正です', 'code': 'INVALID_CORRECT_ANSWER'}), 400
+        logger.info(f"[Debug] Current question data: {current_q}")
 
+        # 回答の処理
+        selected_index = int(data['selected'])
         correct_index = current_q['correct']
         is_correct = selected_index == correct_index
 
-        # スコアと履歴を更新
+        logger.info(f"[Debug] Answer check: selected={selected_index}, correct={correct_index}, is_correct={is_correct}")
+
+        # スコアの更新
         if is_correct:
             score += 1
             session['score'] = score
+            logger.info(f"[Debug] Score updated: {score}")
 
-        # 問題履歴を更新
+        # 履歴の更新
         history_entry = {
             'question': current_q['question'],
             'options': current_q['options'],
-            'selected_index': selected_index,
-            'correct_index': correct_index,
-            'is_correct': is_correct,
-            'explanation': current_q.get('explanation', '')
+            'selected': selected_index,
+            'correct': correct_index,
+            'is_correct': is_correct
         }
         quiz_history.append(history_entry)
         session['quiz_history'] = quiz_history
+        logger.info(f"[Debug] History entry added: {history_entry}")
 
-        # データベースの履歴を更新
-        try:
-            QuestionHistory.update_question_history(
-                user_id=current_user.id,
-                grade=session.get('grade'),
-                category=session.get('category'),
-                subcategory=session.get('subcategory'),
-                difficulty=session.get('difficulty'),
-                question_text=current_q['question'],
-                is_correct=is_correct
-            )
-        except Exception as db_error:
-            logger.error(f"[Debug] Error updating question history: {db_error}")
-            # データベースエラーは無視して続行
+        # 次の問題へ進む
+        current_question += 1
+        session['current_question'] = current_question
+        logger.info(f"[Debug] Moving to next question: {current_question}")
+        
+        # 次の問題のデータを準備
+        is_last_question = current_question >= len(questions)
+        next_question = None if is_last_question else questions[current_question]
 
-        # 次の問題の準備
-        is_last_question = current_question == len(questions) - 1
-        next_question = None
-        if not is_last_question:
-            try:
-                next_question_index = current_question + 1
-                session['current_question'] = next_question_index
-                
-                next_question = questions[next_question_index]
-                if 'shuffled' not in next_question:
-                    next_question = get_shuffled_question(next_question)
-                    next_question['shuffled'] = True
-                    questions[next_question_index] = next_question
-                    session['questions'] = questions
-            except Exception as next_q_error:
-                logger.error(f"[Debug] Error preparing next question: {next_q_error}")
-                # 次の問題の準備エラーは無視して続行
+        # セッションの保存を確実に行う
+        session.modified = True
+        logger.info(f"[Debug] Session after update: {dict(session)}")
 
-        # 最後の問題の場合、QuizAttemptをデータベースに保存
-        if is_last_question:
-            try:
-                quiz_attempt = QuizAttempt(
-                    user_id=current_user.id,
-                    grade=session.get('grade'),
-                    category=session.get('category'),
-                    subcategory=session.get('subcategory'),
-                    difficulty=session.get('difficulty'),
-                    score=score,
-                    total_questions=len(questions),
-                    quiz_history=quiz_history
-                )
-                db.session.add(quiz_attempt)
-                db.session.commit()
-            except Exception as db_error:
-                logger.error(f"[Debug] Error saving quiz attempt: {db_error}")
-                db.session.rollback()
-                # データベースエラーは無視して続行
-
-        return jsonify({
+        response_data = {
             'success': True,
             'isCorrect': is_correct,
             'currentScore': score,
             'totalQuestions': len(questions),
-            'currentQuestion': current_question + 1,
+            'currentQuestion': current_question,
             'isLastQuestion': is_last_question,
             'redirectUrl': url_for('result') if is_last_question else None,
             'questionData': {
                 'explanation': current_q.get('explanation', '')
             },
             'nextQuestionData': next_question
-        })
+        }
+        logger.info(f"[Debug] Sending response: {response_data}")
+        logger.info("[Debug] === Submit Answer End ===")
+
+        return jsonify(response_data)
 
     except Exception as e:
         logger.error(f"[Debug] Error in submit_answer: {e}")
@@ -932,6 +886,7 @@ def next_question():
         
         logger.info(f"[Debug] Next question - Current index: {current_question}")
         logger.info(f"[Debug] Total questions: {len(questions)}")
+        logger.info(f"[Debug] Session state: {dict(session)}")
         
         # 全問題が終了した場合
         if current_question >= len(questions):
@@ -957,12 +912,19 @@ def next_question():
             logger.error(f"[Debug] Error encoding question data: {e}")
             return redirect(url_for('grade_select'))
         
+        # 現在の問題番号を更新（1-basedで表示）
+        display_question = current_question + 1
+        logger.info(f"[Debug] Display question number: {display_question}")
+        
+        # セッションを確実に保存
+        session.modified = True
+        
         return render_template('quiz.html',
                            question=question_data['question'],
                            options=question_data['options'],
                            question_data=question_data_json,
                            current_question=current_question,
-                           display_question=current_question + 1,  # 表示用の問題番号（1-based）
+                           display_question=display_question,
                            total_questions=len(questions),
                            score=session.get('score', 0))
 
