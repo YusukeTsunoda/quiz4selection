@@ -1,9 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('[Init] Quiz.js loaded and initialized');
     const optionsContainer = document.querySelector('.options-container');
-    console.log('[Init] Options container:', optionsContainer);
     if (!optionsContainer) {
-        console.error('[Init] Options container not found');
+        console.error('Options container not found');
         return;
     }
 
@@ -11,41 +9,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const scoreDisplay = document.querySelector('.score-display');
     let isAnswered = false;
     let totalQuestions = parseInt(optionsContainer.dataset.totalQuestions) || 10;
-    console.log('[Init] Total questions:', totalQuestions);
-    
-    // 現在のスコアを取得
     let currentScore = scoreDisplay ? parseInt(scoreDisplay.textContent.match(/\d+/)[0]) || 0 : 0;
-    console.log('[Init] Initial score:', currentScore);
 
-    // wait関数の定義
     function wait(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    // スコア表示を更新する関数
     function updateScoreDisplay(newScore) {
-        console.log('[Score] Updating score display:', {
-            oldScore: currentScore,
-            newScore: newScore,
-            totalQuestions: totalQuestions
-        });
-        
         if (scoreDisplay) {
             currentScore = newScore;
             scoreDisplay.textContent = `正解数: ${newScore}/${totalQuestions}`;
-            console.log('[Score] Score display updated successfully');
-        } else {
-            console.error('[Score] Score display element not found');
         }
     }
 
-    // 解説を表示する関数
     function showExplanation(isCorrect, explanationText) {
-        console.log('[Explanation] Showing explanation:', {
-            isCorrect: isCorrect,
-            text: explanationText
-        });
-
         const explanationDiv = document.createElement('div');
         explanationDiv.className = 'explanation mt-3 p-3 rounded';
         
@@ -69,13 +46,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         optionsContainer.insertAdjacentElement('afterend', explanationDiv);
-        console.log('[Explanation] Explanation div inserted');
     }
 
     async function submitAnswer(selectedIndex) {
-        console.log('[Submit] Submitting answer:', selectedIndex);
         try {
-            console.log('[Submit] Sending request to server...');
             const response = await fetch('/submit_answer', {
                 method: 'POST',
                 headers: {
@@ -85,25 +59,20 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             if (!response.ok) {
-                console.error('[Submit] Server returned error status:', response.status);
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             
-            const data = await response.json();
-            console.log('[Submit] Server response:', data);
-            return data;
+            return await response.json();
         } catch (error) {
-            console.error('[Submit] Error submitting answer:', error);
+            console.error('Error submitting answer:', error);
             return { success: false, error: error.message };
         }
     }
 
     async function handleOptionClick(event) {
         const clickedElement = event.target;
-        console.log('[Click] Clicked element:', clickedElement);
         
         if (!clickedElement.classList.contains('option') || isAnswered) {
-            console.log('[Click] Click ignored - not an option or already answered');
             return;
         }
         
@@ -113,25 +82,15 @@ document.addEventListener('DOMContentLoaded', function() {
         
         try {
             const selectedIndex = parseInt(selectedOption.dataset.index);
-            console.log('[Click] Selected index:', selectedIndex);
-            
-            options.forEach(option => option.classList.remove('selected'));
-            selectedOption.classList.add('selected');
-            
-            console.log('[Submit] Before submitting answer');
             const response = await submitAnswer(selectedIndex);
-            console.log('[Response] Full response object:', response);
             
             if (response.success) {
-                console.log('[Feedback] Starting answer feedback display');
-                
                 if (response.isCorrect) {
                     selectedOption.classList.add('correct');
                     updateScoreDisplay(response.currentScore);
                 } else {
                     selectedOption.classList.add('incorrect');
                     const correctIndex = parseInt(optionsContainer.dataset.correct);
-                    console.log('[Debug] Correct index:', correctIndex);
                     if (options[correctIndex]) {
                         options[correctIndex].classList.add('correct');
                     }
@@ -139,50 +98,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // 解説の表示
                 try {
-                    const rawQuestionData = optionsContainer.dataset.questionData;
-                    console.log('[Debug] Raw question data:', rawQuestionData);
-                    
-                    let explanationText = '解説がありません';
-                    
-                    if (rawQuestionData && typeof rawQuestionData === 'string') {
-                        try {
-                            // Python形式の文字列をJavaScript形式に変換
-                            const jsonString = rawQuestionData
-                                .replace(/'/g, '"')  // シングルクォートをダブルクォートに変換
-                                .replace(/None/g, 'null')  // PythonのNoneをnullに変換
-                                .replace(/True/g, 'true')  // PythonのTrueをtrueに変換
-                                .replace(/False/g, 'false');  // PythonのFalseをfalseに変換
-                            
-                            console.log('[Debug] Converted JSON string:', jsonString);
-                            
-                            // JSONデータをパース
-                            const questionData = JSON.parse(jsonString);
-                            console.log('[Debug] Parsed question data:', questionData);
-                            
-                            // 解説テキストを取得
-                            if (questionData && typeof questionData === 'object') {
-                                explanationText = questionData.explanation || '解説がありません';
-                                console.log('[Debug] Found explanation:', explanationText);
-                            } else {
-                                console.log('[Debug] Question data is not an object:', typeof questionData);
-                            }
-                        } catch (parseError) {
-                            console.error('[Debug] JSON parse error:', parseError);
-                            console.error('[Debug] Raw data causing error:', rawQuestionData);
-                        }
-                    } else {
-                        console.log('[Debug] Invalid or missing question data');
+                    // デバッグ用のJSONデータを取得
+                    const debugDataElement = document.getElementById('debug-data');
+                    if (!debugDataElement) {
+                        throw new Error('Debug data element not found');
                     }
-                    
-                    showExplanation(response.isCorrect, explanationText);
 
+                    const jsonContent = debugDataElement.textContent.trim();
+                    if (!jsonContent) {
+                        throw new Error('Empty JSON content');
+                    }
+
+                    const questionData = JSON.parse(jsonContent);
+                    const explanationText = questionData.explanation || '解説がありません';
+                    showExplanation(response.isCorrect, explanationText);
                 } catch (error) {
-                    console.error('[Debug] Error in explanation handling:', error);
-                    console.error('[Debug] Error details:', error.message);
+                    console.error('Error handling explanation:', error);
                     showExplanation(response.isCorrect, '解説の読み込みに失敗しました');
                 }
 
-                await wait(2500);
+                await wait(1500);
                 
                 const quizContainer = document.querySelector('.quiz-container');
                 if (quizContainer) {
@@ -196,12 +131,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             } else {
-                console.error('[Error] Server response indicates failure:', response.error);
+                console.error('Server response indicates failure:', response.error);
                 isAnswered = false;
             }
         } catch (error) {
-            console.error('[Error] Critical error in click handler:', error);
-            console.error('[Error] Stack trace:', error.stack);
+            console.error('Error handling answer:', error);
             isAnswered = false;
         }
     }

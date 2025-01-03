@@ -673,16 +673,22 @@ def start_quiz(grade, category, subcategory, difficulty):
 
         # 最初の問題を表示
         first_question = questions[0]
-        logger.info(f"First question data: {first_question}")
+        logger.info(f"First question data (raw): {first_question}")
+        logger.info(f"First question data type: {type(first_question)}")
+        logger.info(f"First question keys: {first_question.keys()}")
         
-        # 問題データをJSONエンコード
+        # データの内容を詳しくログ出力
+        for key, value in first_question.items():
+            logger.info(f"Key: {key}, Value type: {type(value)}, Value: {value}")
+        
+        # JSONエンコードしてログ出力
         question_data_json = json.dumps(first_question, ensure_ascii=False)
-        logger.info(f"Encoded question data: {question_data_json}")
+        logger.info(f"JSON encoded question data: {question_data_json}")
         
         return render_template('quiz.html',
                             question=first_question['question'],
                             options=first_question['options'],
-                            question_data=question_data_json,
+                            question_data=question_data_json,  # JSONエンコードしたデータを渡す
                             current_question=0,
                             total_questions=len(questions),
                             score=0)
@@ -804,35 +810,45 @@ def next_question():
     try:
         questions = session.get('questions', [])
         current_question = session.get('current_question', 0)
-        quiz_history = session.get('quiz_history', [])
-
+        
         logger.info(f"Current question index: {current_question}")
         logger.info(f"Total questions: {len(questions)}")
-        logger.info(f"Quiz history entries: {len(quiz_history)}")
-
+        
         # 全問題が終了した場合
         if current_question >= len(questions):
             logger.info("Quiz completed, redirecting to result page")
             return redirect(url_for('result'))
-
-        # 現在の問題を表示
-        logger.info(f"Showing question {current_question + 1}")
+        
+        # 現在の問題を取得
         question_data = questions[current_question]
-        # 問題データをJSONエンコード
-        question_data_json = json.dumps(question_data, ensure_ascii=False)
-        logger.info(f"Encoded question data: {question_data_json}")
-
+        
+        # データの存在確認
+        if not question_data:
+            logger.error("Question data is empty")
+            return redirect(url_for('grade_select'))
+            
+        # データの内容を詳しくログ出力
+        logger.info(f"Question data before encoding: {question_data}")
+        
+        # JSONエンコード
+        try:
+            question_data_json = json.dumps(question_data, ensure_ascii=False)
+            logger.info(f"Question data after encoding: {question_data_json}")
+        except Exception as e:
+            logger.error(f"Error encoding question data: {e}")
+            return redirect(url_for('grade_select'))
+        
         return render_template('quiz.html',
-                               question=question_data['question'],
-                               options=question_data['options'],
-                               question_data=question_data_json,
-                               current_question=current_question,
-                               total_questions=len(questions),
-                               score=session.get('score', 0))
+                           question=question_data['question'],
+                           options=question_data['options'],
+                           question_data=question_data_json,  # JSONエンコードしたデータを渡す
+                           current_question=current_question,
+                           total_questions=len(questions),
+                           score=session.get('score', 0))
 
     except Exception as e:
         logger.error(f"Error in next_question route: {e}")
-        logger.exception("Full traceback:")
+        flash('次の問題の表示中にエラーが発生しました。', 'error')
         return redirect(url_for('grade_select'))
     
 
