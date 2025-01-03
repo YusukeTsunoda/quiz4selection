@@ -240,7 +240,14 @@ function updateQuestionDisplay(questionData) {
 // 選択肢のイベントリスナーを設定する関数
 function setupOptionEventListeners() {
     const options = document.querySelectorAll('.option');
-    const correctIndex = parseInt(document.querySelector('.options-container').dataset.correct);
+    const optionsContainer = document.querySelector('.options-container');
+    if (!optionsContainer) {
+        console.error('[Debug] Options container not found');
+        return;
+    }
+    
+    const correctIndex = parseInt(optionsContainer.dataset.correct);
+    console.log('[Debug] Setting up listeners with correct index:', correctIndex);
 
     options.forEach((option) => {
         option.addEventListener('click', async function() {
@@ -250,17 +257,11 @@ function setupOptionEventListeners() {
             }
 
             const index = parseInt(option.dataset.index);
-            console.log('[Debug] Option clicked:', {
+            console.log('[Debug] Submitting answer:', {
                 index: index,
                 text: option.textContent.trim(),
                 correctIndex: correctIndex
             });
-
-            // 他のオプションを無効化
-            options.forEach(opt => opt.classList.add('disabled'));
-
-            // 選択したオプションをマーク
-            option.classList.add('selected');
 
             try {
                 // サーバーに回答を送信
@@ -271,11 +272,18 @@ function setupOptionEventListeners() {
                     },
                     body: JSON.stringify({
                         selected: index
-                    })
+                    }),
+                    credentials: 'same-origin'  // セッションCookieを送信するために必要
                 });
 
+                // レスポンスの詳細をログ出力
+                console.log('[Debug] Response status:', response.status);
+                console.log('[Debug] Response headers:', Object.fromEntries(response.headers.entries()));
+
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorText = await response.text();
+                    console.error('[Debug] Error response:', errorText);
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
 
                 const responseData = await response.json();
@@ -325,7 +333,8 @@ function setupOptionEventListeners() {
                 }
 
             } catch (error) {
-                console.error('[Debug] Error submitting answer:', error);
+                console.error('[Debug] Error in submit_answer:', error);
+                console.error('[Debug] Error stack:', error.stack);
             }
         });
     });

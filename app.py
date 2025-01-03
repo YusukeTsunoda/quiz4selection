@@ -775,12 +775,25 @@ def start_quiz(grade, category, subcategory, difficulty):
 def submit_answer():
     """回答を提出するエンドポイント"""
     try:
+        # 認証チェック
         if not current_user.is_authenticated:
-            return jsonify({'error': 'ログインが必要です'}), 401
+            logger.error("[Debug] User not authenticated")
+            return jsonify({'error': 'ログインが必要です', 'code': 'AUTH_REQUIRED'}), 401
 
+        # リクエストデータの検証
         data = request.get_json()
-        if not data or 'selected' not in data:
-            return jsonify({'error': '無効なリクエストです'}), 400
+        if not data:
+            logger.error("[Debug] No JSON data in request")
+            return jsonify({'error': 'リクエストデータが不正です', 'code': 'INVALID_REQUEST'}), 400
+        
+        if 'selected' not in data:
+            logger.error("[Debug] No 'selected' field in request data")
+            return jsonify({'error': '選択された回答が含まれていません', 'code': 'MISSING_SELECTED'}), 400
+
+        # セッションデータの検証
+        if 'questions' not in session:
+            logger.error("[Debug] No questions in session")
+            return jsonify({'error': 'セッションが無効です', 'code': 'INVALID_SESSION'}), 400
 
         selected_index = int(data['selected'])
         questions = session.get('questions', [])
@@ -788,10 +801,20 @@ def submit_answer():
         quiz_history = session.get('quiz_history', [])
         score = session.get('score', 0)
 
-        if not questions or current_question >= len(questions):
-            return jsonify({'error': '無効なクイズ状態です'}), 400
+        # 問題データの検証
+        if not questions:
+            logger.error("[Debug] Questions list is empty")
+            return jsonify({'error': '問題データが見つかりません', 'code': 'NO_QUESTIONS'}), 400
+
+        if current_question >= len(questions):
+            logger.error(f"[Debug] Invalid question index: {current_question} >= {len(questions)}")
+            return jsonify({'error': '無効な問題番号です', 'code': 'INVALID_QUESTION_INDEX'}), 400
 
         current_q = questions[current_question]
+        if 'correct' not in current_q:
+            logger.error("[Debug] No correct answer index in current question")
+            return jsonify({'error': '正解データが不正です', 'code': 'INVALID_CORRECT_ANSWER'}), 400
+
         correct_index = current_q['correct']
         is_correct = selected_index == correct_index
 
@@ -803,9 +826,9 @@ def submit_answer():
         # 問題履歴を更新
         history_entry = {
             'question': current_q['question'],
-            'options': current_q['options'],  # シャッフルされた選択肢を使用
-            'selected_index': selected_index,  # シャッフル後のインデックスを使用
-            'correct_index': correct_index,    # シャッフル後の正解インデックスを使用
+            'options': current_q['options'],
+            'selected_index': selected_index,
+            'correct_index': correct_index,
             'is_correct': is_correct,
             'explanation': current_q.get('explanation', '')
         }
@@ -813,32 +836,37 @@ def submit_answer():
         session['quiz_history'] = quiz_history
 
         # データベースの履歴を更新
-        QuestionHistory.update_question_history(
-            user_id=current_user.id,
-            grade=session.get('grade'),
-            category=session.get('category'),
-            subcategory=session.get('subcategory'),
-            difficulty=session.get('difficulty'),
-            question_text=current_q['question'],
-            is_correct=is_correct
-        )
+        try:
+            QuestionHistory.update_question_history(
+                user_id=current_user.id,
+                grade=session.get('grade'),
+                category=session.get('category'),
+                subcategory=session.get('subcategory'),
+                difficulty=session.get('difficulty'),
+                question_text=current_q['question'],
+                is_correct=is_correct
+            )
+        except Exception as db_error:
+            logger.error(f"[Debug] Error updating question history: {db_error}")
+            # データベースエラーは無視して続行
 
         # 次の問題の準備
         is_last_question = current_question == len(questions) - 1
         next_question = None
         if not is_last_question:
-            # 次の問題のインデックスを更新
-            next_question_index = current_question + 1
-            session['current_question'] = next_question_index
-            
-            # 次の問題が既にシャッフルされているか確認
-            next_question = questions[next_question_index]
-            if 'shuffled' not in next_question:
-                # まだシャッフルされていない場合のみシャッフル
-                next_question = get_shuffled_question(next_question)
-                next_question['shuffled'] = True  # シャッフル済みフラグを設定
-                questions[next_question_index] = next_question
-                session['questions'] = questions
+            try:
+                next_question_index = current_question + 1
+                session['current_question'] = next_question_index
+                
+                next_question = questions[next_question_index]
+                if 'shuffled' not in next_question:
+                    next_question = get_shuffled_question(next_question)
+                    next_question['shuffled'] = True
+                    questions[next_question_index] = next_question
+                    session['questions'] = questions
+            except Exception as next_q_error:
+                logger.error(f"[Debug] Error preparing next question: {next_q_error}")
+                # 次の問題の準備エラーは無視して続行
 
         # 最後の問題の場合、QuizAttemptをデータベースに保存
         if is_last_question:
@@ -858,6 +886,7 @@ def submit_answer():
             except Exception as db_error:
                 logger.error(f"[Debug] Error saving quiz attempt: {db_error}")
                 db.session.rollback()
+                # データベースエラーは無視して続行
 
         return jsonify({
             'success': True,
@@ -876,7 +905,11 @@ def submit_answer():
     except Exception as e:
         logger.error(f"[Debug] Error in submit_answer: {e}")
         logger.exception("[Debug] Full traceback:")
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'code': 'INTERNAL_ERROR'
+        }), 500
 
 
 @app.route('/next_question', methods=['GET'])
