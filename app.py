@@ -807,13 +807,36 @@ def submit_answer():
         is_last_question = current_question == len(questions) - 1
         logger.info(f"[Debug] Is last question: {is_last_question}")
 
+        # 最後の問題の場合、QuizAttemptをデータベースに保存
+        if is_last_question:
+            try:
+                logger.info("[Debug] Saving quiz attempt to database")
+                quiz_attempt = QuizAttempt(
+                    user_id=current_user.id,
+                    grade=session.get('grade'),
+                    category=session.get('category'),
+                    subcategory=session.get('subcategory'),
+                    difficulty=session.get('difficulty'),
+                    score=current_score,
+                    total_questions=len(questions),
+                    quiz_history=quiz_history
+                )
+                db.session.add(quiz_attempt)
+                db.session.commit()
+                logger.info(f"[Debug] Quiz attempt saved successfully. ID: {quiz_attempt.id}")
+            except Exception as db_error:
+                logger.error(f"[Debug] Error saving quiz attempt: {db_error}")
+                db.session.rollback()
+                # データベース保存エラーでもクイズ自体は完了させる
+
         response_data = {
             'success': True,
             'isCorrect': is_correct,
             'currentScore': current_score,
+            'totalQuestions': len(questions),
             'isLastQuestion': is_last_question,
             'redirectUrl': url_for('result') if is_last_question else None,
-            'questionData': current_q  # 問題データを含める
+            'questionData': current_q
         }
         logger.info(f"[Debug] Sending response: {response_data}")
 
