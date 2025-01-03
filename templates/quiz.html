@@ -5,12 +5,12 @@
       <div class="progress mb-2">
         <div
           class="progress-fill"
-          style="width: {{ (current_question / total_questions * 100)|round }}%"
+          style="width: {{ (display_question / total_questions * 100)|round }}%"
         ></div>
       </div>
       <div class="status-info">
         <span class="question-counter"
-          >問題 {{ current_question + 1 }}/{{ total_questions }}</span
+          >問題 {{ display_question }}/{{ total_questions }}</span
         >
         <span class="score-display"
           >正解数: {{ score }}/{{ total_questions }}</span
@@ -23,6 +23,7 @@
       <div
         class="options-container"
         data-total-questions="{{ total_questions }}"
+        data-current-question="{{ display_question }}"
       >
         {% for option in options %}
         <div

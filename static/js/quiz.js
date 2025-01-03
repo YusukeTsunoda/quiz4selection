@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
         quizContainer.classList.add('show');
     }
 
-    const jsonContent = questionDataElement.textContent;
+    const jsonContent = questionDataElement.textContent.trim();
     console.log('[Debug] Raw JSON content:', jsonContent);
 
     let questionData;
@@ -40,7 +40,15 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error('[Debug] Options container not found');
         return;
     }
+
+    // データ属性の設定
     optionsContainer.dataset.correct = correctIndex;
+    const currentQuestion = parseInt(optionsContainer.dataset.currentQuestion) || 1;
+    const totalQuestions = parseInt(optionsContainer.dataset.totalQuestions) || 10;
+    console.log('[Debug] Initial progress setup:', { currentQuestion, totalQuestions });
+
+    // 進捗状況の初期設定
+    updateProgress(currentQuestion, totalQuestions);
 
     // クリック処理の設定
     const options = document.querySelectorAll('.option');
@@ -53,7 +61,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             console.log('[Debug] Option clicked:', {
                 index: index,
-                text: option.textContent,
+                text: option.textContent.trim(),
                 correctIndex: correctIndex
             });
 
@@ -91,27 +99,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (responseData.isCorrect) {
                     option.classList.add('correct');
                     console.log('[Debug] Correct answer selected');
-                    // 正解の解説を表示
-                    showExplanation(true, questionData.explanation);
+                    showExplanation(true, responseData.questionData.explanation);
                 } else {
                     option.classList.add('incorrect');
-                    // 正解のオプションを緑で表示
                     const correctOption = options[correctIndex];
                     if (correctOption) {
                         correctOption.classList.add('correct');
                         console.log('[Debug] Showing correct answer:', correctIndex);
-                    } else {
-                        console.error('[Debug] Correct option not found:', correctIndex);
                     }
-                    // 不正解の解説を表示
-                    showExplanation(false, questionData.explanation);
+                    showExplanation(false, responseData.questionData.explanation);
                 }
 
-                // スコアの更新
-                const scoreDisplay = document.querySelector('.score-display');
-                if (scoreDisplay) {
-                    scoreDisplay.textContent = `正解数: ${responseData.currentScore}/${responseData.totalQuestions}`;
-                }
+                // スコアと進捗状況の更新
+                updateScore(responseData.currentScore, responseData.totalQuestions);
+                updateProgress(responseData.currentQuestion, responseData.totalQuestions);
 
                 // 最後の問題の場合
                 if (responseData.isLastQuestion) {
@@ -120,7 +121,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         window.location.href = '/result';
                     }, 2000);
                 } else {
-                    // 次の問題への遷移
                     setTimeout(() => {
                         const quizContainer = document.querySelector('.quiz-container');
                         if (quizContainer) {
@@ -137,20 +137,57 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-
-    // 解説を表示する関数
-    function showExplanation(isCorrect, explanation) {
-        const questionContainer = document.querySelector('.question-container');
-        if (!questionContainer) return;
-
-        const existingExplanation = document.querySelector('.explanation');
-        if (existingExplanation) {
-            existingExplanation.remove();
-        }
-
-        const explanationDiv = document.createElement('div');
-        explanationDiv.className = `explanation ${isCorrect ? 'correct-message' : 'incorrect-message'}`;
-        explanationDiv.textContent = explanation || (isCorrect ? '正解です！' : '不正解です。');
-        questionContainer.appendChild(explanationDiv);
-    }
 });
+
+// 解説を表示する関数
+function showExplanation(isCorrect, explanation) {
+    const questionContainer = document.querySelector('.question-container');
+    if (!questionContainer) return;
+
+    console.log('[Debug] Showing explanation:', explanation);
+
+    const existingExplanation = document.querySelector('.explanation');
+    if (existingExplanation) {
+        existingExplanation.remove();
+    }
+
+    const explanationDiv = document.createElement('div');
+    explanationDiv.className = `explanation ${isCorrect ? 'correct-message' : 'incorrect-message'}`;
+    explanationDiv.textContent = explanation || (isCorrect ? '正解です！' : '不正解です。');
+    questionContainer.appendChild(explanationDiv);
+}
+
+// スコアを更新する関数
+function updateScore(currentScore, totalQuestions) {
+    const scoreDisplay = document.querySelector('.score-display');
+    if (scoreDisplay) {
+        scoreDisplay.textContent = `正解数: ${currentScore}/${totalQuestions}`;
+        console.log('[Debug] Score updated:', currentScore);
+    }
+}
+
+// 進捗状況を更新する関数
+function updateProgress(currentQuestion, totalQuestions) {
+    console.log('[Debug] Updating progress:', { currentQuestion, totalQuestions });
+    
+    // 問題番号の更新
+    const questionCounter = document.querySelector('.question-counter');
+    if (questionCounter) {
+        questionCounter.textContent = `問題 ${currentQuestion}/${totalQuestions}`;
+        console.log('[Debug] Question counter updated:', questionCounter.textContent);
+    }
+
+    // プログレスバーの更新
+    const progressFill = document.querySelector('.progress-fill');
+    if (progressFill) {
+        const percentage = (currentQuestion / totalQuestions) * 100;
+        progressFill.style.width = `${percentage}%`;
+        console.log('[Debug] Progress bar updated:', percentage + '%');
+    }
+
+    // データ属性の更新
+    const optionsContainer = document.querySelector('.options-container');
+    if (optionsContainer) {
+        optionsContainer.dataset.currentQuestion = currentQuestion;
+    }
+}

@@ -691,15 +691,17 @@ def start_quiz(grade, category, subcategory, difficulty):
 
         # 問題を取得
         questions = get_questions(grade, category, subcategory, difficulty)
+        logger.info(f"[Debug] Retrieved questions: {len(questions) if questions else 0} questions")
 
         if not questions:
+            logger.error("[Debug] No questions retrieved")
             flash('問題の取得に失敗しました。', 'error')
             return redirect(url_for('select_difficulty', grade=grade,
                             category=category, subcategory=subcategory))
 
         # セッションに情報を保存
         session['questions'] = questions
-        session['current_question'] = 0
+        session['current_question'] = 0  # 0-based index
         session['score'] = 0
         session['quiz_history'] = []
         session['answered_questions'] = []
@@ -714,9 +716,10 @@ def start_quiz(grade, category, subcategory, difficulty):
         
         # 問題データをJSONに変換（必要なフィールドのみ）
         question_data = {
-            'question': first_question['question'],
-            'options': first_question['options'],
-            'correct': first_question['correct']
+            'question': first_question.get('question', '問題が見つかりません'),
+            'options': first_question.get('options', []),
+            'correct': first_question.get('correct', 0),
+            'explanation': first_question.get('explanation', '')
         }
         
         # JSONエンコード
@@ -732,7 +735,8 @@ def start_quiz(grade, category, subcategory, difficulty):
                             question=question_data['question'],
                             options=question_data['options'],
                             question_data=question_data_json,
-                            current_question=0,
+                            current_question=0,  # 0-based index for internal use
+                            display_question=1,  # 1-based index for display
                             total_questions=len(questions),
                             score=0)
 
@@ -829,19 +833,30 @@ def submit_answer():
                 db.session.rollback()
                 # データベース保存エラーでもクイズ自体は完了させる
 
+        # 現在の問題番号を更新（次の問題用）
+        next_question = current_question + 1 if not is_last_question else current_question
+        session['current_question'] = next_question
+
+        # 現在の問題番号（1-based）を計算
+        display_question = current_question + 1
+
         response_data = {
             'success': True,
             'isCorrect': is_correct,
             'currentScore': current_score,
             'totalQuestions': len(questions),
+            'currentQuestion': display_question,  # 現在の問題番号（1-based）
+            'nextQuestion': next_question + 1,    # 次の問題番号（1-based）
             'isLastQuestion': is_last_question,
             'redirectUrl': url_for('result') if is_last_question else None,
-            'questionData': current_q
+            'questionData': {
+                'question': current_q.get('question', ''),
+                'options': current_q.get('options', []),
+                'correct': current_q.get('correct'),
+                'explanation': current_q.get('explanation', '')
+            }
         }
         logger.info(f"[Debug] Sending response: {response_data}")
-
-        if not is_last_question:
-            session['current_question'] = current_question + 1
                 
         return jsonify(response_data)
         
@@ -890,6 +905,7 @@ def next_question():
                            options=question_data['options'],
                            question_data=question_data_json,
                            current_question=current_question,
+                           display_question=current_question + 1,  # 表示用の問題番号（1-based）
                            total_questions=len(questions),
                            score=session.get('score', 0))
 
