@@ -1,7 +1,8 @@
 import click
 from flask.cli import with_appcontext
-from models import db, User
+from models import db, User, QuizAttempt, QuestionHistory
 from config import supabase
+import json
 
 INITIAL_ADMIN_EMAIL = "tsunotsunoda@gmail.com"  # 初期管理者のメールアドレス
 
@@ -71,6 +72,7 @@ def init_app(app):
     app.cli.add_command(init_admin_command)
     app.cli.add_command(promote_admin_command)
     app.cli.add_command(create_admin_command)
+    app.cli.add_command(migrate_question_history)
 
 @click.command('create-admin')
 @click.argument('email')
@@ -105,4 +107,68 @@ def create_admin_command(email, username):
 
     except Exception as e:
         click.echo(f'エラーが発生しました: {str(e)}')
+        db.session.rollback() 
+
+@click.command('migrate-question-history')
+@with_appcontext
+def migrate_question_history():
+    """既存のQuizAttemptから問題履歴を移行"""
+    try:
+        quiz_attempts = QuizAttempt.query.all()
+        migrated_count = 0
+        
+        for attempt in quiz_attempts:
+            try:
+                # quiz_historyがJSON文字列の場合はパース
+                if isinstance(attempt.quiz_history, str):
+                    history_data = json.loads(attempt.quiz_history)
+                else:
+                    history_data = attempt.quiz_history
+                
+                # 各問題の履歴を処理
+                for question_data in history_data:
+                    question_text = question_data.get('question')
+                    is_correct = question_data.get('is_correct')
+                    
+                    # 既存の履歴を検索または新規作成
+                    history = QuestionHistory.query.filter_by(
+                        user_id=attempt.user_id,
+                        question_text=question_text
+                    ).first()
+                    
+                    if not history:
+                        history = QuestionHistory(
+                            user_id=attempt.user_id,
+                            grade=attempt.grade,
+                            category=attempt.category,
+                            subcategory=attempt.subcategory,
+                            difficulty=attempt.difficulty,
+                            question_text=question_text,
+                            correct_count=1 if is_correct else 0,
+                            attempt_count=1,
+                            last_attempted_at=attempt.timestamp
+                        )
+                    else:
+                        history.attempt_count += 1
+                        if is_correct:
+                            history.correct_count += 1
+                        if attempt.timestamp > history.last_attempted_at:
+                            history.last_attempted_at = attempt.timestamp
+                    
+                    db.session.add(history)
+                    migrated_count += 1
+                
+                if migrated_count % 100 == 0:  # 100件ごとにコミット
+                    db.session.commit()
+                    print(f'Migrated {migrated_count} records')
+            
+            except Exception as e:
+                print(f'Error processing attempt {attempt.id}: {e}')
+                continue
+        
+        db.session.commit()
+        print(f'Successfully migrated {migrated_count} question history records')
+        
+    except Exception as e:
+        print(f'Migration failed: {e}')
         db.session.rollback() 

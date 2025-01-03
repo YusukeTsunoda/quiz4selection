@@ -44,7 +44,7 @@
           <h3>実施日時: {{ entry.timestamp.strftime('%Y-%m-%d %H:%M') }}</h3>
           <div class="score-info">
             <span class="score"
-              >スコア: {{ entry.score }}/{{ entry.total_questions }}</span
+              >正解数: {{ entry.score }}/{{ entry.total_questions }}</span
             >
             <span class="percentage"
               >({{ "%.1f"|format(entry.score/entry.total_questions*100)

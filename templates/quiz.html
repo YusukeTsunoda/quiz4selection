@@ -12,7 +12,9 @@
         <span class="question-counter"
           >問題 {{ current_question + 1 }}/{{ total_questions }}</span
         >
-        <span class="score-display">スコア: {{ score }}問</span>
+        <span class="score-display"
+          >正解数: {{ score }}/{{ total_questions }}</span
+        >
       </div>
     </div>
 
@@ -21,7 +23,7 @@
       <div
         class="options-container"
         data-correct="{{ question_data.correct }}"
-        data-question-data='{{ question_data|tojson|safe }}'
+        data-question-data="{{ question_data|tojson|safe }}"
       >
         {% for option in options %}
         <div
@@ -160,4 +162,4 @@
 </style>
 
 <script src="{{ url_for('static', filename='js/quiz.js') }}"></script>
-{% endblock %} 
+{% endblock %}

@@ -130,3 +130,22 @@ class QuizAttempt(db.Model):
             'avg_score': total_score_percentage / total_attempts,
             'highest_score': highest_score_percentage
         }
+
+
+class QuestionHistory(db.Model):
+    __tablename__ = 'question_history'
+
+    id = db.Column(db.BigInteger, primary_key=True)
+    user_id = db.Column(db.String, db.ForeignKey('users.id'), nullable=False)
+    grade = db.Column(db.Integer, nullable=False)
+    category = db.Column(db.String(50), nullable=False)
+    subcategory = db.Column(db.String(50), nullable=False)
+    difficulty = db.Column(db.String(20), nullable=False)
+    question_text = db.Column(db.Text, nullable=False)
+    correct_count = db.Column(db.Integer, default=0)
+    attempt_count = db.Column(db.Integer, default=0)
+    last_attempted_at = db.Column(db.DateTime(timezone=True), default=db.func.now())
+    created_at = db.Column(db.DateTime(timezone=True), default=db.func.now())
+    updated_at = db.Column(db.DateTime(timezone=True), default=db.func.now(), onupdate=db.func.now())
+
+    user = db.relationship('User', backref=db.backref('question_history', lazy=True))
