@@ -713,6 +713,7 @@ def start_quiz(grade, category, subcategory, difficulty):
 
         # 最初の問題をシャッフル
         first_question = get_shuffled_question(questions[0])
+        first_question['shuffled'] = True  # シャッフル済みフラグを設定
         logger.info(f"[Debug] First question data (after shuffle): {first_question}")
         
         # 問題データの形式を確認
@@ -826,8 +827,18 @@ def submit_answer():
         is_last_question = current_question == len(questions) - 1
         next_question = None
         if not is_last_question:
-            next_question = get_shuffled_question(questions[current_question + 1])
-            session['current_question'] = current_question + 1
+            # 次の問題のインデックスを更新
+            next_question_index = current_question + 1
+            session['current_question'] = next_question_index
+            
+            # 次の問題が既にシャッフルされているか確認
+            next_question = questions[next_question_index]
+            if 'shuffled' not in next_question:
+                # まだシャッフルされていない場合のみシャッフル
+                next_question = get_shuffled_question(next_question)
+                next_question['shuffled'] = True  # シャッフル済みフラグを設定
+                questions[next_question_index] = next_question
+                session['questions'] = questions
 
         # 最後の問題の場合、QuizAttemptをデータベースに保存
         if is_last_question:

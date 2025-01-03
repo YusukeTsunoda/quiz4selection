@@ -222,7 +222,7 @@ function updateQuestionDisplay(questionData) {
         // データ属性を更新
         optionsContainer.dataset.correct = questionData.correct;
 
-        // 新しい選択肢を追加（シャッフルされた順序を維持）
+        // サーバーから受け取った選択肢をそのまま表示（順序を維持）
         questionData.options.forEach((optionText, index) => {
             const option = document.createElement('div');
             option.className = 'option';
@@ -232,7 +232,7 @@ function updateQuestionDisplay(questionData) {
             optionsContainer.appendChild(option);
         });
 
-        // イベントリスナーを一括で設定
+        // イベントリスナーを設定
         setupOptionEventListeners();
     }
 }
