@@ -708,31 +708,37 @@ def start_quiz(grade, category, subcategory, difficulty):
         session['subcategory'] = subcategory
         session['difficulty'] = difficulty
 
-        # 最初の問題を表示
+        # 最初の問題を取得
         first_question = questions[0]
-        logger.info(f"First question data (raw): {first_question}")
-        logger.info(f"First question data type: {type(first_question)}")
-        logger.info(f"First question keys: {first_question.keys()}")
+        logger.info(f"[Debug] First question data (raw): {first_question}")
         
-        # データの内容を詳しくログ出力
-        for key, value in first_question.items():
-            logger.info(f"Key: {key}, Value type: {type(value)}, Value: {value}")
+        # 問題データをJSONに変換（必要なフィールドのみ）
+        question_data = {
+            'question': first_question['question'],
+            'options': first_question['options'],
+            'correct': first_question['correct']
+        }
         
-        # JSONエンコードしてログ出力
-        question_data_json = json.dumps(first_question, ensure_ascii=False)
-        logger.info(f"JSON encoded question data: {question_data_json}")
+        # JSONエンコード
+        try:
+            question_data_json = json.dumps(question_data, ensure_ascii=False)
+            logger.info(f"[Debug] JSON encoded question data: {question_data_json}")
+        except Exception as e:
+            logger.error(f"[Debug] Error encoding question data: {e}")
+            flash('問題データの処理中にエラーが発生しました。', 'error')
+            return redirect(url_for('grade_select'))
         
         return render_template('quiz.html',
-                            question=first_question['question'],
-                            options=first_question['options'],
-                            question_data=question_data_json,  # JSONエンコードしたデータを渡す
+                            question=question_data['question'],
+                            options=question_data['options'],
+                            question_data=question_data_json,
                             current_question=0,
                             total_questions=len(questions),
                             score=0)
 
     except Exception as e:
-        logger.error(f"Error in start_quiz: {e}")
-        logger.exception("Full traceback:")
+        logger.error(f"[Debug] Error in start_quiz: {e}")
+        logger.exception("[Debug] Full traceback:")
         flash('クイズの開始中にエラーが発生しました。', 'error')
         return redirect(url_for('grade_select'))
 
@@ -1032,34 +1038,58 @@ def get_quiz_data(grade, category, subcategory, difficulty):
     try:
         # 新しいフォルダ構造に基づいたファイルパス
         file_path = f'quiz_data/grade_{grade}/{category}/{subcategory}/{difficulty}/questions.json'
-        logger.info(f"Loading quiz data from: {file_path}")
+        logger.info(f"[Debug] Loading quiz data from: {file_path}")
 
         # ファイルの存在確認
         if not os.path.exists(file_path):
-            logger.error(f"Quiz data file not found: {file_path}")
+            logger.error(f"[Debug] Quiz data file not found: {file_path}")
             return None, "問題データファイルが見つかりません"
 
         # ファイルの読み込み
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            logger.info(f"Successfully loaded JSON data")
+            logger.info(f"[Debug] Loaded data type: {type(data)}")
+            logger.info(f"[Debug] Loaded data content: {data}")
 
-            if not data or not isinstance(data, list):
-                logger.error("Invalid question data format")
+            if not data:
+                logger.error("[Debug] Data is empty")
+                return None, "問題データが空です"
+                
+            if not isinstance(data, list):
+                logger.error(f"[Debug] Data is not a list. Type: {type(data)}")
                 return None, "問題データの形式が正しくありません"
+
+            # 各問題の形式を確認
+            for i, question in enumerate(data):
+                logger.info(f"[Debug] Checking question {i}: {question}")
+                if not isinstance(question, dict):
+                    logger.error(f"[Debug] Question {i} is not a dictionary")
+                    return None, "問題データの形式が正しくありません"
+                
+                # 必須フィールドの確認
+                required_fields = ['question', 'options', 'correct']
+                missing_fields = [field for field in required_fields if field not in question]
+                if missing_fields:
+                    logger.error(f"[Debug] Question {i} is missing fields: {missing_fields}")
+                    return None, "問題データの形式が正しくありません"
+                
+                # optionsの形式確認
+                if not isinstance(question['options'], list):
+                    logger.error(f"[Debug] Question {i} options is not a list")
+                    return None, "問題データの形式が正しくありません"
 
             # 問題をシャッフル
             shuffled_questions = [get_shuffled_question(q) for q in data]
-            logger.info(f"Successfully loaded and shuffled {len(shuffled_questions)} questions")
+            logger.info(f"[Debug] Successfully loaded and shuffled {len(shuffled_questions)} questions")
 
             return shuffled_questions, None
 
     except json.JSONDecodeError as e:
-        logger.error(f"JSON decode error in {file_path}: {e}")
+        logger.error(f"[Debug] JSON decode error in {file_path}: {e}")
         return None, "問題データの形式が正しくありません"
     except Exception as e:
-        logger.error(f"Error in get_quiz_data: {e}")
-        logger.exception("Full traceback:")
+        logger.error(f"[Debug] Error in get_quiz_data: {e}")
+        logger.exception("[Debug] Full traceback:")
         return None, "問題データの読み込み中にエラーが発生しました"
 
 
@@ -1172,17 +1202,46 @@ def quiz_history(grade, category, subcategory, difficulty):
         return redirect(url_for('dashboard'))
 
 
-@app.route('/signup', methods=['GET', 'POST'], endpoint='signup')
+@app.route('/signup', methods=['GET', 'POST'])
 def signup():
-    # セッションをクリア
-    session.clear()
-    
     if request.method == 'POST':
         try:
             email = request.form['email']
             password = request.form['password']
             username = request.form['username']
             
+            logger.info(f"Attempting signup for email: {email}, username: {username}")
+            logger.info(f"Development mode: {is_development()}")
+            
+            if not is_development():
+                # Supabaseでユーザー登録
+                try:
+                    logger.info("Attempting Supabase signup...")
+                    logger.info(f"Using Supabase URL: {os.getenv('SUPABASE_URL')}")
+                    logger.info(f"API Key exists: {bool(os.getenv('SUPABASE_KEY'))}")
+                    
+                    response = supabase.auth.sign_up({
+                        "email": email,
+                        "password": password
+                    })
+                    logger.info("Supabase signup response received")
+                    logger.info(f"Response type: {type(response)}")
+                    logger.info(f"Response contains user: {hasattr(response, 'user')}")
+                    
+                    if hasattr(response, 'user') and response.user:
+                        user_id = response.user.id
+                        logger.info(f"User ID retrieved: {user_id}")
+                    else:
+                        logger.error("No user data in response")
+                        raise ValueError("No user data received from Supabase")
+                        
+                except Exception as auth_error:
+                    logger.error(f"Supabase signup error details: {str(auth_error)}")
+                    logger.error(f"Error type: {type(auth_error)}")
+                    if hasattr(auth_error, 'response'):
+                        logger.error(f"Error response: {auth_error.response.text if hasattr(auth_error.response, 'text') else 'No response text'}")
+                    raise
+                
             # メールアドレスの重複チェック
             existing_user = User.query.filter_by(email=email).first()
             if existing_user:

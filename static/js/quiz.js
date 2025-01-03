@@ -6,6 +6,12 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
+    // クイズコンテナを表示
+    const quizContainer = document.querySelector('.quiz-container');
+    if (quizContainer) {
+        quizContainer.classList.add('show');
+    }
+
     const jsonContent = questionDataElement.textContent;
     console.log('[Debug] Raw JSON content:', jsonContent);
 
@@ -85,6 +91,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (responseData.isCorrect) {
                     option.classList.add('correct');
                     console.log('[Debug] Correct answer selected');
+                    // 正解の解説を表示
+                    showExplanation(true, questionData.explanation);
                 } else {
                     option.classList.add('incorrect');
                     // 正解のオプションを緑で表示
@@ -95,30 +103,33 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         console.error('[Debug] Correct option not found:', correctIndex);
                     }
+                    // 不正解の解説を表示
+                    showExplanation(false, questionData.explanation);
                 }
 
                 // スコアの更新
-                const scoreElement = document.getElementById('score');
-                if (scoreElement) {
-                    scoreElement.textContent = responseData.currentScore;
-                    console.log('[Debug] Score updated:', responseData.currentScore);
+                const scoreDisplay = document.querySelector('.score-display');
+                if (scoreDisplay) {
+                    scoreDisplay.textContent = `正解数: ${responseData.currentScore}/${responseData.totalQuestions}`;
                 }
 
                 // 最後の問題の場合
                 if (responseData.isLastQuestion) {
                     console.log('[Debug] Last question completed');
-                    if (responseData.redirectUrl) {
-                        setTimeout(() => {
-                            window.location.href = responseData.redirectUrl;
-                        }, 1500);
-                    }
+                    setTimeout(() => {
+                        window.location.href = '/result';
+                    }, 2000);
                 } else {
-                    // 次の問題ボタンを有効化
-                    const nextButton = document.getElementById('next-button');
-                    if (nextButton) {
-                        nextButton.classList.remove('disabled');
-                        console.log('[Debug] Next button enabled');
-                    }
+                    // 次の問題への遷移
+                    setTimeout(() => {
+                        const quizContainer = document.querySelector('.quiz-container');
+                        if (quizContainer) {
+                            quizContainer.classList.add('fade');
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 500);
+                        }
+                    }, 2000);
                 }
 
             } catch (error) {
@@ -126,4 +137,20 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // 解説を表示する関数
+    function showExplanation(isCorrect, explanation) {
+        const questionContainer = document.querySelector('.question-container');
+        if (!questionContainer) return;
+
+        const existingExplanation = document.querySelector('.explanation');
+        if (existingExplanation) {
+            existingExplanation.remove();
+        }
+
+        const explanationDiv = document.createElement('div');
+        explanationDiv.className = `explanation ${isCorrect ? 'correct-message' : 'incorrect-message'}`;
+        explanationDiv.textContent = explanation || (isCorrect ? '正解です！' : '不正解です。');
+        questionContainer.appendChild(explanationDiv);
+    }
 });
