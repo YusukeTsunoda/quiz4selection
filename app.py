@@ -1211,37 +1211,7 @@ def signup():
             username = request.form['username']
             
             logger.info(f"Attempting signup for email: {email}, username: {username}")
-            logger.info(f"Development mode: {is_development()}")
             
-            if not is_development():
-                # Supabaseでユーザー登録
-                try:
-                    logger.info("Attempting Supabase signup...")
-                    logger.info(f"Using Supabase URL: {os.getenv('SUPABASE_URL')}")
-                    logger.info(f"API Key exists: {bool(os.getenv('SUPABASE_KEY'))}")
-                    
-                    response = supabase.auth.sign_up({
-                        "email": email,
-                        "password": password
-                    })
-                    logger.info("Supabase signup response received")
-                    logger.info(f"Response type: {type(response)}")
-                    logger.info(f"Response contains user: {hasattr(response, 'user')}")
-                    
-                    if hasattr(response, 'user') and response.user:
-                        user_id = response.user.id
-                        logger.info(f"User ID retrieved: {user_id}")
-                    else:
-                        logger.error("No user data in response")
-                        raise ValueError("No user data received from Supabase")
-                        
-                except Exception as auth_error:
-                    logger.error(f"Supabase signup error details: {str(auth_error)}")
-                    logger.error(f"Error type: {type(auth_error)}")
-                    if hasattr(auth_error, 'response'):
-                        logger.error(f"Error response: {auth_error.response.text if hasattr(auth_error.response, 'text') else 'No response text'}")
-                    raise
-                
             # メールアドレスの重複チェック
             existing_user = User.query.filter_by(email=email).first()
             if existing_user:
@@ -1254,39 +1224,64 @@ def signup():
                 flash('このユーザー名は既に使用されています。', 'error')
                 return render_template('signup.html')
             
+            user_id = None
             if is_development():
                 # 開発環境では認証をスキップ
                 user_id = f'dev-{username}'
+                logger.info("Using development mode authentication")
             else:
-                # Supabaseでユーザー登録
+                # Supabaseでユーザー登録（本番環境）
                 try:
+                    logger.info("Attempting Supabase signup...")
+                    logger.info(f"Using Supabase URL: {os.getenv('SUPABASE_URL')}")
+                    logger.info(f"API Key exists: {bool(os.getenv('SUPABASE_KEY'))}")
+                    
                     response = supabase.auth.sign_up({
                         "email": email,
                         "password": password
                     })
+                    
+                    if not response or not hasattr(response, 'user') or not response.user:
+                        logger.error("No user data in Supabase response")
+                        raise ValueError("No user data received from Supabase")
+                    
                     user_id = response.user.id
+                    logger.info(f"Supabase signup successful. User ID: {user_id}")
+                    
                 except Exception as auth_error:
                     logger.error(f"Supabase signup error: {auth_error}")
+                    logger.error(f"Error type: {type(auth_error)}")
+                    if hasattr(auth_error, 'response'):
+                        logger.error(f"Error response: {auth_error.response.text if hasattr(auth_error.response, 'text') else 'No response text'}")
                     flash('アカウント登録に失敗しました。', 'error')
                     return render_template('signup.html')
             
             # ユーザーをデータベースに保存
-            user = User(
-                id=user_id,
-                email=email,
-                username=username,
-                is_admin=False
-            )
-            db.session.add(user)
-            db.session.commit()
-            
-            flash('アカウントが登録されました。ログインしてください。', 'success')
-            return redirect(url_for('login'))
+            try:
+                user = User(
+                    id=user_id,
+                    email=email,
+                    username=username,
+                    is_admin=False
+                )
+                db.session.add(user)
+                db.session.commit()
+                logger.info(f"User {username} successfully saved to database")
+                
+                flash('アカウントが登録されました。ログインしてください。', 'success')
+                return redirect(url_for('login'))
+                
+            except Exception as db_error:
+                logger.error(f"Database error during user creation: {db_error}")
+                db.session.rollback()
+                flash('データベースへの登録に失敗しました。', 'error')
+                return render_template('signup.html')
+                
         except Exception as e:
-            logger.error(f"Error in signup: {e}")
-            db.session.rollback()
+            logger.error(f"Unexpected error in signup: {e}")
             flash('登録に失敗しました。', 'error')
             return render_template('signup.html')
+            
     return render_template('signup.html')
 
 @app.route('/login', methods=['GET', 'POST'])
