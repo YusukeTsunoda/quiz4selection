@@ -741,10 +741,11 @@ def start_quiz(grade, category, subcategory, difficulty):
 def submit_answer():
     try:
         if not current_user.is_authenticated:
+            logger.error('[Debug] User not authenticated')
             return jsonify({'success': False, 'error': 'User not logged in'})
 
         data = request.get_json()
-        logger.info(f"Received answer data: {data}")
+        logger.info(f"[Debug] Received answer data: {data}")
         
         # answerとselectedの両方のキーをチェック
         selected_index = data.get('answer')
@@ -753,7 +754,7 @@ def submit_answer():
             
         # selected_indexがNoneの場合のエラーハンドリング
         if selected_index is None:
-            logger.error("No answer received from client")
+            logger.error("[Debug] No answer received from client")
             return jsonify({'success': False, 'error': 'No answer selected'})
         
         current_question = session.get('current_question', 0)
@@ -761,26 +762,29 @@ def submit_answer():
         quiz_history = session.get('quiz_history', [])
         current_score = session.get('score', 0)
 
+        logger.info(f"[Debug] Session state: current_question={current_question}, total_questions={len(questions)}, current_score={current_score}")
+
         if not questions or current_question >= len(questions):
-            logger.error("Invalid question state")
+            logger.error("[Debug] Invalid question state")
             return jsonify({'success': False, 'error': 'Invalid question'})
 
         current_q = questions[current_question]
         correct_index = current_q.get('correct')
-        logger.info(f"Question data: {current_q}")
-        logger.info(f"Selected index: {selected_index}, Correct index: {correct_index}")
+        logger.info(f"[Debug] Current question data: {current_q}")
+        logger.info(f"[Debug] Selected index: {selected_index}, Correct index: {correct_index}")
         
         # 型を合わせて比較（エラーハンドリングを追加）
         try:
             is_correct = int(selected_index) == int(correct_index)
-            logger.info(f"Is correct: {is_correct}")
+            logger.info(f"[Debug] Answer comparison: {selected_index} == {correct_index} = {is_correct}")
         except (ValueError, TypeError) as e:
-            logger.error(f"Error comparing answers: {e}")
+            logger.error(f"[Debug] Error comparing answers: {e}")
             return jsonify({'success': False, 'error': 'Invalid answer format'})
         
         if is_correct:
             current_score += 1
             session['score'] = current_score
+            logger.info(f"[Debug] Score updated: {current_score}")
 
         # 回答履歴を保存
         quiz_history.append({
@@ -789,46 +793,23 @@ def submit_answer():
             'correct_answer': current_q['options'][int(correct_index)],
             'is_correct': is_correct,
             'options': current_q.get('options', []),
-            'explanation': current_q.get('explanation', '')  # 解説を追加
+            'explanation': current_q.get('explanation', '')
         })
         session['quiz_history'] = quiz_history
+        logger.info(f"[Debug] Quiz history updated: {quiz_history[-1]}")
 
         is_last_question = current_question == len(questions) - 1
-        logger.info(f"Is last question: {is_last_question}")
-
-        # 最後の問題の場合、QuizAttemptを保存
-        if is_last_question:
-            try:
-                grade = session.get('grade')
-                category = session.get('category')
-                subcategory = session.get('subcategory')
-                difficulty = session.get('difficulty')
-                
-                quiz_attempt = QuizAttempt(
-                    user_id=current_user.id,
-                    grade=grade,
-                    category=category,
-                    subcategory=subcategory,
-                    difficulty=difficulty,
-                    score=current_score,
-                    total_questions=len(questions),
-                    quiz_history=json.dumps(quiz_history)
-                )
-                db.session.add(quiz_attempt)
-                db.session.commit()
-                logger.info(f"Quiz attempt saved - User: {current_user.id}, Final score: {current_score}/{len(questions)}")
-            except Exception as e:
-                logger.error(f"Error saving quiz attempt: {e}")
-                return jsonify({'success': False, 'error': 'Failed to save quiz attempt'})
+        logger.info(f"[Debug] Is last question: {is_last_question}")
 
         response_data = {
             'success': True,
             'isCorrect': is_correct,
             'currentScore': current_score,
             'isLastQuestion': is_last_question,
-            'redirectUrl': url_for('result') if is_last_question else None
+            'redirectUrl': url_for('result') if is_last_question else None,
+            'questionData': current_q  # 問題データを含める
         }
-        logger.info(f"Sending response: {response_data}")
+        logger.info(f"[Debug] Sending response: {response_data}")
 
         if not is_last_question:
             session['current_question'] = current_question + 1
@@ -836,8 +817,8 @@ def submit_answer():
         return jsonify(response_data)
         
     except Exception as e:
-        logger.error(f"Error in submit_answer: {e}")
-        logger.exception("Full traceback:")
+        logger.error(f"[Debug] Error in submit_answer: {e}")
+        logger.exception("[Debug] Full traceback:")
         return jsonify({'success': False, 'error': str(e)})
 
 
@@ -848,12 +829,12 @@ def next_question():
         questions = session.get('questions', [])
         current_question = session.get('current_question', 0)
         
-        logger.info(f"Current question index: {current_question}")
-        logger.info(f"Total questions: {len(questions)}")
+        logger.info(f"[Debug] Next question - Current index: {current_question}")
+        logger.info(f"[Debug] Total questions: {len(questions)}")
         
         # 全問題が終了した場合
         if current_question >= len(questions):
-            logger.info("Quiz completed, redirecting to result page")
+            logger.info("[Debug] Quiz completed, redirecting to result page")
             return redirect(url_for('result'))
         
         # 現在の問題を取得
@@ -861,30 +842,30 @@ def next_question():
         
         # データの存在確認
         if not question_data:
-            logger.error("Question data is empty")
+            logger.error("[Debug] Question data is empty")
             return redirect(url_for('grade_select'))
             
         # データの内容を詳しくログ出力
-        logger.info(f"Question data before encoding: {question_data}")
+        logger.info(f"[Debug] Question data before encoding: {question_data}")
         
         # JSONエンコード
         try:
             question_data_json = json.dumps(question_data, ensure_ascii=False)
-            logger.info(f"Question data after encoding: {question_data_json}")
+            logger.info(f"[Debug] Question data after encoding: {question_data_json}")
         except Exception as e:
-            logger.error(f"Error encoding question data: {e}")
+            logger.error(f"[Debug] Error encoding question data: {e}")
             return redirect(url_for('grade_select'))
         
         return render_template('quiz.html',
                            question=question_data['question'],
                            options=question_data['options'],
-                           question_data=question_data_json,  # JSONエンコードしたデータを渡す
+                           question_data=question_data_json,
                            current_question=current_question,
                            total_questions=len(questions),
                            score=session.get('score', 0))
 
     except Exception as e:
-        logger.error(f"Error in next_question route: {e}")
+        logger.error(f"[Debug] Error in next_question route: {e}")
         flash('次の問題の表示中にエラーが発生しました。', 'error')
         return redirect(url_for('grade_select'))
     
