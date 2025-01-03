@@ -673,19 +673,25 @@ def start_quiz(grade, category, subcategory, difficulty):
 
         # 最初の問題を表示
         first_question = questions[0]
+        logger.info(f"First question data: {first_question}")
+        
+        # 問題データをJSONエンコード
+        question_data_json = json.dumps(first_question, ensure_ascii=False)
+        logger.info(f"Encoded question data: {question_data_json}")
+        
         return render_template('quiz.html',
                             question=first_question['question'],
                             options=first_question['options'],
-                            question_data=first_question,
+                            question_data=question_data_json,
                             current_question=0,
                             total_questions=len(questions),
                             score=0)
 
     except Exception as e:
         logger.error(f"Error in start_quiz: {e}")
+        logger.exception("Full traceback:")
         flash('クイズの開始中にエラーが発生しました。', 'error')
-        return redirect(url_for('select_difficulty', grade=grade,
-                        category=category, subcategory=subcategory))
+        return redirect(url_for('grade_select'))
 
 
 @app.route('/submit_answer', methods=['POST'])
@@ -812,11 +818,14 @@ def next_question():
         # 現在の問題を表示
         logger.info(f"Showing question {current_question + 1}")
         question_data = questions[current_question]
+        # 問題データをJSONエンコード
+        question_data_json = json.dumps(question_data, ensure_ascii=False)
+        logger.info(f"Encoded question data: {question_data_json}")
 
         return render_template('quiz.html',
                                question=question_data['question'],
                                options=question_data['options'],
-                               question_data=question_data,
+                               question_data=question_data_json,
                                current_question=current_question,
                                total_questions=len(questions),
                                score=session.get('score', 0))

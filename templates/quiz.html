@@ -24,6 +24,7 @@
         class="options-container"
         data-correct="{{ question_data.correct }}"
         data-question-data="{{ question_data|tojson|safe }}"
+        data-total-questions="{{ total_questions }}"
       >
         {% for option in options %}
         <div
