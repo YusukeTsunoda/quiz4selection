@@ -26,7 +26,31 @@ class Config:
         self.DEBUG = is_development()
 
 # Supabaseクライアントの初期化
-supabase: Client = create_client(
-    os.getenv('SUPABASE_URL', ''),
-    os.getenv('SUPABASE_KEY', '')
-)
+if is_development():
+    # 開発環境ではダミーのクライアントを使用
+    class DummySupabaseClient:
+        class Auth:
+            def sign_up(self, credentials):
+                return type('User', (), {'id': f"dev-{credentials['email']}"})()
+            
+            def sign_in_with_password(self, credentials):
+                return type('User', (), {'id': f"dev-{credentials['email']}"})()
+            
+            def sign_out(self):
+                pass
+            
+            def reset_password_email(self, email):
+                pass
+        
+        auth = Auth()
+    
+    supabase = DummySupabaseClient()
+else:
+    # 本番環境では実際のSupabaseクライアントを使用
+    supabase_url = os.getenv('SUPABASE_URL')
+    supabase_key = os.getenv('SUPABASE_KEY')
+    
+    if not supabase_url or not supabase_key:
+        raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in production environment")
+    
+    supabase = create_client(supabase_url, supabase_key)
