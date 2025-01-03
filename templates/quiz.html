@@ -22,8 +22,6 @@
       <p class="question-text">{{ question }}</p>
       <div
         class="options-container"
-        data-correct="{{ question_data.correct }}"
-        data-question-data="{{ question_data }}"
         data-total-questions="{{ total_questions }}"
       >
         {% for option in options %}
@@ -40,8 +38,8 @@
   </div>
 </div>
 
-<!-- デバッグ用のJSONデータ -->
-<script type="application/json" id="debug-data" style="display: none">
+<!-- 問題データをJSONとして保持 -->
+<script type="application/json" id="question-data" style="display: none">
   {{ question_data|safe }}
 </script>
 

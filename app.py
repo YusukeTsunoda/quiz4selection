@@ -486,6 +486,43 @@ GRADE_CATEGORIES = {
     }
 }
 
+# 管理者用エンドポイント
+@app.route('/admin/subjects', methods=['GET'])
+@login_required
+def get_subjects():
+    """学年ごとの教科・単元情報を取得するエンドポイント"""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized access'}), 403
+    
+    return jsonify(GRADE_CATEGORIES)
+
+@app.route('/admin/subjects/<int:grade>', methods=['GET'])
+@login_required
+def get_subjects_by_grade(grade):
+    """特定の学年の教科・単元情報を取得するエンドポイント"""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized access'}), 403
+    
+    if grade not in GRADE_CATEGORIES:
+        return jsonify({'error': 'Invalid grade'}), 400
+    
+    return jsonify(GRADE_CATEGORIES[grade])
+
+@app.route('/admin/subjects/<int:grade>/<subject>', methods=['GET'])
+@login_required
+def get_subcategories(grade, subject):
+    """特定の学年・教科の単元情報を取得するエンドポイント"""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized access'}), 403
+    
+    if grade not in GRADE_CATEGORIES:
+        return jsonify({'error': 'Invalid grade'}), 400
+        
+    if subject not in GRADE_CATEGORIES[grade]:
+        return jsonify({'error': 'Invalid subject'}), 400
+    
+    return jsonify(GRADE_CATEGORIES[grade][subject])
+
 def get_subcategories(grade, category):
     """指定された学年とカテゴリのサブカテゴリを取得"""
     return GRADE_CATEGORIES.get(grade, {}).get(category, [])

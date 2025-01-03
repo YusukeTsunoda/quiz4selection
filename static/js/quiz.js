@@ -85,12 +85,28 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await submitAnswer(selectedIndex);
             
             if (response.success) {
+                // 問題データを取得
+                const questionDataElement = document.getElementById('question-data');
+                if (!questionDataElement) {
+                    throw new Error('Question data element not found');
+                }
+
+                const jsonContent = questionDataElement.textContent.trim();
+                if (!jsonContent) {
+                    throw new Error('Empty JSON content');
+                }
+
+                const questionData = JSON.parse(jsonContent);
+                
                 if (response.isCorrect) {
                     selectedOption.classList.add('correct');
                     updateScoreDisplay(response.currentScore);
                 } else {
+                    // 不正解の選択肢を赤く表示
                     selectedOption.classList.add('incorrect');
-                    const correctIndex = parseInt(optionsContainer.dataset.correct);
+                    
+                    // 正解の選択肢を緑色で表示
+                    const correctIndex = parseInt(questionData.correct);
                     if (correctIndex >= 0 && correctIndex < options.length) {
                         const correctOption = options[correctIndex];
                         correctOption.classList.add('correct');
@@ -98,25 +114,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 // 解説の表示
-                try {
-                    // デバッグ用のJSONデータを取得
-                    const debugDataElement = document.getElementById('debug-data');
-                    if (!debugDataElement) {
-                        throw new Error('Debug data element not found');
-                    }
-
-                    const jsonContent = debugDataElement.textContent.trim();
-                    if (!jsonContent) {
-                        throw new Error('Empty JSON content');
-                    }
-
-                    const questionData = JSON.parse(jsonContent);
-                    const explanationText = questionData.explanation || '解説がありません';
-                    showExplanation(response.isCorrect, explanationText);
-                } catch (error) {
-                    console.error('Error handling explanation:', error);
-                    showExplanation(response.isCorrect, '解説の読み込みに失敗しました');
-                }
+                const explanationText = questionData.explanation || '解説がありません';
+                showExplanation(response.isCorrect, explanationText);
 
                 await wait(1500);
                 
