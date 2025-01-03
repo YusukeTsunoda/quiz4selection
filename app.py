@@ -780,6 +780,11 @@ def submit_answer():
             logger.error("[Debug] User not authenticated")
             return jsonify({'error': 'ログインが必要です', 'code': 'AUTH_REQUIRED'}), 401
 
+        # AJAXリクエストかどうかを確認
+        if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+            logger.error("[Debug] Not an AJAX request")
+            return jsonify({'error': '不正なリクエストです', 'code': 'INVALID_REQUEST_TYPE'}), 400
+
         # リクエストデータの検証
         data = request.get_json()
         if not data:
@@ -790,12 +795,18 @@ def submit_answer():
             logger.error("[Debug] No 'selected' field in request data")
             return jsonify({'error': '選択された回答が含まれていません', 'code': 'MISSING_SELECTED'}), 400
 
-        # セッションデータの検証
+        # セッションの有効性を確認
         if 'questions' not in session:
             logger.error("[Debug] No questions in session")
-            return jsonify({'error': 'セッションが無効です', 'code': 'INVALID_SESSION'}), 400
+            return jsonify({'error': 'セッションが無効です。ページを更新してください。', 'code': 'INVALID_SESSION'}), 400
 
-        selected_index = int(data['selected'])
+        # 型変換を安全に行う
+        try:
+            selected_index = int(data['selected'])
+        except (ValueError, TypeError):
+            logger.error("[Debug] Invalid selected index format")
+            return jsonify({'error': '選択された回答の形式が不正です', 'code': 'INVALID_INDEX_FORMAT'}), 400
+
         questions = session.get('questions', [])
         current_question = session.get('current_question', 0)
         quiz_history = session.get('quiz_history', [])
@@ -907,7 +918,7 @@ def submit_answer():
         logger.exception("[Debug] Full traceback:")
         return jsonify({
             'success': False,
-            'error': str(e),
+            'error': 'サーバーエラーが発生しました。ページを更新してもう一度お試しください。',
             'code': 'INTERNAL_ERROR'
         }), 500
 

@@ -256,6 +256,12 @@ function setupOptionEventListeners() {
                 return;
             }
 
+            // 他のオプションを無効化
+            options.forEach(opt => opt.classList.add('disabled'));
+
+            // 選択したオプションをマーク
+            option.classList.add('selected');
+
             const index = parseInt(option.dataset.index);
             console.log('[Debug] Submitting answer:', {
                 index: index,
@@ -269,11 +275,13 @@ function setupOptionEventListeners() {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'  // AJAXリクエストであることを示す
                     },
                     body: JSON.stringify({
                         selected: index
                     }),
-                    credentials: 'same-origin'  // セッションCookieを送信するために必要
+                    credentials: 'include',  // すべてのリクエストでクッキーを送信
+                    mode: 'same-origin'      // 同一オリジンのみ許可
                 });
 
                 // レスポンスの詳細をログ出力
@@ -335,6 +343,13 @@ function setupOptionEventListeners() {
             } catch (error) {
                 console.error('[Debug] Error in submit_answer:', error);
                 console.error('[Debug] Error stack:', error.stack);
+                
+                // エラーメッセージを表示
+                showExplanation(false, 'エラーが発生しました。ページを更新してもう一度お試しください。');
+                
+                // 選択肢の無効化を解除
+                options.forEach(opt => opt.classList.remove('disabled'));
+                option.classList.remove('selected');
             }
         });
     });
