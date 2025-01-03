@@ -1322,50 +1322,113 @@ def logout():
 @admin_required
 def admin_dashboard():
     """管理者ダッシュボード"""
-    users = User.query.filter_by(is_admin=False).all()
-    return render_template('admin/dashboard.html', users=users)
+    try:
+        users = User.query.filter_by(is_admin=False).all()
+        
+        # 学年ごとの教科・単元情報を構造化
+        subjects_by_grade = {}
+        for grade in range(1, 7):
+            subjects_by_grade[grade] = {}
+            # その学年で利用可能な教科のみを取得
+            available_subjects = GRADE_CATEGORIES[grade].keys()
+            
+            for subject in available_subjects:
+                if subject in CATEGORY_NAMES:
+                    subjects_by_grade[grade][subject] = {
+                        'name': CATEGORY_NAMES[subject],
+                        'subcategories': []
+                    }
+                    # その学年・教科で利用可能な単元のみを取得
+                    for subcategory in GRADE_CATEGORIES[grade][subject]:
+                        # 単元の日本語名を取得
+                        subcategory_name = SUBCATEGORY_NAMES[subject].get(subcategory, subcategory)
+                        subjects_by_grade[grade][subject]['subcategories'].append({
+                            'id': subcategory,
+                            'name': subcategory_name
+                        })
+
+        return render_template('admin/dashboard.html',
+                           users=users,
+                           subjects_by_grade=subjects_by_grade,
+                           CATEGORY_NAMES=CATEGORY_NAMES)
+                           
+    except Exception as e:
+        logger.error(f"Error in admin dashboard: {e}")
+        flash('ダッシュボードの表示中にエラーが発生しました。', 'error')
+        return redirect(url_for('grade_select'))
 
 @app.route('/admin/user/<user_id>', methods=['GET', 'POST'])
 @admin_required
 def admin_user_edit(user_id):
     """ユーザーの権限編集"""
-    user = User.query.get_or_404(user_id)
-    
-    if request.method == 'POST':
-        try:
-            # 許可する学年を更新
-            allowed_grades = [int(grade) for grade in request.form.getlist('grades[]')]
-            user.allowed_grades = allowed_grades
+    try:
+        user = User.query.get_or_404(user_id)
+        
+        if request.method == 'POST':
+            try:
+                # 許可する学年を更新
+                allowed_grades = [int(grade) for grade in request.form.getlist('grades[]')]
+                user.allowed_grades = allowed_grades
+                
+                # 許可する科目とサブカテゴリを更新
+                allowed_subjects = {}
+                for grade in range(1, 7):
+                    # その学年で利用可能な教科のみを処理
+                    available_subjects = GRADE_CATEGORIES[grade].keys()
+                    for category in available_subjects:
+                        if category in CATEGORY_NAMES:
+                            subcategories = request.form.getlist(f'subjects[{grade}][{category}][]')
+                            if subcategories:
+                                if category not in allowed_subjects:
+                                    allowed_subjects[category] = []
+                                allowed_subjects[category].extend(subcategories)
+                
+                # 重複を除去
+                for category in allowed_subjects:
+                    allowed_subjects[category] = list(set(allowed_subjects[category]))
+                
+                user.allowed_subjects = allowed_subjects
+                db.session.commit()
+                
+                flash('ユーザー権限を更新しました。', 'success')
+                return redirect(url_for('admin_dashboard'))
+                
+            except Exception as e:
+                logger.error(f"Error updating user permissions: {e}")
+                db.session.rollback()
+                flash('ユーザー権限の更新に失敗しました。', 'error')
+
+        # 学年ごとの教科・単元情報を構造化
+        subjects_by_grade = {}
+        for grade in range(1, 7):
+            subjects_by_grade[grade] = {}
+            # その学年で利用可能な教科のみを取得
+            available_subjects = GRADE_CATEGORIES[grade].keys()
             
-            # 許可する科目とサブカテゴリを更新
-            allowed_subjects = {}
-            for grade in range(1, 7):
-                for category in CATEGORY_NAMES.keys():
-                    subcategories = request.form.getlist(f'subjects[{grade}][{category}][]')
-                    if subcategories:
-                        if category not in allowed_subjects:
-                            allowed_subjects[category] = []
-                        allowed_subjects[category].extend(subcategories)
-            
-            # 重複を除去
-            for category in allowed_subjects:
-                allowed_subjects[category] = list(set(allowed_subjects[category]))
-            
-            user.allowed_subjects = allowed_subjects
-            db.session.commit()
-            
-            flash('ユーザー権限を更新しました。', 'success')
-            return redirect(url_for('admin_dashboard'))
-            
-        except Exception as e:
-            logger.error(f"Error updating user permissions: {e}")
-            db.session.rollback()
-            flash('ユーザー権限の更新に失敗しました。', 'error')
-    
-    return render_template('admin/user_edit.html',
-                         user=user,
-                         CATEGORY_NAMES=CATEGORY_NAMES,
-                         SUBCATEGORY_NAMES=SUBCATEGORY_NAMES)
+            for subject in available_subjects:
+                if subject in CATEGORY_NAMES:
+                    subjects_by_grade[grade][subject] = {
+                        'name': CATEGORY_NAMES[subject],
+                        'subcategories': []
+                    }
+                    # その学年・教科で利用可能な単元のみを取得
+                    for subcategory in GRADE_CATEGORIES[grade][subject]:
+                        # 単元の日本語名を取得
+                        subcategory_name = SUBCATEGORY_NAMES[subject].get(subcategory, subcategory)
+                        subjects_by_grade[grade][subject]['subcategories'].append({
+                            'id': subcategory,
+                            'name': subcategory_name
+                        })
+        
+        return render_template('admin/user_edit.html',
+                           user=user,
+                           subjects_by_grade=subjects_by_grade,
+                           CATEGORY_NAMES=CATEGORY_NAMES)
+                           
+    except Exception as e:
+        logger.error(f"Error in user edit: {e}")
+        flash('ユーザー編集画面の表示中にエラーが発生しました。', 'error')
+        return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/setup', methods=['POST'])
 def admin_setup():
