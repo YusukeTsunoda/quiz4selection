@@ -36,19 +36,19 @@
         <p class="question-text">{{ item.question }}</p>
 
         <div class="answer-info">
-          <p class="user-answer">
-            あなたの回答:
-            <span
-              class="{% if item.is_correct %}text-success{% else %}text-danger{% endif %}"
+          <div class="options-list">
+            {% for option in item.options %}
+            <div
+              class="option-item {% if loop.index0 == item.selected_index %}selected{% endif %} {% if loop.index0 == item.correct_index %}correct{% endif %}"
             >
-              {{ item.user_answer }}
-            </span>
-          </p>
-          {% if not item.is_correct %}
-          <p class="correct-answer">
-            正解: <span class="text-success">{{ item.correct_answer }}</span>
-          </p>
-          {% endif %}
+              {{ option }} {% if loop.index0 == item.selected_index %}
+              <span class="badge selected-badge">選択</span>
+              {% endif %} {% if loop.index0 == item.correct_index %}
+              <span class="badge correct-badge">正解</span>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
         </div>
 
         {% if item.explanation %}
@@ -134,19 +134,44 @@
     line-height: 1.6;
   }
 
-  .answer-info {
-    background-color: #f8f9fa;
-    padding: 15px;
+  .options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .option-item {
+    padding: 10px 15px;
     border-radius: 8px;
-    margin-bottom: 15px;
+    background-color: #f8f9fa;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
-  .answer-info p {
-    margin-bottom: 8px;
+  .option-item.selected {
+    background-color: #e2e6ea;
   }
 
-  .answer-info p:last-child {
-    margin-bottom: 0;
+  .option-item.correct {
+    background-color: #d4edda;
+  }
+
+  .badge {
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 0.8em;
+    margin-left: 10px;
+  }
+
+  .selected-badge {
+    background-color: #6c757d;
+    color: white;
+  }
+
+  .correct-badge {
+    background-color: #28a745;
+    color: white;
   }
 
   .explanation {
@@ -154,6 +179,7 @@
     padding: 15px;
     border-radius: 8px;
     color: #004085;
+    margin-top: 15px;
   }
 
   .explanation h5 {
@@ -170,6 +196,7 @@
 
   .action-buttons {
     text-align: center;
+    margin-top: 30px;
   }
 </style>
 {% endblock %}

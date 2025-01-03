@@ -154,7 +154,11 @@ function showExplanation(isCorrect, explanation) {
 
     const explanationDiv = document.createElement('div');
     explanationDiv.className = `explanation ${isCorrect ? 'correct-message' : 'incorrect-message'}`;
-    explanationDiv.textContent = explanation || (isCorrect ? '正解です！' : '不正解です。');
+    
+    // 解説テキストの前に「解説:」を追加
+    const explanationText = explanation || (isCorrect ? '正解です！' : '不正解です。');
+    explanationDiv.textContent = `解説: ${explanationText}`;
+    
     questionContainer.appendChild(explanationDiv);
 }
 
@@ -197,6 +201,12 @@ function updateProgress(currentQuestion, totalQuestions) {
 function updateQuestionDisplay(questionData) {
     console.log('[Debug] Updating question display:', questionData);
 
+    // 既存の解説を削除
+    const existingExplanation = document.querySelector('.explanation');
+    if (existingExplanation) {
+        existingExplanation.remove();
+    }
+
     // 問題文の更新
     const questionText = document.querySelector('.question-text');
     if (questionText) {
@@ -212,86 +222,111 @@ function updateQuestionDisplay(questionData) {
         // データ属性を更新
         optionsContainer.dataset.correct = questionData.correct;
 
-        // 新しい選択肢を追加
+        // 新しい選択肢を追加（シャッフルされた順序を維持）
         questionData.options.forEach((optionText, index) => {
-            const option = document.createElement('button');
+            const option = document.createElement('div');
             option.className = 'option';
+            option.dataset.index = index;
+            option.dataset.value = optionText;
             option.textContent = optionText;
-            
-            // クリックイベントの設定
-            option.addEventListener('click', async function() {
-                if (option.classList.contains('selected') || option.classList.contains('disabled')) {
+            optionsContainer.appendChild(option);
+        });
+
+        // イベントリスナーを一括で設定
+        setupOptionEventListeners();
+    }
+}
+
+// 選択肢のイベントリスナーを設定する関数
+function setupOptionEventListeners() {
+    const options = document.querySelectorAll('.option');
+    const correctIndex = parseInt(document.querySelector('.options-container').dataset.correct);
+
+    options.forEach((option) => {
+        option.addEventListener('click', async function() {
+            if (option.classList.contains('selected') || option.classList.contains('disabled')) {
+                console.log('[Debug] Option already selected or disabled');
+                return;
+            }
+
+            const index = parseInt(option.dataset.index);
+            console.log('[Debug] Option clicked:', {
+                index: index,
+                text: option.textContent.trim(),
+                correctIndex: correctIndex
+            });
+
+            // 他のオプションを無効化
+            options.forEach(opt => opt.classList.add('disabled'));
+
+            // 選択したオプションをマーク
+            option.classList.add('selected');
+
+            try {
+                // サーバーに回答を送信
+                const response = await fetch('/submit_answer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        selected: index
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const responseData = await response.json();
+                console.log('[Debug] Server response:', responseData);
+
+                if (!responseData.success) {
+                    console.error('[Debug] Server error:', responseData.error);
                     return;
                 }
 
-                // 他のオプションを無効化
-                const allOptions = optionsContainer.querySelectorAll('.option');
-                allOptions.forEach(opt => opt.classList.add('disabled'));
-
-                // 選択したオプションをマーク
-                option.classList.add('selected');
-
-                try {
-                    const response = await fetch('/submit_answer', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            selected: index
-                        })
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                // 正解・不正解の表示
+                if (responseData.isCorrect) {
+                    option.classList.add('correct');
+                    console.log('[Debug] Correct answer selected');
+                    showExplanation(true, responseData.questionData.explanation);
+                } else {
+                    option.classList.add('incorrect');
+                    const correctOption = options[correctIndex];
+                    if (correctOption) {
+                        correctOption.classList.add('correct');
+                        console.log('[Debug] Showing correct answer:', correctIndex);
                     }
+                    showExplanation(false, responseData.questionData.explanation);
+                }
 
-                    const responseData = await response.json();
-                    if (!responseData.success) {
-                        console.error('[Debug] Server error:', responseData.error);
-                        return;
-                    }
+                // スコアと進捗状況の更新
+                updateScore(responseData.currentScore, responseData.totalQuestions);
+                updateProgress(responseData.currentQuestion, responseData.totalQuestions);
 
-                    // 正解・不正解の表示
-                    if (responseData.isCorrect) {
-                        option.classList.add('correct');
-                        showExplanation(true, responseData.questionData.explanation);
-                    } else {
-                        option.classList.add('incorrect');
-                        const correctOption = allOptions[questionData.correct];
-                        if (correctOption) {
-                            correctOption.classList.add('correct');
-                        }
-                        showExplanation(false, responseData.questionData.explanation);
-                    }
-
-                    // スコアと進捗状況の更新
-                    updateScore(responseData.currentScore, responseData.totalQuestions);
-                    updateProgress(responseData.currentQuestion, responseData.totalQuestions);
-
-                    // 最後の問題の場合
-                    if (responseData.isLastQuestion) {
-                        setTimeout(() => {
-                            window.location.href = responseData.redirectUrl;
-                        }, 2000);
-                    } else if (responseData.nextQuestionData) {
+                // 最後の問題の場合
+                if (responseData.isLastQuestion) {
+                    console.log('[Debug] Last question completed');
+                    setTimeout(() => {
+                        window.location.href = responseData.redirectUrl;
+                    }, 2000);
+                } else {
+                    // 次の問題データが含まれている場合、直接更新
+                    if (responseData.nextQuestionData) {
                         setTimeout(() => {
                             updateQuestionDisplay(responseData.nextQuestionData);
                         }, 1500);
+                    } else {
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
                     }
-
-                } catch (error) {
-                    console.error('[Debug] Error submitting answer:', error);
                 }
-            });
 
-            optionsContainer.appendChild(option);
+            } catch (error) {
+                console.error('[Debug] Error submitting answer:', error);
+            }
         });
-    }
-
-    // 問題データ要素の更新
-    const questionDataElement = document.getElementById('question-data');
-    if (questionDataElement) {
-        questionDataElement.textContent = JSON.stringify(questionData);
-    }
+    });
 }

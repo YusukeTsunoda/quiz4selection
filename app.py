@@ -4,7 +4,7 @@ import json
 import random
 import logging
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, g
-from models import db, QuizAttempt, User
+from models import db, QuizAttempt, User, QuestionHistory
 from config import Config, supabase, is_development
 from dotenv import load_dotenv
 from sqlalchemy.exc import SQLAlchemyError
@@ -531,7 +531,8 @@ def get_shuffled_question(question):
     """問題の選択肢をシャッフルする"""
     shuffled = question.copy()
     options = shuffled['options'].copy()
-    correct = shuffled['correct']
+    correct_index = shuffled['correct']
+    correct_option = options[correct_index]  # 正解の選択肢を保存
     
     # 選択肢をシャッフル
     indices = list(range(len(options)))
@@ -539,8 +540,12 @@ def get_shuffled_question(question):
     
     # 選択肢を並び替え
     shuffled['options'] = [options[i] for i in indices]
-    # 正解のインデックスも更新
-    shuffled['correct'] = indices.index(correct)
+    
+    # 正解の選択肢の新しいインデックスを見つける
+    for i, option in enumerate(shuffled['options']):
+        if option == correct_option:
+            shuffled['correct'] = i
+            break
     
     return shuffled
 
@@ -699,20 +704,36 @@ def start_quiz(grade, category, subcategory, difficulty):
             return redirect(url_for('select_difficulty', grade=grade,
                             category=category, subcategory=subcategory))
 
-        # セッションに情報を保存
+        # 最初の問題を取得
+        if not questions or len(questions) == 0:
+            logger.error("[Debug] Questions list is empty")
+            flash('問題の取得に失敗しました。', 'error')
+            return redirect(url_for('select_difficulty', grade=grade,
+                            category=category, subcategory=subcategory))
+
+        # 最初の問題をシャッフル
+        first_question = get_shuffled_question(questions[0])
+        logger.info(f"[Debug] First question data (after shuffle): {first_question}")
+        
+        # 問題データの形式を確認
+        required_fields = ['question', 'options', 'correct']
+        if not all(field in first_question for field in required_fields):
+            logger.error("[Debug] First question is missing required fields")
+            flash('問題データの形式が正しくありません。', 'error')
+            return redirect(url_for('select_difficulty', grade=grade,
+                            category=category, subcategory=subcategory))
+        
+        # シャッフルされた問題をセッションに保存
+        questions[0] = first_question
         session['questions'] = questions
         session['current_question'] = 0  # 0-based index
-        session['score'] = 0
+        session['score'] = 0  # スコアを0に初期化
         session['quiz_history'] = []
         session['answered_questions'] = []
         session['grade'] = grade
         session['category'] = category
         session['subcategory'] = subcategory
         session['difficulty'] = difficulty
-
-        # 最初の問題を取得
-        first_question = questions[0]
-        logger.info(f"[Debug] First question data (raw): {first_question}")
         
         # 問題データをJSONに変換（必要なフィールドのみ）
         question_data = {
@@ -729,7 +750,8 @@ def start_quiz(grade, category, subcategory, difficulty):
         except Exception as e:
             logger.error(f"[Debug] Error encoding question data: {e}")
             flash('問題データの処理中にエラーが発生しました。', 'error')
-            return redirect(url_for('grade_select'))
+            return redirect(url_for('select_difficulty', grade=grade,
+                            category=category, subcategory=subcategory))
         
         return render_template('quiz.html',
                             question=question_data['question'],
@@ -744,132 +766,102 @@ def start_quiz(grade, category, subcategory, difficulty):
         logger.error(f"[Debug] Error in start_quiz: {e}")
         logger.exception("[Debug] Full traceback:")
         flash('クイズの開始中にエラーが発生しました。', 'error')
-        return redirect(url_for('grade_select'))
+        return redirect(url_for('select_difficulty', grade=grade,
+                            category=category, subcategory=subcategory))
 
 
 @app.route('/submit_answer', methods=['POST'])
 def submit_answer():
+    """回答を提出するエンドポイント"""
     try:
         if not current_user.is_authenticated:
-            logger.error('[Debug] User not authenticated')
-            return jsonify({'success': False, 'error': 'User not logged in'})
+            return jsonify({'error': 'ログインが必要です'}), 401
 
         data = request.get_json()
-        logger.info(f"[Debug] Received answer data: {data}")
-        
-        # answerとselectedの両方のキーをチェック
-        selected_index = data.get('answer')
-        if selected_index is None:
-            selected_index = data.get('selected')
-            
-        # selected_indexがNoneの場合のエラーハンドリング
-        if selected_index is None:
-            logger.error("[Debug] No answer received from client")
-            return jsonify({'success': False, 'error': 'No answer selected'})
-        
-        current_question = session.get('current_question', 0)
-        questions = session.get('questions', [])
-        quiz_history = session.get('quiz_history', [])
-        current_score = session.get('score', 0)
+        if not data or 'selected' not in data:
+            return jsonify({'error': '無効なリクエストです'}), 400
 
-        logger.info(f"[Debug] Session state: current_question={current_question}, total_questions={len(questions)}, current_score={current_score}")
+        selected_index = int(data['selected'])
+        questions = session.get('questions', [])
+        current_question = session.get('current_question', 0)
+        quiz_history = session.get('quiz_history', [])
+        score = session.get('score', 0)
 
         if not questions or current_question >= len(questions):
-            logger.error("[Debug] Invalid question state")
-            return jsonify({'success': False, 'error': 'Invalid question'})
+            return jsonify({'error': '無効なクイズ状態です'}), 400
 
         current_q = questions[current_question]
-        correct_index = current_q.get('correct')
-        logger.info(f"[Debug] Current question data: {current_q}")
-        logger.info(f"[Debug] Selected index: {selected_index}, Correct index: {correct_index}")
-        
-        # 型を合わせて比較（エラーハンドリングを追加）
-        try:
-            is_correct = int(selected_index) == int(correct_index)
-            logger.info(f"[Debug] Answer comparison: {selected_index} == {correct_index} = {is_correct}")
-        except (ValueError, TypeError) as e:
-            logger.error(f"[Debug] Error comparing answers: {e}")
-            return jsonify({'success': False, 'error': 'Invalid answer format'})
-        
+        correct_index = current_q['correct']
+        is_correct = selected_index == correct_index
+
+        # スコアと履歴を更新
         if is_correct:
-            current_score += 1
-            session['score'] = current_score
-            logger.info(f"[Debug] Score updated: {current_score}")
+            score += 1
+            session['score'] = score
 
-        # 回答履歴を保存
-        quiz_history.append({
-            'question': current_q.get('question', ''),
-            'user_answer': current_q['options'][int(selected_index)],
-            'correct_answer': current_q['options'][int(correct_index)],
+        # 問題履歴を更新
+        history_entry = {
+            'question': current_q['question'],
+            'options': current_q['options'],  # シャッフルされた選択肢を使用
+            'selected_index': selected_index,  # シャッフル後のインデックスを使用
+            'correct_index': correct_index,    # シャッフル後の正解インデックスを使用
             'is_correct': is_correct,
-            'options': current_q.get('options', []),
             'explanation': current_q.get('explanation', '')
-        })
+        }
+        quiz_history.append(history_entry)
         session['quiz_history'] = quiz_history
-        logger.info(f"[Debug] Quiz history updated: {quiz_history[-1]}")
 
+        # データベースの履歴を更新
+        QuestionHistory.update_question_history(
+            user_id=current_user.id,
+            grade=session.get('grade'),
+            category=session.get('category'),
+            subcategory=session.get('subcategory'),
+            difficulty=session.get('difficulty'),
+            question_text=current_q['question'],
+            is_correct=is_correct
+        )
+
+        # 次の問題の準備
         is_last_question = current_question == len(questions) - 1
-        logger.info(f"[Debug] Is last question: {is_last_question}")
+        next_question = None
+        if not is_last_question:
+            next_question = get_shuffled_question(questions[current_question + 1])
+            session['current_question'] = current_question + 1
 
         # 最後の問題の場合、QuizAttemptをデータベースに保存
         if is_last_question:
             try:
-                logger.info("[Debug] Saving quiz attempt to database")
                 quiz_attempt = QuizAttempt(
                     user_id=current_user.id,
                     grade=session.get('grade'),
                     category=session.get('category'),
                     subcategory=session.get('subcategory'),
                     difficulty=session.get('difficulty'),
-                    score=current_score,
+                    score=score,
                     total_questions=len(questions),
                     quiz_history=quiz_history
                 )
                 db.session.add(quiz_attempt)
                 db.session.commit()
-                logger.info(f"[Debug] Quiz attempt saved successfully. ID: {quiz_attempt.id}")
             except Exception as db_error:
                 logger.error(f"[Debug] Error saving quiz attempt: {db_error}")
                 db.session.rollback()
 
-        # 現在の問題番号を更新（次の問題用）
-        next_question_index = current_question + 1 if not is_last_question else current_question
-        session['current_question'] = next_question_index
-
-        # 現在の問題番号（1-based）を計算
-        display_question = current_question + 1
-
-        response_data = {
+        return jsonify({
             'success': True,
             'isCorrect': is_correct,
-            'currentScore': current_score,
+            'currentScore': score,
             'totalQuestions': len(questions),
-            'currentQuestion': display_question,  # 現在の問題番号（1-based）
-            'nextQuestion': next_question_index + 1,    # 次の問題番号（1-based）
+            'currentQuestion': current_question + 1,
             'isLastQuestion': is_last_question,
             'redirectUrl': url_for('result') if is_last_question else None,
             'questionData': {
-                'question': current_q.get('question', ''),
-                'options': current_q.get('options', []),
-                'correct': current_q.get('correct'),
                 'explanation': current_q.get('explanation', '')
-            }
-        }
+            },
+            'nextQuestionData': next_question
+        })
 
-        # 次の問題のデータを追加（最後の問題でない場合）
-        if not is_last_question:
-            next_q = questions[next_question_index]
-            response_data['nextQuestionData'] = {
-                'question': next_q.get('question', ''),
-                'options': next_q.get('options', []),
-                'correct': next_q.get('correct'),
-                'explanation': next_q.get('explanation', '')
-            }
-        
-        logger.info(f"[Debug] Sending response: {response_data}")
-                
-        return jsonify(response_data)
-        
     except Exception as e:
         logger.error(f"[Debug] Error in submit_answer: {e}")
         logger.exception("[Debug] Full traceback:")
@@ -1054,13 +1046,22 @@ def get_questions(grade, category, subcategory, difficulty):
             f"Getting questions for grade={grade}, category={category}, subcategory={subcategory}, difficulty={difficulty}")
 
         # 問題データを取得
-        questions, error = get_quiz_data(
-            grade, category, subcategory, difficulty)
-        if error:
-            logger.error(f"Error getting quiz data: {error}")
+        file_path = f'quiz_data/grade_{grade}/{category}/{subcategory}/{difficulty}/questions.json'
+        
+        # ファイルの存在確認
+        if not os.path.exists(file_path):
+            logger.error(f"Question file not found: {file_path}")
             return []
-        if not questions:
-            logger.error("No questions returned from get_quiz_data")
+            
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                questions = json.load(f)
+        except Exception as e:
+            logger.error(f"Error reading question file: {e}")
+            return []
+
+        if not questions or not isinstance(questions, list):
+            logger.error("Invalid question data format")
             return []
 
         logger.info(f"Retrieved {len(questions)} questions from quiz data")
@@ -1068,14 +1069,18 @@ def get_questions(grade, category, subcategory, difficulty):
         # 問題をランダムに選択し、10問を選択
         if len(questions) > 10:
             selected_questions = random.sample(questions, 10)
-            logger.info(
-                f"Selected 10 random questions from {
-                    len(questions)} available questions")
+            logger.info(f"Selected 10 random questions from {len(questions)} available questions")
         else:
             selected_questions = questions
             logger.info(f"Using all {len(questions)} available questions")
 
+        # 選択した問題が空でないことを確認
+        if not selected_questions:
+            logger.error("No questions selected")
+            return []
+
         return selected_questions
+
     except Exception as e:
         logger.error(f"Error in get_questions: {e}")
         logger.exception("Full traceback:")
@@ -1085,61 +1090,39 @@ def get_questions(grade, category, subcategory, difficulty):
 def get_quiz_data(grade, category, subcategory, difficulty):
     """クイズデータを取得する関数"""
     try:
-        # 新しいフォルダ構造に基づいたファイルパス
-        file_path = f'quiz_data/grade_{grade}/{category}/{subcategory}/{difficulty}/questions.json'
-        logger.info(f"[Debug] Loading quiz data from: {file_path}")
+        if not current_user.is_authenticated:
+            logger.error("[Debug] User not authenticated")
+            return None, "ログインが必要です"
 
-        # ファイルの存在確認
-        if not os.path.exists(file_path):
-            logger.error(f"[Debug] Quiz data file not found: {file_path}")
-            return None, "問題データファイルが見つかりません"
+        # QuestionHistoryを使用して問題を選択
+        questions = QuestionHistory.get_questions_for_quiz(
+            user_id=current_user.id,
+            grade=grade,
+            category=category,
+            subcategory=subcategory,
+            difficulty=difficulty
+        )
 
-        # ファイルの読み込み
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            logger.info(f"[Debug] Loaded data type: {type(data)}")
-            logger.info(f"[Debug] Loaded data content: {data}")
+        if not questions:
+            logger.error("[Debug] No questions available")
+            return None, "問題が見つかりません"
 
-            if not data:
-                logger.error("[Debug] Data is empty")
-                return None, "問題データが空です"
-                
-            if not isinstance(data, list):
-                logger.error(f"[Debug] Data is not a list. Type: {type(data)}")
-                return None, "問題データの形式が正しくありません"
+        # セッションに問題データを保存
+        session['questions'] = questions
+        session['current_question'] = 0
+        session['quiz_history'] = []
+        session['current_score'] = 0
+        session['grade'] = grade
+        session['category'] = category
+        session['subcategory'] = subcategory
+        session['difficulty'] = difficulty
 
-            # 各問題の形式を確認
-            for i, question in enumerate(data):
-                logger.info(f"[Debug] Checking question {i}: {question}")
-                if not isinstance(question, dict):
-                    logger.error(f"[Debug] Question {i} is not a dictionary")
-                    return None, "問題データの形式が正しくありません"
-                
-                # 必須フィールドの確認
-                required_fields = ['question', 'options', 'correct']
-                missing_fields = [field for field in required_fields if field not in question]
-                if missing_fields:
-                    logger.error(f"[Debug] Question {i} is missing fields: {missing_fields}")
-                    return None, "問題データの形式が正しくありません"
-                
-                # optionsの形式確認
-                if not isinstance(question['options'], list):
-                    logger.error(f"[Debug] Question {i} options is not a list")
-                    return None, "問題データの形式が正しくありません"
+        # 最初の問題を返す
+        return get_shuffled_question(questions[0]), None
 
-            # 問題をシャッフル
-            shuffled_questions = [get_shuffled_question(q) for q in data]
-            logger.info(f"[Debug] Successfully loaded and shuffled {len(shuffled_questions)} questions")
-
-            return shuffled_questions, None
-
-    except json.JSONDecodeError as e:
-        logger.error(f"[Debug] JSON decode error in {file_path}: {e}")
-        return None, "問題データの形式が正しくありません"
     except Exception as e:
         logger.error(f"[Debug] Error in get_quiz_data: {e}")
-        logger.exception("[Debug] Full traceback:")
-        return None, "問題データの読み込み中にエラーが発生しました"
+        return None, "問題データの取得に失敗しました"
 
 
 @app.route('/quiz_history/<int:grade>/<category>/<subcategory>/<difficulty>')
@@ -1186,52 +1169,59 @@ def quiz_history(grade, category, subcategory, difficulty):
 
         logger.info(f"Processed {len(history_data)} history entries")
 
-        # 問題データを取得して問題別統計を計算
-        questions_data, error = get_quiz_data(grade, category, subcategory, difficulty)
+        # 問題データを直接取得
+        file_path = f'quiz_data/grade_{grade}/{category}/{subcategory}/{difficulty}/questions.json'
         question_stats = {}
         
-        if questions_data:
-            # 問題ごとの統計を初期化
-            for question in questions_data:
-                question_text = question.get('question', '')
-                question_stats[question_text] = {
-                    'total_attempts': 0,
-                    'correct_attempts': 0,
-                    'percentage': 0,
-                    'has_attempts': False  # 回答有無を追跡
-                }
-        
-            # 履歴から統計を計算
-            for entry in history_data:
-                for question in entry['questions']:
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    questions = json.load(f)
+                    
+                # 問題ごとの統計を初期化
+                for question in questions:
                     question_text = question.get('question', '')
-                    if question_text in question_stats:
-                        question_stats[question_text]['total_attempts'] += 1
-                        question_stats[question_text]['has_attempts'] = True
-                        if question.get('is_correct', False):
-                            question_stats[question_text]['correct_attempts'] += 1
+                    question_stats[question_text] = {
+                        'total_attempts': 0,
+                        'correct_attempts': 0,
+                        'percentage': 0,
+                        'has_attempts': False  # 回答有無を追跡
+                    }
         
-            # 正答率を計算
-            for stats in question_stats.values():
-                if stats['total_attempts'] > 0:
-                    stats['percentage'] = (stats['correct_attempts'] / stats['total_attempts']) * 100
+                # 履歴から統計を計算
+                for entry in history_data:
+                    for question in entry['questions']:
+                        question_text = question.get('question', '')
+                        if question_text in question_stats:
+                            question_stats[question_text]['total_attempts'] += 1
+                            question_stats[question_text]['has_attempts'] = True
+                            if question.get('is_correct', False):
+                                question_stats[question_text]['correct_attempts'] += 1
+        
+                # 正答率を計算
+                for stats in question_stats.values():
+                    if stats['total_attempts'] > 0:
+                        stats['percentage'] = (stats['correct_attempts'] / stats['total_attempts']) * 100
 
-            # 回答済みと未回答の問題に分類
-            answered_questions = {q: stats for q, stats in question_stats.items() if stats['has_attempts']}
-            unanswered_questions = {q: stats for q, stats in question_stats.items() if not stats['has_attempts']}
+                # 回答済みと未回答の問題に分類
+                answered_questions = {q: stats for q, stats in question_stats.items() if stats['has_attempts']}
+                unanswered_questions = {q: stats for q, stats in question_stats.items() if not stats['has_attempts']}
 
-            # 回答済み問題を正答率でソート（降順）
-            sorted_answered = dict(sorted(
-                answered_questions.items(),
-                key=lambda x: (x[1]['percentage'], x[1]['total_attempts']),
-                reverse=True
-            ))
+                # 回答済み問題を正答率でソート（降順）
+                sorted_answered = dict(sorted(
+                    answered_questions.items(),
+                    key=lambda x: (x[1]['percentage'], x[1]['total_attempts']),
+                    reverse=True
+                ))
 
-            # 未回答問題をアルファベット順でソート
-            sorted_unanswered = dict(sorted(unanswered_questions.items()))
+                # 未回答問題をアルファベット順でソート
+                sorted_unanswered = dict(sorted(unanswered_questions.items()))
 
-            # 回答済み問題と未回答問題を結合
-            question_stats = {**sorted_answered, **sorted_unanswered}
+                # 回答済み問題と未回答問題を結合
+                question_stats = {**sorted_answered, **sorted_unanswered}
+                
+            except Exception as e:
+                logger.error(f"Error reading questions file: {e}")
         
         return render_template(
             'quiz_history.html',
@@ -1247,6 +1237,7 @@ def quiz_history(grade, category, subcategory, difficulty):
 
     except Exception as e:
         logger.error(f"Error in quiz_history route: {e}")
+        logger.exception("Full traceback:")  # 詳細なエラー情報をログに記録
         flash('クイズ履歴の表示中にエラーが発生しました。', 'error')
         return redirect(url_for('dashboard'))
 

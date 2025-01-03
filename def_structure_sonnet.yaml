@@ -1,5 +1,188 @@
+# 1. ディレクトリ構造定義
 project_name: Quiz4selection
 description: 小学生向けの教科別クイズアプリケーション
+
+1 ディレクトリ構造
+  プロジェクトの論理的な構造を定義
+
+1.1 概要
+  小学生向けの教科別クイズアプリケーションの構造を階層的に整理し、各機能の配置を定義します。
+
+1.2 具体例
+  app: アプリケーションのメインモジュール
+  static: 静的ファイルの管理
+  templates: テンプレートの管理
+  quiz_data: クイズデータの管理
+  migrations: データベースマイグレーションの管理
+
+2 ファイル定義
+  コンポーネントやモジュールの実装単位
+
+2.1 概要
+  各機能を実装するファイルの定義と役割を明確化します。
+  フォルダやファイルの順番はabc順にする
+
+2.2 具体例
+  app.py: メインアプリケーションファイル
+  commands.py: CLIコマンド定義
+  config.py: 設定ファイル
+  create_test_users.py: テストユーザー作成スクリプト
+  extensions.py: Flask拡張機能
+  models.py: データベースモデル定義
+  requirements.txt: 依存関係定義
+
+3 コンテンツ定義
+  コンポーネントの機能と責務の記述
+
+3.1 概要
+  各コンポーネントやモジュールの具体的な機能と責任範囲を定義します。
+
+3.2 具体例
+  - app.py: ルーティング、ビジネスロジック、エラーハンドリング
+  - models.py: データベースモデルとスキーマ定義
+  - quiz.js: クイズのインタラクション処理、UIアップデート
+  - templates: ユーザーインターフェースの表示
+
+4 依存関係
+  モジュール間の関係性の定義
+
+4.1 概要
+  コンポーネント間の依存関係と相互作用を明確化します。
+
+4.2 具体例
+  - Flask: Webアプリケーションフレームワーク
+  - PostgreSQL: データベース
+  - Supabase: 認証基盤
+  - SQLAlchemy: データベースORM
+
+5 ファイル構造事例
+  main:
+    root:
+      app.py:  # メインアプリケーションファイル
+        content: |-
+          アプリケーションのメインロジック
+          - ルーティング設定
+          - ビジネスロジック実装
+          - エラーハンドリング
+          - セッション管理
+        dependency:
+          - Flask: "2.2.5"
+          - SQLAlchemy: "1.4.46"
+          - models.py
+          - config.py
+
+      models.py:  # データベースモデル
+        content: |-
+          データベースモデルの定義
+          - Userモデル：ユーザー情報管理
+          - QuizAttemptモデル：クイズ履歴管理
+        dependency:
+          - SQLAlchemy: "1.4.46"
+          - Flask-SQLAlchemy: "2.5.1"
+
+      static:
+        js/quiz.js:  # クイズ機能のJavaScript
+          content: |-
+            クライアントサイドのクイズ機能
+            - 問題表示制御
+            - 回答処理
+            - 進捗管理
+            - UIアップデート
+          dependency:
+            - templates/quiz.html
+
+        css/style.css:  # メインスタイルシート
+          content: |-
+            アプリケーション全体のスタイル定義
+            - レイアウト
+            - カラースキーム
+            - タイポグラフィ
+          dependency:
+            - templates/base.html
+
+        css/quiz.css:  # クイズ画面用スタイル
+          content: |-
+            クイズ画面専用のスタイル定義
+            - 問題表示
+            - 選択肢ボタン
+            - プログレスバー
+          dependency:
+            - templates/quiz.html
+
+      templates:
+        admin:
+          dashboard.html:  # 管理者ダッシュボード
+            content: |-
+              管理者用ダッシュボード画面
+              - ユーザー管理
+              - クイズデータ管理
+            dependency:
+              - base.html
+              - models.User
+
+          user_edit.html:  # ユーザー権限編集
+            content: |-
+              ユーザー権限の編集画面
+              - 学年アクセス権限
+              - 教科アクセス権限
+            dependency:
+              - base.html
+              - models.User
+
+          user_detail.html:  # ユーザー詳細
+            content: |-
+              ユーザー詳細情報表示
+              - プロフィール情報
+              - クイズ履歴
+              - 成績統計
+            dependency:
+              - base.html
+              - models.User
+              - models.QuizAttempt
+
+        quiz.html:  # クイズ画面
+          content: |-
+            クイズ実行画面
+            - 問題表示
+            - 選択肢表示
+            - 進捗表示
+          dependency:
+            - base.html
+            - static/js/quiz.js
+            - static/css/quiz.css
+
+        result.html:  # 結果画面
+          content: |-
+            クイズ結果表示画面
+            - スコア表示
+            - 解答履歴
+            - 解説表示
+          dependency:
+            - base.html
+            - models.QuizAttempt
+
+      quiz_data:  # クイズデータ
+        content: |-
+          学年・教科・単元・難易度別のクイズデータ
+          - JSON形式で問題を管理
+          - 各問題に問題文、選択肢、正解、解説を含む
+        structure:
+          grade_[1-6]:
+            [category]:
+              [subcategory]:
+                [difficulty]:
+                  - questions.json
+
+      migrations:  # データベースマイグレーション
+        versions:
+          content: |-
+            データベースのスキーマ変更履歴
+            - テーブル作成
+            - カラム追加・変更
+            - インデックス設定
+          dependency:
+            - Flask-Migrate: "4.0.4"
+            - models.py
 
 environment:
   python_version: "3.12"
@@ -7,143 +190,29 @@ environment:
   database: PostgreSQL
   authentication: Supabase
 
-directory_structure:
-  root:
-    - app.py  # メインアプリケーションファイル
-    - config.py  # 設定ファイル
-    - models.py  # データベースモデル
-    - commands.py  # CLIコマンド
-    - extensions.py  # Flask拡張機能
-    - requirements.txt  # 依存関係
-    - create_test_users.py  # テストユーザー作成スクリプト
-    templates:  # テンプレートディレクトリ
-      admin:  # 管理者用テンプレート
-        - dashboard.html  # 管理者ダッシュボード
-        - user_edit.html  # ユーザー権限編集
-      - base.html  # ベーステンプレート
-      - grade_select.html  # 学年選択
-      - category_select.html  # カテゴリー選択
-      - subcategory_select.html  # サブカテゴリー選択
-      - difficulty_select.html  # 難易度選択
-      - quiz.html  # クイズ画面
-      - result.html  # 結果画面
-      - dashboard.html  # ユーザーダッシュボード
-      - quiz_history.html  # クイズ履歴
-      - login.html  # ログイン
-      - signup.html  # サインアップ
-      - reset_password.html  # パスワードリセット
-    quiz_data:  # クイズデータディレクトリ
-      grade_1:  # 1年生用データ
-        - japanese.json
-        - math.json
-        - science.json
-        - society.json
-      grade_2:  # 2年生用データ
-        - japanese.json
-        - math.json
-        - science.json
-        - society.json
-      grade_3:  # 3年生用データ
-        - japanese.json
-        - math.json
-        - science.json
-        - society.json
-      grade_4:  # 4年生用データ
-        - japanese.json
-        - math.json
-        - science.json
-        - society.json
-      grade_5:  # 5年生用データ
-        - japanese.json
-        - math.json
-        - science.json
-        - society.json
-      grade_6:  # 6年生用データ
-        - japanese.json
-        - math.json
-        - science.json
-        - society.json
+validation:
+  rules:
+    grade: integer[1-6]
+    category: enum[japanese, math, science, society]
+    difficulty: enum[easy, medium, hard]
+    score: integer[0-max_questions]
 
-models:
-  User:
-    fields:
-      - id: String (primary key)
-      - username: String (unique)
-      - email: String (unique)
-      - is_admin: Boolean
-      - created_at: DateTime
-      - allowed_subjects: JSON
-      - allowed_grades: JSON
-  QuizAttempt:
-    fields:
-      - id: Integer (primary key)
-      - user_id: String (foreign key)
-      - grade: Integer
-      - category: String
-      - subcategory: String
-      - difficulty: String
-      - score: Integer
-      - total_questions: Integer
-      - timestamp: DateTime
-      - quiz_history: Text (JSON)
+security:
+  requirements:
+    - sql_injection: prevent
+    - input_sanitization: required
+    - session_protection: required
+    - password_reset: required
+    - admin_setup_secret: required
 
-routes:
-  auth:
-    - /signup: ユーザー登録
-    - /login: ログイン
-    - /logout: ログアウト
-    - /reset-password: パスワードリセット
-  quiz:
-    - /: ホーム（学年選択へリダイレクト）
-    - /grade_select: 学年選択
-    - /grade/<grade>/category: カテゴリー選択
-    - /grade/<grade>/category/<category>/subcategory: サブカテゴリー選択
-    - /grade/<grade>/category/<category>/subcategory/<subcategory>/difficulty: 難易度選択
-    - /start_quiz/<grade>/<category>/<subcategory>/<difficulty>: クイズ開始
-    - /submit_answer: 回答提出
-    - /next_question: 次の問題
-    - /result: クイズ結果
-  admin:
-    - /admin: 管理者ダッシュボード
-    - /admin/user/<user_id>: ユーザー権限編集
-    - /admin/setup: 管理者セットアップ
-  dashboard:
-    - /dashboard: ユーザーダッシュボード
-    - /quiz_history/<grade>/<category>/<subcategory>/<difficulty>: クイズ履歴
-
-test_users:
-  student_1:
-    username: tanaka_ichiro
-    email: tanaka1@example.com
-    grade: 1
-    subjects:
-      japanese: [kanji, reading]
-      math: [calculation]
-  student_3:
-    username: suzuki_hanako
-    email: suzuki3@example.com
-    grade: 3
-    subjects:
-      japanese: [kanji, reading, grammar]
-      math: [calculation, figure]
-      science: [physics]
-  student_5:
-    username: sato_taro
-    email: sato5@example.com
-    grade: 5
-    subjects:
-      japanese: [kanji, reading, grammar, writing]
-      math: [calculation, figure, measurement]
-      science: [physics, chemistry]
-      society: [history, geography]
-  parent:
-    username: yamada_parent
-    email: yamada_p@example.com
-    grade: all
-    subjects: all
-  teacher:
-    username: sensei
-    email: teacher@example.com
-    is_admin: true
-    grade: all
-    subjects: all
+session:
+  required_keys:
+    - questions
+    - current_question
+    - score
+    - quiz_history
+    - grade
+    - category
+    - subcategory
+    - difficulty
+    - user

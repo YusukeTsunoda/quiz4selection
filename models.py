@@ -4,6 +4,7 @@ import logging
 from flask_sqlalchemy import SQLAlchemy
 from extensions import db
 from flask_login import UserMixin
+import random
 
 logger = logging.getLogger(__name__)
 
@@ -149,3 +150,122 @@ class QuestionHistory(db.Model):
     updated_at = db.Column(db.DateTime(timezone=True), default=db.func.now(), onupdate=db.func.now())
 
     user = db.relationship('User', backref=db.backref('question_history', lazy=True))
+
+    @property
+    def correct_rate(self):
+        """正答率を計算"""
+        if self.attempt_count == 0:
+            return 0
+        return (self.correct_count / self.attempt_count) * 100
+
+    @classmethod
+    def get_questions_for_quiz(cls, user_id, grade, category, subcategory, difficulty, num_questions=10):
+        """クイズ用の問題を選択"""
+        # 問題データを読み込む
+        file_path = f'quiz_data/grade_{grade}/{category}/{subcategory}/{difficulty}/questions.json'
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                all_questions = json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading questions: {e}")
+            return []
+
+        # ユーザーの問題履歴を取得
+        history = cls.query.filter_by(
+            user_id=user_id,
+            grade=grade,
+            category=category,
+            subcategory=subcategory,
+            difficulty=difficulty
+        ).all()
+
+        # 問題を分類
+        unanswered = []  # 未回答問題
+        low_correct_rate = []  # 低正答率問題
+        high_correct_rate_low_attempts = []  # 高正答率・低回答数問題
+        high_correct_rate_high_attempts = []  # 高正答率・高回答数問題
+
+        history_dict = {h.question_text: h for h in history}
+
+        for question in all_questions:
+            q_text = question['question']
+            if q_text not in history_dict:
+                unanswered.append(question)
+                continue
+
+            h = history_dict[q_text]
+            if h.correct_rate < 50:
+                low_correct_rate.append(question)
+            elif h.attempt_count < 3:
+                high_correct_rate_low_attempts.append(question)
+            else:
+                high_correct_rate_high_attempts.append(question)
+
+        # 優先順位に基づいて問題を選択
+        selected = []
+        remaining = num_questions
+
+        # 1. 未回答問題から選択
+        selected.extend(random.sample(unanswered, min(remaining, len(unanswered))))
+        remaining = num_questions - len(selected)
+        if remaining == 0:
+            return selected
+
+        # 2. 低正答率問題から選択
+        selected.extend(random.sample(low_correct_rate, min(remaining, len(low_correct_rate))))
+        remaining = num_questions - len(selected)
+        if remaining == 0:
+            return selected
+
+        # 3. 高正答率・低回答数問題から選択
+        selected.extend(random.sample(high_correct_rate_low_attempts, min(remaining, len(high_correct_rate_low_attempts))))
+        remaining = num_questions - len(selected)
+        if remaining == 0:
+            return selected
+
+        # 4. 高正答率・高回答数問題から選択
+        selected.extend(random.sample(high_correct_rate_high_attempts, min(remaining, len(high_correct_rate_high_attempts))))
+
+        # 必要な問題数に満たない場合、全問題からランダムに追加
+        remaining = num_questions - len(selected)
+        if remaining > 0:
+            all_remaining = [q for q in all_questions if q not in selected]
+            selected.extend(random.sample(all_remaining, min(remaining, len(all_remaining))))
+
+        return selected
+
+    @classmethod
+    def update_question_history(cls, user_id, grade, category, subcategory, difficulty, question_text, is_correct):
+        """問題の履歴を更新"""
+        history = cls.query.filter_by(
+            user_id=user_id,
+            grade=grade,
+            category=category,
+            subcategory=subcategory,
+            difficulty=difficulty,
+            question_text=question_text
+        ).first()
+
+        if history is None:
+            history = cls(
+                user_id=user_id,
+                grade=grade,
+                category=category,
+                subcategory=subcategory,
+                difficulty=difficulty,
+                question_text=question_text,
+                correct_count=1 if is_correct else 0,
+                attempt_count=1
+            )
+            db.session.add(history)
+        else:
+            history.attempt_count += 1
+            if is_correct:
+                history.correct_count += 1
+            history.last_attempted_at = db.func.now()
+
+        try:
+            db.session.commit()
+        except Exception as e:
+            logger.error(f"Error updating question history: {e}")
+            db.session.rollback()
