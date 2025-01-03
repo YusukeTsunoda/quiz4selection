@@ -91,8 +91,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     selectedOption.classList.add('incorrect');
                     const correctIndex = parseInt(optionsContainer.dataset.correct);
-                    if (options[correctIndex]) {
-                        options[correctIndex].classList.add('correct');
+                    if (correctIndex >= 0 && correctIndex < options.length) {
+                        const correctOption = options[correctIndex];
+                        correctOption.classList.add('correct');
                     }
                 }
 
