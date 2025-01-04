@@ -325,12 +325,12 @@ function setupOptionEventListeners() {
                 if (!responseData.is_last_question && responseData.next_question) {
                     setTimeout(() => {
                         window.location.href = '/next_question';
-                    }, 2000);
+                    }, 1200);
                 } else {
                     // 最後の問題の場合は結果ページへ
                     setTimeout(() => {
                         window.location.href = '/result';
-                    }, 2000);
+                    }, 1500);
                 }
 
             } catch (error) {
