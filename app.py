@@ -813,10 +813,10 @@ def submit_answer():
 
         # 回答の処理
         selected_index = int(data['selected'])
-        correct_index = current_q['correct']
-        is_correct = selected_index == correct_index
+        current_options = data.get('options', [])  # シャッフルされた選択肢の配列
+        is_correct = selected_index == current_q['correct']
 
-        logger.info(f"[Debug] Answer check: selected={selected_index}, correct={correct_index}, is_correct={is_correct}")
+        logger.info(f"[Debug] Answer check: selected={selected_index}, correct={current_q['correct']}, is_correct={is_correct}")
 
         # スコアの更新
         if is_correct:
@@ -824,14 +824,19 @@ def submit_answer():
             session['score'] = score
             logger.info(f"[Debug] Score updated: {score}")
 
-        # 履歴の更新
+        # 履歴エントリを作成
         history_entry = {
             'question': current_q['question'],
-            'options': current_q['options'],
-            'selected': selected_index,
-            'correct': correct_index,
-            'is_correct': is_correct
+            'options': current_options,  # シャッフルされた選択肢を使用
+            'selected_index': selected_index,
+            'selected_option': current_options[selected_index],
+            'correct_index': current_q['correct'],
+            'correct_option': current_options[current_q['correct']],
+            'is_correct': is_correct,
+            'explanation': current_q.get('explanation', '')
         }
+
+        # 履歴を更新
         quiz_history.append(history_entry)
         session['quiz_history'] = quiz_history
         logger.info(f"[Debug] History entry added: {history_entry}")
@@ -843,29 +848,66 @@ def submit_answer():
         
         # 次の問題のデータを準備
         is_last_question = current_question >= len(questions)
-        next_question = None if is_last_question else questions[current_question]
+        next_question = None if is_last_question else get_shuffled_question(questions[current_question])
 
         # セッションの保存を確実に行う
         session.modified = True
         logger.info(f"[Debug] Session after update: {dict(session)}")
 
-        response_data = {
-            'success': True,
-            'isCorrect': is_correct,
-            'currentScore': score,
-            'totalQuestions': len(questions),
-            'currentQuestion': current_question,
-            'isLastQuestion': is_last_question,
-            'redirectUrl': url_for('result') if is_last_question else None,
-            'questionData': {
-                'explanation': current_q.get('explanation', '')
-            },
-            'nextQuestionData': next_question
-        }
-        logger.info(f"[Debug] Sending response: {response_data}")
-        logger.info("[Debug] === Submit Answer End ===")
+        # 最後の問題の場合、QuizAttemptをデータベースに保存
+        if is_last_question:
+            try:
+                # 履歴データを保存用に整形
+                formatted_history = []
+                for entry in quiz_history:
+                    formatted_entry = {
+                        'question': entry['question'],
+                        'options': entry['options'],
+                        'selected_index': entry['selected_index'],
+                        'selected_option': entry['options'][entry['selected_index']],
+                        'correct_index': entry['correct_index'],
+                        'correct_option': entry['options'][entry['correct_index']],
+                        'is_correct': entry['is_correct'],
+                        'explanation': entry.get('explanation', '')  # 解説を追加
+                    }
+                    formatted_history.append(formatted_entry)
 
-        return jsonify(response_data)
+                # QuizAttemptを作成
+                quiz_attempt = QuizAttempt(
+                    user_id=current_user.id,
+                    grade=session.get('grade'),
+                    category=session.get('category'),
+                    subcategory=session.get('subcategory'),
+                    difficulty=session.get('difficulty'),
+                    score=score,
+                    total_questions=len(questions),
+                    quiz_history=formatted_history
+                )
+                db.session.add(quiz_attempt)
+                db.session.commit()
+                logger.info(f"[Debug] Quiz attempt saved to database")
+
+                # 問題履歴を更新
+                QuestionHistory.update_question_history(
+                    user_id=current_user.id,
+                    grade=session.get('grade'),
+                    category=session.get('category'),
+                    subcategory=session.get('subcategory'),
+                    difficulty=session.get('difficulty'),
+                    question_text=current_q['question'],
+                    is_correct=is_correct
+                )
+            except Exception as e:
+                logger.error(f"Error saving quiz attempt: {e}")
+                return jsonify({'error': 'Failed to save quiz attempt'}), 500
+
+        return jsonify({
+            'is_correct': is_correct,
+            'score': score,
+            'next_question': next_question,
+            'is_last_question': is_last_question,
+            'explanation': current_q.get('explanation', '')
+        })
 
     except Exception as e:
         logger.error(f"[Debug] Error in submit_answer: {e}")

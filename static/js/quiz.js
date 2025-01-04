@@ -73,8 +73,23 @@ function showExplanation(isCorrect, explanation) {
 function updateScore(currentScore, totalQuestions) {
     const scoreDisplay = document.querySelector('.score-display');
     if (scoreDisplay) {
-        scoreDisplay.textContent = `正解数: ${currentScore}/${totalQuestions}`;
-        console.log('[Debug] Score updated:', currentScore);
+        // total_questionsが未定義の場合、HTMLから再取得を試みる
+        if (typeof totalQuestions === 'undefined' || totalQuestions === null) {
+            const totalQuestionsInput = document.getElementById('total_questions');
+            if (totalQuestionsInput) {
+                totalQuestions = parseInt(totalQuestionsInput.value);
+            } else {
+                console.error('[Debug] Could not find total_questions element');
+                return;
+            }
+        }
+        
+        if (!isNaN(totalQuestions)) {
+            scoreDisplay.textContent = `正解数: ${currentScore}/${totalQuestions}`;
+            console.log('[Debug] Score updated:', currentScore);
+        } else {
+            console.error('[Debug] Invalid total_questions value:', totalQuestions);
+        }
     }
 }
 
@@ -236,6 +251,12 @@ function setupOptionEventListeners() {
             });
 
             try {
+                // サーバーに送信するデータ
+                const requestData = {
+                    selected: index,
+                    options: Array.from(options).map(opt => opt.textContent.trim())
+                };
+
                 // サーバーに回答を送信
                 const response = await fetch('/submit_answer', {
                     method: 'POST',
@@ -244,15 +265,17 @@ function setupOptionEventListeners() {
                         'X-Requested-With': 'XMLHttpRequest',
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify({
-                        selected: index
-                    }),
+                    body: JSON.stringify(requestData),
                     credentials: 'same-origin'
                 });
 
                 // レスポンスの詳細をログ出力
-                console.log('[Debug] Response status:', response.status);
-                console.log('[Debug] Response headers:', Object.fromEntries(response.headers.entries()));
+                console.log('[Debug] Response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries(response.headers.entries()),
+                    url: response.url
+                });
 
                 if (!response.ok) {
                     const errorText = await response.text();
@@ -263,49 +286,51 @@ function setupOptionEventListeners() {
                 const responseData = await response.json();
                 console.log('[Debug] Server response:', responseData);
 
-                if (!responseData.success) {
+                // エラーチェック
+                if (responseData.error) {
                     console.error('[Debug] Server error:', responseData.error);
+                    showExplanation(false, `エラー: ${responseData.error}`);
                     return;
                 }
 
                 // 正解・不正解の表示
-                if (responseData.isCorrect) {
+                if (responseData.is_correct) {
                     option.classList.add('correct');
                     console.log('[Debug] Correct answer selected');
-                    showExplanation(true, responseData.questionData.explanation);
+                    showExplanation(true, responseData.explanation);
                 } else {
                     option.classList.add('incorrect');
                     const correctOption = options[correctIndex];
                     if (correctOption) {
                         correctOption.classList.add('correct');
-                        console.log('[Debug] Showing correct answer:', correctIndex);
                     }
-                    showExplanation(false, responseData.questionData.explanation);
+                    console.log('[Debug] Incorrect answer selected');
+                    showExplanation(false, responseData.explanation);
                 }
 
-                // スコアの更新
-                updateScore(responseData.currentScore, responseData.totalQuestions);
+                // スコアを更新
+                const totalQuestionsInput = document.getElementById('total_questions');
+                if (totalQuestionsInput) {
+                    const totalQuestions = parseInt(totalQuestionsInput.value);
+                    if (!isNaN(totalQuestions)) {
+                        updateScore(responseData.score, totalQuestions);
+                    } else {
+                        console.error('[Debug] Invalid total_questions value:', totalQuestionsInput.value);
+                    }
+                } else {
+                    console.error('[Debug] total_questions element not found');
+                }
 
-                // 最後の問題の場合
-                if (responseData.isLastQuestion) {
-                    console.log('[Debug] Last question completed');
+                // 次の問題がある場合は更新
+                if (!responseData.is_last_question && responseData.next_question) {
                     setTimeout(() => {
-                        window.location.href = responseData.redirectUrl;
+                        window.location.href = '/next_question';
                     }, 2000);
                 } else {
-                    // 次の問題データが含まれている場合、直接更新
-                    if (responseData.nextQuestionData) {
-                        // 進捗状況の更新は次の問題の表示後に行う
-                        setTimeout(() => {
-                            updateQuestionDisplay(responseData.nextQuestionData);
-                            // 問題表示が完了してから進捗を更新
-                            updateProgress(responseData.currentQuestion, responseData.totalQuestions);
-                        }, 1500);
-                    } else {
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1500);
-                    }
+                    // 最後の問題の場合は結果ページへ
+                    setTimeout(() => {
+                        window.location.href = '/result';
+                    }, 2000);
                 }
 
             } catch (error) {
