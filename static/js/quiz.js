@@ -298,6 +298,17 @@ function setupOptionEventListeners() {
                     option.classList.add('correct');
                     console.log('[Debug] Correct answer selected');
                     showExplanation(true, responseData.explanation);
+                    
+                    // 正解の場合は少し待ってから自動遷移
+                    if (!responseData.is_last_question && responseData.next_question) {
+                        setTimeout(() => {
+                            window.location.href = '/next_question';
+                        }, 1200);
+                    } else {
+                        setTimeout(() => {
+                            window.location.href = '/result';
+                        }, 1500);
+                    }
                 } else {
                     option.classList.add('incorrect');
                     const correctOption = options[correctIndex];
@@ -306,6 +317,19 @@ function setupOptionEventListeners() {
                     }
                     console.log('[Debug] Incorrect answer selected');
                     showExplanation(false, responseData.explanation);
+                    
+                    // 不正解の場合は「次の問題へ」ボタンを表示
+                    const nextButton = document.createElement('button');
+                    nextButton.className = 'next-question-btn';
+                    nextButton.textContent = '次の問題へ';
+                    nextButton.onclick = () => {
+                        if (!responseData.is_last_question && responseData.next_question) {
+                            window.location.href = '/next_question';
+                        } else {
+                            window.location.href = '/result';
+                        }
+                    };
+                    document.querySelector('.question-container').appendChild(nextButton);
                 }
 
                 // スコアを更新
@@ -319,18 +343,6 @@ function setupOptionEventListeners() {
                     }
                 } else {
                     console.error('[Debug] total_questions element not found');
-                }
-
-                // 次の問題がある場合は更新
-                if (!responseData.is_last_question && responseData.next_question) {
-                    setTimeout(() => {
-                        window.location.href = '/next_question';
-                    }, 1200);
-                } else {
-                    // 最後の問題の場合は結果ページへ
-                    setTimeout(() => {
-                        window.location.href = '/result';
-                    }, 1500);
                 }
 
             } catch (error) {
