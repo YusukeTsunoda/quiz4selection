@@ -172,20 +172,26 @@
   }
 
   .next-question-btn {
-    display: block;
+    display: block !important;
     margin: 20px auto 0;
     padding: 10px 20px;
     font-size: 1.1em;
-    color: white;
-    background-color: #007bff;
+    color: white !important;
+    background-color: #007bff !important;
     border: none;
     border-radius: 5px;
     cursor: pointer;
     transition: background-color 0.3s ease;
+    position: relative;
+    z-index: 1000;
+    min-width: 150px;
+    text-align: center;
+    opacity: 1 !important;
+    visibility: visible !important;
   }
 
   .next-question-btn:hover {
-    background-color: #0056b3;
+    background-color: #0056b3 !important;
   }
 </style>
 

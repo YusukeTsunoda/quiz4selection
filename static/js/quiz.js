@@ -319,17 +319,41 @@ function setupOptionEventListeners() {
                     showExplanation(false, responseData.explanation);
                     
                     // 不正解の場合は「次の問題へ」ボタンを表示
-                    const nextButton = document.createElement('button');
-                    nextButton.className = 'next-question-btn';
-                    nextButton.textContent = '次の問題へ';
-                    nextButton.onclick = () => {
-                        if (!responseData.is_last_question && responseData.next_question) {
-                            window.location.href = '/next_question';
-                        } else {
-                            window.location.href = '/result';
+                    try {
+                        const questionContainer = document.querySelector('.question-container');
+                        console.log('[Debug] Question container found:', questionContainer);
+                        
+                        if (!questionContainer) {
+                            console.error('[Debug] Question container not found for next button');
+                            return;
                         }
-                    };
-                    document.querySelector('.question-container').appendChild(nextButton);
+
+                        const nextButton = document.createElement('button');
+                        nextButton.className = 'next-question-btn';
+                        nextButton.textContent = '次の問題へ';
+                        nextButton.onclick = () => {
+                            console.log('[Debug] Next button clicked');
+                            if (!responseData.is_last_question && responseData.next_question) {
+                                window.location.href = '/next_question';
+                            } else {
+                                window.location.href = '/result';
+                            }
+                        };
+
+                        // ボタンが既に存在する場合は削除
+                        const existingButton = questionContainer.querySelector('.next-question-btn');
+                        if (existingButton) {
+                            console.log('[Debug] Removing existing next button');
+                            existingButton.remove();
+                        }
+
+                        console.log('[Debug] Appending next button');
+                        questionContainer.appendChild(nextButton);
+                        console.log('[Debug] Next button added successfully');
+                    } catch (error) {
+                        console.error('[Debug] Error adding next button:', error);
+                        console.error('[Debug] Error stack:', error.stack);
+                    }
                 }
 
                 // スコアを更新
