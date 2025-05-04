@@ -2,10 +2,9 @@ Flask==2.2.5
 Werkzeug==2.2.3
 flask-migrate==4.0.4
 python-dotenv==1.0.0
-psycopg2-binary==2.9.9
 flask-login==0.6.2
 Flask-SQLAlchemy==3.0.2
 SQLAlchemy==1.4.46
 flask-caching==2.0.2
 dnspython==2.7.0
-supabase==2.0.3
+supabase==2.0.3 
