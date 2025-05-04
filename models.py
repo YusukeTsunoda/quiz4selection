@@ -136,7 +136,7 @@ class QuizAttempt(db.Model):
 class QuestionHistory(db.Model):
     __tablename__ = 'question_history'
 
-    id = db.Column(db.BigInteger, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_id = db.Column(db.String, db.ForeignKey('users.id'), nullable=False)
     grade = db.Column(db.Integer, nullable=False)
     category = db.Column(db.String(50), nullable=False)
