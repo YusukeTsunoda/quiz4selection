@@ -10,8 +10,9 @@ from dotenv import load_dotenv
 from sqlalchemy.exc import SQLAlchemyError
 from functools import wraps
 import commands  # コマンドをインポート
-from extensions import db, migrate
+from extensions import db, migrate, cache
 from flask_login import LoginManager, current_user, login_user, logout_user, login_required
+from quiz_data.loader import get_questions as load_quiz_questions  # 新しい遅延読み込み関数をインポート
 
 # .envファイルを読み込む
 load_dotenv()
@@ -35,6 +36,15 @@ except Exception as e:
 try:
     db.init_app(app)
     migrate.init_app(app, db)  # マイグレーションの初期化を追加
+    
+    # キャッシュの初期化
+    cache_config = {
+        'CACHE_TYPE': 'SimpleCache',  # メモリ内キャッシュ
+        'CACHE_DEFAULT_TIMEOUT': 300  # デフォルトのタイムアウト（秒）
+    }
+    cache.init_app(app, config=cache_config)
+    logger.info("Cache initialized successfully")
+    
     with app.app_context():
         # データベース接続のテスト
         try:
@@ -699,7 +709,7 @@ def start_quiz(grade, category, subcategory, difficulty):
         session['user'] = user_info
 
         # 問題を取得
-        questions = get_questions(grade, category, subcategory, difficulty)
+        questions = load_quiz_questions(grade, category, subcategory, difficulty)
         logger.info(f"[Debug] Retrieved questions: {len(questions) if questions else 0} questions")
 
         if not questions:
@@ -1020,10 +1030,27 @@ def dashboard():
                         # クイズデータが存在するか確認
                         has_quiz_data = False
                         for difficulty in ['easy', 'medium', 'hard']:
-                            file_path = f'quiz_data/grade_{grade}/{category}/{subcategory}/{difficulty}/questions.json'
-                            if os.path.exists(file_path):
-                                has_quiz_data = True
-                                break
+                            try:
+                                # 新しい遅延読み込み関数を使用してデータの存在を確認
+                                questions = load_quiz_questions(grade, category, subcategory, difficulty)
+                                if questions:
+                                    has_quiz_data = True
+                                    break
+                            except Exception as e:
+                                logger.debug(f"クイズデータ確認エラー: {e}")
+                                # フォールバックとして従来の方法も残す
+                                try:
+                                    from quiz_data.loader import get_available_difficulties
+                                    if difficulty in get_available_difficulties(grade, category, subcategory):
+                                        has_quiz_data = True
+                                        break
+                                except Exception as e:
+                                    logger.debug(f"難易度確認エラー: {e}")
+                                    # 最終手段としてファイル存在確認
+                                    file_path = f'quiz_data/grade_{grade}/{category}/{subcategory}/{difficulty}/questions.json'
+                                    if os.path.exists(file_path):
+                                        has_quiz_data = True
+                                        break
                         
                         if has_quiz_data:
                             # サブカテゴリー名の取得を安全に行う
@@ -1110,45 +1137,33 @@ def get_questions(grade, category, subcategory, difficulty):
         logger.info(
             f"Getting questions for grade={grade}, category={category}, subcategory={subcategory}, difficulty={difficulty}")
 
-        # 問題データを取得
-        file_path = f'quiz_data/grade_{grade}/{category}/{subcategory}/{difficulty}/questions.json'
+        # 問題データを取得（新しい遅延読み込み関数を使用）
+        questions = load_quiz_questions(grade, category, subcategory, difficulty)
         
-        # ファイルの存在確認
-        if not os.path.exists(file_path):
-            logger.error(f"Question file not found: {file_path}")
-            return []
-            
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                questions = json.load(f)
-        except Exception as e:
-            logger.error(f"Error reading question file: {e}")
-            return []
-
         if not questions or not isinstance(questions, list):
-            logger.error("Invalid question data format")
+            logger.error("問題データが見つからないか、無効な形式です")
             return []
 
-        logger.info(f"Retrieved {len(questions)} questions from quiz data")
+        logger.info(f"取得した問題数: {len(questions)}")
 
         # 問題をランダムに選択し、10問を選択
         if len(questions) > 10:
             selected_questions = random.sample(questions, 10)
-            logger.info(f"Selected 10 random questions from {len(questions)} available questions")
+            logger.info(f"{len(questions)}問から10問をランダムに選択しました")
         else:
             selected_questions = questions
-            logger.info(f"Using all {len(questions)} available questions")
+            logger.info(f"利用可能な全{len(questions)}問を使用します")
 
         # 選択した問題が空でないことを確認
         if not selected_questions:
-            logger.error("No questions selected")
+            logger.error("選択された問題がありません")
             return []
 
         return selected_questions
 
     except Exception as e:
-        logger.error(f"Error in get_questions: {e}")
-        logger.exception("Full traceback:")
+        logger.error(f"get_questions関数でエラーが発生しました: {e}")
+        logger.exception("詳細なエラー情報:")
         return []
 
 
@@ -1234,60 +1249,53 @@ def quiz_history(grade, category, subcategory, difficulty):
 
         logger.info(f"Processed {len(history_data)} history entries")
 
-        # 問題データを直接取得
-        file_path = f'quiz_data/grade_{grade}/{category}/{subcategory}/{difficulty}/questions.json'
+        # 問題データを取得
+        questions = load_quiz_questions(grade, category, subcategory, difficulty)
         question_stats = {}
         
-        if os.path.exists(file_path):
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    questions = json.load(f)
-                    
-                # 問題ごとの統計を初期化
-                for question in questions:
+        if questions:
+            # 問題ごとの統計を初期化
+            for question in questions:
+                question_text = question.get('question', '')
+                question_stats[question_text] = {
+                    'total_attempts': 0,
+                    'correct_attempts': 0,
+                    'percentage': 0,
+                    'has_attempts': False  # 回答有無を追跡
+                }
+        
+            # 履歴から統計を計算
+            for entry in history_data:
+                for question in entry['questions']:
                     question_text = question.get('question', '')
-                    question_stats[question_text] = {
-                        'total_attempts': 0,
-                        'correct_attempts': 0,
-                        'percentage': 0,
-                        'has_attempts': False  # 回答有無を追跡
-                    }
+                    if question_text in question_stats:
+                        question_stats[question_text]['total_attempts'] += 1
+                        question_stats[question_text]['has_attempts'] = True
+                        if question.get('is_correct', False):
+                            question_stats[question_text]['correct_attempts'] += 1
         
-                # 履歴から統計を計算
-                for entry in history_data:
-                    for question in entry['questions']:
-                        question_text = question.get('question', '')
-                        if question_text in question_stats:
-                            question_stats[question_text]['total_attempts'] += 1
-                            question_stats[question_text]['has_attempts'] = True
-                            if question.get('is_correct', False):
-                                question_stats[question_text]['correct_attempts'] += 1
-        
-                # 正答率を計算
-                for stats in question_stats.values():
-                    if stats['total_attempts'] > 0:
-                        stats['percentage'] = (stats['correct_attempts'] / stats['total_attempts']) * 100
+            # 正答率を計算
+            for stats in question_stats.values():
+                if stats['total_attempts'] > 0:
+                    stats['percentage'] = (stats['correct_attempts'] / stats['total_attempts']) * 100
 
-                # 回答済みと未回答の問題に分類
-                answered_questions = {q: stats for q, stats in question_stats.items() if stats['has_attempts']}
-                unanswered_questions = {q: stats for q, stats in question_stats.items() if not stats['has_attempts']}
+            # 回答済みと未回答の問題に分類
+            answered_questions = {q: stats for q, stats in question_stats.items() if stats['has_attempts']}
+            unanswered_questions = {q: stats for q, stats in question_stats.items() if not stats['has_attempts']}
 
-                # 回答済み問題を正答率でソート（降順）
-                sorted_answered = dict(sorted(
-                    answered_questions.items(),
-                    key=lambda x: (x[1]['percentage'], x[1]['total_attempts']),
-                    reverse=True
-                ))
+            # 回答済み問題を正答率でソート（降順）
+            sorted_answered = dict(sorted(
+                answered_questions.items(),
+                key=lambda x: (x[1]['percentage'], x[1]['total_attempts']),
+                reverse=True
+            ))
 
-                # 未回答問題をアルファベット順でソート
-                sorted_unanswered = dict(sorted(unanswered_questions.items()))
+            # 未回答問題をアルファベット順でソート
+            sorted_unanswered = dict(sorted(unanswered_questions.items()))
 
-                # 回答済み問題と未回答問題を結合
-                question_stats = {**sorted_answered, **sorted_unanswered}
+            # 回答済み問題と未回答問題を結合
+            question_stats = {**sorted_answered, **sorted_unanswered}
                 
-            except Exception as e:
-                logger.error(f"Error reading questions file: {e}")
-        
         return render_template(
             'quiz_history.html',
             history_data=history_data,

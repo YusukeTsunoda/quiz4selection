@@ -164,12 +164,14 @@ class QuestionHistory(db.Model):
     def get_questions_for_quiz(cls, user_id, grade, category, subcategory, difficulty, num_questions=10):
         """クイズ用の問題を選択"""
         # 問題データを読み込む
-        file_path = f'quiz_data/grade_{grade}/{category}/{subcategory}/{difficulty}/questions.json'
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                all_questions = json.load(f)
+            from quiz_data.loader import get_questions
+            all_questions = get_questions(grade, category, subcategory, difficulty)
+            if not all_questions:
+                logger.warning(f"問題が見つかりません: grade_{grade}/{category}/{subcategory}/{difficulty}")
+                return []
         except Exception as e:
-            logger.error(f"Error loading questions: {e}")
+            logger.error(f"問題データの読み込みエラー: {e}")
             return []
 
         # ユーザーの問題履歴を取得
