@@ -28,10 +28,15 @@
               {% for grade in user.allowed_grades %}
               <li>
                 <strong>{{ grade }}年生:</strong>
-                {% if 'japanese' in user.allowed_subjects or 'math' in user.allowed_subjects %}
-                  {% if 'japanese' in user.allowed_subjects %}国語{% endif %}
-                  {% if 'japanese' in user.allowed_subjects and 'math' in user.allowed_subjects %}、{% endif %}
-                  {% if 'math' in user.allowed_subjects %}算数{% endif %}
+                {% set subject_list = [] %}
+                {% for subject, subcategories in user.allowed_subjects.items() %}
+                  {% if subcategories and subject in CATEGORY_NAMES %}
+                    {% set subject_list = subject_list + [CATEGORY_NAMES[subject]] %}
+                  {% endif %}
+                {% endfor %}
+                
+                {% if subject_list %}
+                  {{ subject_list|join('、') }}
                 {% else %}
                   設定された科目はありません
                 {% endif %}

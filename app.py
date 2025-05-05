@@ -229,9 +229,22 @@ SUBCATEGORY_NAMES = {
         'agriculture': '気候と農業や水産業との関係',
         'information': '情報産業とわたしたちの生活',
         'transportation': '運輸・通信と貿易',
+        'environment': 'わたしたちの生活と環境',
         'disaster': '国土の自然災害の防止',
         'fishery': '我が国の農業や水産業',
         'manufacturing': '我が国の工業生産',
+        'food_production': 'これからの食料生産'
+    },
+    'life': {
+        'school': '学校生活に慣れる（学校の施設や規則、友達との関わり）',
+        'family': '家族や地域との関わり（自分の家族、通学路、公共施設）',
+        'seasons': '季節と生活',
+        'nature': '自然との触れ合い',
+        'safety': '安全な生活',
+        'growth': '自分の成長',
+        'community': '地域との関わり'
+    },
+    'history': {
         'history_ancient': '歴史：縄文～古墳時代',
         'history_asuka': '歴史：飛鳥～奈良時代',
         'history_heian': '歴史：平安時代',
@@ -246,16 +259,8 @@ SUBCATEGORY_NAMES = {
         'government': '政治：国会・内閣・裁判所',
         'local': '政治：地方自治',
         'un': '政治：国際連合の働き',
-        'international': '政治：世界の中の日本'
-    },
-    'life': {
-        'school': '学校生活に慣れる（学校の施設や規則、友達との関わり）',
-        'family': '家族や地域との関わり（自分の家族、通学路、公共施設）',
-        'seasons': '季節と生活',
-        'nature': '自然との触れ合い',
-        'safety': '安全な生活',
-        'growth': '自分の成長',
-        'community': '地域との関わり'
+        'international': '政治：世界の中の日本',
+        'food_production': 'これからの食料生産'
     }
 }
 
@@ -440,7 +445,8 @@ GRADE_CATEGORIES = {
             'environment',   # わたしたちの生活と環境
             'disaster',      # 国土の自然災害の防止
             'fishery',       # 我が国の農業や水産業
-            'manufacturing'  # 我が国の工業生産
+            'manufacturing',  # 我が国の工業生産
+            'food_production' # これからの食料生産
         ]
     },
     6: {
@@ -759,6 +765,12 @@ def start_quiz(grade, category, subcategory, difficulty):
             return redirect(url_for('select_difficulty', grade=grade,
                             category=category, subcategory=subcategory))
 
+        # 問題を10問に制限する
+        original_count = len(questions)
+        if original_count > 10:
+            questions = random.sample(questions, 10)
+            logger.info(f"[Debug] Limited to 10 random questions out of {original_count}")
+        
         # 最初の問題を取得
         if not questions or len(questions) == 0:
             logger.error("[Debug] Questions list is empty")
@@ -776,14 +788,16 @@ def start_quiz(grade, category, subcategory, difficulty):
         if not all(field in first_question for field in required_fields):
             logger.error("[Debug] First question is missing required fields")
             flash('問題データの形式が正しくありません。', 'error')
-            return redirect(url_for('select_difficulty', grade=grade,
-                            category=category, subcategory=subcategory))
+        # セッションサイズを削減するため、問題IDのみを保存
+        question_ids = []
+        for i, q in enumerate(questions):
+            q_id = f"{grade}_{category}_{subcategory}_{difficulty}_{i}"
+            # グローバルキャッシュに問題データを保存
+            cache.set(q_id, q, timeout=3600)  # 1時間キャッシュ
+            question_ids.append(q_id)
         
-        # シャッフルされた問題をセッションに保存
-        questions[0] = first_question
-        session['questions'] = questions
-        session['current_question'] = 0  # 0-based index
-        session['score'] = 0  # スコアを0に初期化
+        # 問題IDのリストをセッションに保存（サイズ削減）
+        session['question_ids'] = question_ids
         session['quiz_history'] = []
         session['answered_questions'] = []
         session['grade'] = grade
@@ -810,13 +824,13 @@ def start_quiz(grade, category, subcategory, difficulty):
                             category=category, subcategory=subcategory))
         
         return render_template('quiz.html',
-                            question=question_data['question'],
-                            options=question_data['options'],
-                            question_data=question_data_json,
-                            current_question=0,  # 0-based index for internal use
-                            display_question=1,  # 1-based index for display
-                            total_questions=len(questions),
-                            score=0)
+                           question=question_data['question'],
+                           options=question_data['options'],
+                           question_data=question_data_json,
+                           current_question=0,  # 0-based index for internal use
+                           display_question=1,  # 1-based index for display
+                           total_questions=len(questions),
+                           score=0)
 
     except Exception as e:
         logger.error(f"[Debug] Error in start_quiz: {e}")
@@ -851,25 +865,31 @@ def submit_answer():
             return jsonify({'error': '選択された回答が含まれていません', 'code': 'MISSING_SELECTED'}), 400
 
         # セッションデータの取得と検証
-        questions = session.get('questions', [])
+        question_ids = session.get('question_ids', [])
         current_question = session.get('current_question', 0)
         quiz_history = session.get('quiz_history', [])
         score = session.get('score', 0)
 
-        logger.info(f"[Debug] Current state: question={current_question}, score={score}, total={len(questions)}")
+        logger.info(f"[Debug] Current state: question={current_question}, score={score}, total={len(question_ids)}")
 
         # 問題データの検証
-        if current_question >= len(questions):
-            logger.error(f"[Debug] Invalid question index: {current_question} >= {len(questions)}")
+        if current_question >= len(question_ids):
+            logger.error(f"[Debug] Invalid question index: {current_question} >= {len(question_ids)}")
             return jsonify({'error': '無効な問題番号です', 'code': 'INVALID_QUESTION_INDEX'}), 400
 
-        current_q = questions[current_question]
-        logger.info(f"[Debug] Current question data: {current_q}")
+        # 問題IDから問題データを取得
+        question_id = question_ids[current_question]
+        question_data = cache.get(question_id)
+        if not question_data:
+            logger.error(f"[Debug] Question data not found for ID: {question_id}")
+            return jsonify({'error': '問題データが見つかりません', 'code': 'QUESTION_DATA_NOT_FOUND'}), 404
+        
+        logger.info(f"[Debug] Current question data: {question_data}")
 
         # 回答の処理
         selected_index = int(data['selected'])
         current_options = data.get('options', [])  # シャッフルされた選択肢の配列
-        correct_option = current_q['options'][current_q['correct_answer_index']]
+        correct_option = current_options[question_data['correct_answer_index']]
         selected_option = current_options[selected_index]
         is_correct = selected_option == correct_option
         
@@ -883,14 +903,14 @@ def submit_answer():
 
         # 履歴エントリを作成
         history_entry = {
-            'question': current_q['question'],
+            'question': question_data['question'],
             'options': current_options,  # シャッフルされた選択肢を使用
             'user_answer_index': selected_index,
             'user_answer': current_options[selected_index],
-            'correct_answer_index': current_q['correct_answer_index'],
-            'correct_answer': current_options[current_q['correct_answer_index']],
+            'correct_answer_index': question_data['correct_answer_index'],
+            'correct_answer': current_options[question_data['correct_answer_index']],
             'is_correct': is_correct,
-            'explanation': current_q.get('explanation', '')
+            'explanation': question_data.get('explanation', '')
         }
 
         # 履歴を更新
@@ -904,8 +924,9 @@ def submit_answer():
         logger.info(f"[Debug] Moving to next question: {current_question}")
         
         # 次の問題のデータを準備
-        is_last_question = current_question >= len(questions)
-        next_question = None if is_last_question else get_shuffled_question(questions[current_question])
+        is_last_question = current_question >= len(question_ids)
+        next_question_id = question_ids[current_question] if not is_last_question else None
+        next_question_data = cache.get(next_question_id) if next_question_id else None
 
         # セッションの保存を確実に行う
         session.modified = True
@@ -937,7 +958,7 @@ def submit_answer():
                     subcategory=session.get('subcategory'),
                     difficulty=session.get('difficulty'),
                     score=score,
-                    total_questions=len(questions),
+                    total_questions=len(question_ids),
                     quiz_history=formatted_history
                 )
                 db.session.add(quiz_attempt)
@@ -951,7 +972,7 @@ def submit_answer():
                     category=session.get('category'),
                     subcategory=session.get('subcategory'),
                     difficulty=session.get('difficulty'),
-                    question_text=current_q['question'],
+                    question_text=question_data['question'],
                     is_correct=is_correct
                 )
             except Exception as e:
@@ -961,9 +982,9 @@ def submit_answer():
         return jsonify({
             'is_correct': is_correct,
             'score': score,
-            'next_question': next_question,
+            'next_question': next_question_data,
             'is_last_question': is_last_question,
-            'explanation': current_q.get('explanation', '')
+            'explanation': question_data.get('explanation', '')
         })
 
     except Exception as e:
@@ -980,32 +1001,33 @@ def submit_answer():
 def next_question():
     """次の問題を表示する"""
     try:
-        questions = session.get('questions', [])
+        question_ids = session.get('question_ids', [])
         current_question = session.get('current_question', 0)
         
         logger.info(f"[Debug] Next question - Current index: {current_question}")
-        logger.info(f"[Debug] Total questions: {len(questions)}")
+        logger.info(f"[Debug] Total questions: {len(question_ids)}")
         logger.info(f"[Debug] Session state: {dict(session)}")
         
         # 全問題が終了した場合
-        if current_question >= len(questions):
+        if current_question >= len(question_ids):
             logger.info("[Debug] Quiz completed, redirecting to result page")
             return redirect(url_for('result'))
         
-        # 現在の問題を取得してシャッフル
-        question_data = get_shuffled_question(questions[current_question])
+        # 次の問題のIDを取得
+        next_question_id = question_ids[current_question]
+        next_question_data = cache.get(next_question_id)
         
         # データの存在確認
-        if not question_data:
+        if not next_question_data:
             logger.error("[Debug] Question data is empty")
             return redirect(url_for('grade_select'))
             
         # データの内容を詳しくログ出力
-        logger.info(f"[Debug] Question data before encoding: {question_data}")
+        logger.info(f"[Debug] Question data before encoding: {next_question_data}")
         
         # JSONエンコード
         try:
-            question_data_json = json.dumps(question_data, ensure_ascii=False)
+            question_data_json = json.dumps(next_question_data, ensure_ascii=False)
             logger.info(f"[Debug] Question data after encoding: {question_data_json}")
         except Exception as e:
             logger.error(f"[Debug] Error encoding question data: {e}")
@@ -1019,12 +1041,12 @@ def next_question():
         session.modified = True
         
         return render_template('quiz.html',
-                           question=question_data['question'],
-                           options=question_data['options'],
+                           question=next_question_data['question'],
+                           options=next_question_data['options'],
                            question_data=question_data_json,
                            current_question=current_question,
                            display_question=display_question,
-                           total_questions=len(questions),
+                           total_questions=len(question_ids),
                            score=session.get('score', 0))
 
     except Exception as e:
@@ -1156,7 +1178,7 @@ def result():
     try:
         # セッションから必要な情報を取得
         score = session.get('score', 0)
-        total_questions = len(session.get('questions', []))
+        total_questions = len(session.get('question_ids', []))
         quiz_history = session.get('quiz_history', [])
 
         if not quiz_history:
@@ -1610,7 +1632,7 @@ def admin_user_edit(user_id):
                         'id': subcategory,
                         'name': subcategory_name
                     })
-        
+
         return render_template('admin/user_edit.html',
                            user=user,
                            subjects_by_grade=subjects_by_grade,
