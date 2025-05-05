@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}ページが見つかりません{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-warning text-white">
+                    <h2 class="mb-0">404 - ページが見つかりません</h2>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-exclamation-triangle fa-4x text-warning"></i>
+                    </div>
+                    <p class="lead text-center">お探しのページは存在しないか、移動した可能性があります。</p>
+                    <p class="text-center">URLが正しいかご確認ください。</p>
+                    <div class="d-flex justify-content-center mt-4">
+                        <a href="{{ url_for('index') }}" class="btn btn-primary me-2">
+                            <i class="fas fa-home"></i> ホームに戻る
+                        </a>
+                        <a href="{{ url_for('grade_select') }}" class="btn btn-success">
+                            <i class="fas fa-list"></i> 学年選択に戻る
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

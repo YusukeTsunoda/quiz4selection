@@ -5,6 +5,8 @@ from flask_sqlalchemy import SQLAlchemy
 from extensions import db
 from flask_login import UserMixin
 import random
+from sqlalchemy.dialects.postgresql import JSON as PostgresJSON
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -16,13 +18,13 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(120), unique=True, nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    allowed_subjects = db.Column(db.JSON, default=lambda: {
+    allowed_subjects = db.Column(PostgresJSON, default=lambda: {
         'japanese': ['kanji', 'reading', 'grammar', 'writing'],
         'math': ['calculation', 'figure', 'measurement', 'graph'],
         'science': ['physics', 'chemistry', 'biology', 'earth_science'],
         'society': ['history', 'geography', 'civics', 'current_events', 'prefectures']
     })
-    allowed_grades = db.Column(db.JSON, default=lambda: list(range(1, 7)))
+    allowed_grades = db.Column(PostgresJSON, default=lambda: list(range(1, 7)))
     quiz_attempts = db.relationship('QuizAttempt', backref='user', lazy=True)
 
     def get_id(self):
@@ -71,7 +73,7 @@ class QuizAttempt(db.Model):
     difficulty = db.Column(db.String(20), nullable=False)
     score = db.Column(db.Integer, nullable=False, default=0)
     total_questions = db.Column(db.Integer, nullable=False, default=0)
-    quiz_history = db.Column(db.JSON)
+    quiz_history = db.Column(PostgresJSON)
     timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
 
     @property

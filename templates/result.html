@@ -6,9 +6,8 @@
       <h3>最終スコア: {{ score }}/{{ total_questions }}</h3>
       <div class="progress mb-3">
         <div
-          class="progress-bar bg-success"
+          class="progress-bar bg-success dynamic-width"
           role="progressbar"
-          style="width: {{ (score/total_questions*100)|round }}%"
           aria-valuenow="{{ score }}"
           aria-valuemin="0"
           aria-valuemax="{{ total_questions }}"
@@ -39,11 +38,11 @@
           <div class="options-list">
             {% for option in item.options %}
             <div
-              class="option-item {% if loop.index0 == item.selected_index %}selected{% endif %} {% if loop.index0 == item.correct_index %}correct{% endif %}"
+              class="option-item {% if loop.index0 == item.user_answer_index %}selected{% endif %} {% if loop.index0 == item.correct_answer_index %}correct{% endif %}"
             >
-              {{ option }} {% if loop.index0 == item.selected_index %}
+              {{ option }} {% if loop.index0 == item.user_answer_index %}
               <span class="badge selected-badge">選択</span>
-              {% endif %} {% if loop.index0 == item.correct_index %}
+              {% endif %} {% if loop.index0 == item.correct_answer_index %}
               <span class="badge correct-badge">正解</span>
               {% endif %}
             </div>

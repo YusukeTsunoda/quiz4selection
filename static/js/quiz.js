@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 正解のインデックスを保存
         const optionsContainer = document.querySelector('.options-container');
         if (optionsContainer) {
-            const correctIndex = questionData.correct;
+            const correctIndex = questionData.correct_answer_index;
             optionsContainer.dataset.correct = correctIndex;
             console.log('[Debug] Correct index:', correctIndex);
         }

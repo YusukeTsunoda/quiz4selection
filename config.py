@@ -2,6 +2,7 @@ import os
 import logging
 from dotenv import load_dotenv
 
+# .envファイルを読み込む
 load_dotenv()
 
 # ロガーの設定
@@ -14,9 +15,9 @@ def is_development():
 class Config:
     """アプリケーション設定"""
     def __init__(self):
-        # SQLiteデータベースを使用
-        self.SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'sqlite:///quiz.db')
-        logger.info(f"Using database: {self.SQLALCHEMY_DATABASE_URI}")
+        # PostgreSQL接続設定
+        self.SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/quiz4selection')
+        logger.info(f"Using PostgreSQL database: {self.SQLALCHEMY_DATABASE_URI}")
             
         self.SQLALCHEMY_TRACK_MODIFICATIONS = False
         self.SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')

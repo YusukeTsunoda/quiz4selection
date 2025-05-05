@@ -150,7 +150,7 @@ SUBCATEGORY_NAMES = {
         'rounding': '概数と四捨五入',
         'decimals': '小数',
         'fractions': '分数',
-        'angles': '角度',
+        'angles': '角度の測定と作図',
         'area': '面積',
         'volume': '体積',
         'parallel_lines': '垂直と平行',
@@ -531,11 +531,12 @@ def get_shuffled_question(question):
     """問題の選択肢をシャッフルする"""
     shuffled = question.copy()
     options = shuffled['options'].copy()
-    correct_index = shuffled['correct']
+    correct_index = shuffled['correct_answer_index']
     correct_option = options[correct_index]  # 正解の選択肢を保存
     
     # 選択肢をシャッフル
     indices = list(range(len(options)))
+    random.seed()  # 明示的にシードをリセット
     random.shuffle(indices)
     
     # 選択肢を並び替え
@@ -544,8 +545,11 @@ def get_shuffled_question(question):
     # 正解の選択肢の新しいインデックスを見つける
     for i, option in enumerate(shuffled['options']):
         if option == correct_option:
-            shuffled['correct'] = i
+            shuffled['correct_answer_index'] = i
             break
+    
+    # デバッグログを追加
+    logger.info(f"選択肢シャッフル: 元のインデックス={correct_index}、新インデックス={shuffled['correct_answer_index']}")
     
     return shuffled
 
@@ -629,7 +633,7 @@ def select_difficulty(grade, category, subcategory):
                                 isinstance(q, dict) and 
                                 'question' in q and 
                                 'options' in q and 
-                                ('correct' in q or 'correct_answer' in q) and 
+                                ('correct_answer_index' in q) and 
                                 isinstance(q['options'], list) 
                                 for q in questions
                             )
@@ -717,7 +721,7 @@ def start_quiz(grade, category, subcategory, difficulty):
         logger.info(f"[Debug] First question data (after shuffle): {first_question}")
         
         # 問題データの形式を確認
-        required_fields = ['question', 'options', 'correct']
+        required_fields = ['question', 'options', 'correct_answer_index']
         if not all(field in first_question for field in required_fields):
             logger.error("[Debug] First question is missing required fields")
             flash('問題データの形式が正しくありません。', 'error')
@@ -740,7 +744,7 @@ def start_quiz(grade, category, subcategory, difficulty):
         question_data = {
             'question': first_question.get('question', '問題が見つかりません'),
             'options': first_question.get('options', []),
-            'correct': first_question.get('correct', 0),
+            'correct_answer_index': first_question.get('correct_answer_index', 0),
             'explanation': first_question.get('explanation', '')
         }
         
@@ -814,9 +818,11 @@ def submit_answer():
         # 回答の処理
         selected_index = int(data['selected'])
         current_options = data.get('options', [])  # シャッフルされた選択肢の配列
-        is_correct = selected_index == current_q['correct']
-
-        logger.info(f"[Debug] Answer check: selected={selected_index}, correct={current_q['correct']}, is_correct={is_correct}")
+        correct_option = current_q['options'][current_q['correct_answer_index']]
+        selected_option = current_options[selected_index]
+        is_correct = selected_option == correct_option
+        
+        logger.info(f"[Debug] Answer check: selected_index={selected_index}, selected_option='{selected_option}', correct_option='{correct_option}', is_correct={is_correct}")
 
         # スコアの更新
         if is_correct:
@@ -828,10 +834,10 @@ def submit_answer():
         history_entry = {
             'question': current_q['question'],
             'options': current_options,  # シャッフルされた選択肢を使用
-            'selected_index': selected_index,
-            'selected_option': current_options[selected_index],
-            'correct_index': current_q['correct'],
-            'correct_option': current_options[current_q['correct']],
+            'user_answer_index': selected_index,
+            'user_answer': current_options[selected_index],
+            'correct_answer_index': current_q['correct_answer_index'],
+            'correct_answer': current_options[current_q['correct_answer_index']],
             'is_correct': is_correct,
             'explanation': current_q.get('explanation', '')
         }
@@ -863,10 +869,10 @@ def submit_answer():
                     formatted_entry = {
                         'question': entry['question'],
                         'options': entry['options'],
-                        'selected_index': entry['selected_index'],
-                        'selected_option': entry['options'][entry['selected_index']],
-                        'correct_index': entry['correct_index'],
-                        'correct_option': entry['options'][entry['correct_index']],
+                        'user_answer_index': entry['user_answer_index'],
+                        'user_answer': entry['options'][entry['user_answer_index']],
+                        'correct_answer_index': entry['correct_answer_index'],
+                        'correct_answer': entry['options'][entry['correct_answer_index']],
                         'is_correct': entry['is_correct'],
                         'explanation': entry.get('explanation', '')  # 解説を追加
                     }
@@ -935,8 +941,8 @@ def next_question():
             logger.info("[Debug] Quiz completed, redirecting to result page")
             return redirect(url_for('result'))
         
-        # 現在の問題を取得
-        question_data = questions[current_question]
+        # 現在の問題を取得してシャッフル
+        question_data = get_shuffled_question(questions[current_question])
         
         # データの存在確認
         if not question_data:
@@ -1648,3 +1654,25 @@ login_manager.login_view = 'login'
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(user_id)
+
+# 404エラーハンドラ
+@app.errorhandler(404)
+def page_not_found(error):
+    """404エラー（ページが見つからない）のハンドリング"""
+    logger.info(f"404 error: {request.path}")
+    return render_template('404.html'), 404
+
+# 500エラーハンドラ
+@app.errorhandler(500)
+def internal_server_error(error):
+    """500エラー（サーバー内部エラー）のハンドリング"""
+    error_info = str(error)
+    logger.error(f"500 error: {error_info}")
+    logger.exception("詳細エラー情報:")
+    
+    # 管理者かどうかの確認
+    is_admin = False
+    if current_user.is_authenticated:
+        is_admin = current_user.is_admin
+    
+    return render_template('500.html', error_info=error_info, is_admin=is_admin), 500
