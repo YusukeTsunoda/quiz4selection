@@ -535,7 +535,34 @@ def get_subcategories(grade, subject):
 
 def get_subcategories(grade, category):
     """指定された学年とカテゴリのサブカテゴリを取得"""
-    return GRADE_CATEGORIES.get(grade, {}).get(category, [])
+    # 基本のサブカテゴリーリストを取得
+    all_subcategories = GRADE_CATEGORIES.get(grade, {}).get(category, [])
+    
+    # ログインしていない場合は全てのサブカテゴリーを返す
+    if not current_user.is_authenticated:
+        return all_subcategories
+    
+    # 管理者の場合は全てのサブカテゴリーを返す
+    if current_user.is_admin:
+        return all_subcategories
+    
+    # ユーザーの権限をチェック
+    # 許可された学年かどうか確認
+    if grade not in current_user.allowed_grades:
+        logger.info(f"ユーザー {current_user.id} は学年 {grade} へのアクセス権限がありません")
+        return []
+    
+    # 許可されたカテゴリーかどうか確認
+    if category not in current_user.allowed_subjects:
+        logger.info(f"ユーザー {current_user.id} はカテゴリー {category} へのアクセス権限がありません")
+        return []
+    
+    # 許可されたサブカテゴリーのみをフィルタリング
+    allowed_subcategories = current_user.allowed_subjects.get(category, [])
+    filtered_subcategories = [sc for sc in all_subcategories if sc in allowed_subcategories]
+    
+    logger.debug(f"ユーザー {current_user.id} の学年 {grade}, カテゴリー {category} のサブカテゴリー: {filtered_subcategories}")
+    return filtered_subcategories
 
 def get_shuffled_question(question):
     """問題の選択肢をシャッフルする"""
@@ -605,7 +632,21 @@ def select_category(grade):
         flash('無効な学年が選択されました')
         return redirect(url_for('grade_select'))
     
-    return render_template('category_select.html', grade=grade)
+    # ユーザーが認証されていない場合や管理者の場合は、すべてのカテゴリーを表示
+    if not current_user.is_authenticated or current_user.is_admin:
+        return render_template('category_select.html', grade=grade)
+    
+    # 許可された学年かどうか確認
+    if grade not in current_user.allowed_grades:
+        flash('この学年へのアクセス権限がありません')
+        return redirect(url_for('grade_select'))
+    
+    # 許可されたカテゴリーのみを表示
+    allowed_categories = current_user.allowed_subjects.keys()
+    
+    return render_template('category_select.html', 
+                          grade=grade, 
+                          allowed_categories=allowed_categories)
 
 @app.route('/grade/<int:grade>/category/<category>/subcategory')
 def select_subcategory(grade, category):
@@ -1010,6 +1051,9 @@ def dashboard():
         # クイズの試行履歴を取得
         quiz_attempts = QuizAttempt.query.filter_by(user_id=user_id).order_by(QuizAttempt.timestamp.desc()).all()
         
+        # 直近のクイズ履歴（最大10件）
+        recent_quiz_attempts = quiz_attempts[:10] if quiz_attempts else []
+        
         # 進捗データの初期化
         progress = {grade: {} for grade in range(1, 7)}
 
@@ -1093,11 +1137,13 @@ def dashboard():
             'hard': '上級'
         }
 
-        return render_template('dashboard.html',
-                           progress=progress,
-                           difficulty_names=difficulty_names,
-                           quiz_attempts=quiz_attempts)
-
+        return render_template('dashboard.html', 
+                              progress=progress, 
+                              difficulty_names=difficulty_names,
+                              recent_quiz_attempts=recent_quiz_attempts,
+                              CATEGORY_NAMES=CATEGORY_NAMES,
+                              SUBCATEGORY_NAMES=SUBCATEGORY_NAMES)
+        
     except Exception as e:
         logger.error(f"Error in dashboard route: {e}")
         flash('ダッシュボードの表示中にエラーが発生しました。', 'error')

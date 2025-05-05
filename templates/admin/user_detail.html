@@ -63,7 +63,10 @@
                 <thead>
                   <tr>
                     <th>日時</th>
+                    <th>学年</th>
                     <th>科目</th>
+                    <th>単元</th>
+                    <th>レベル</th>
                     <th>スコア</th>
                   </tr>
                 </thead>
@@ -71,9 +74,26 @@
                   {% for attempt in quiz_attempts %}
                   <tr>
                     <td>{{ attempt.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>{{ attempt.grade }}年生</td>
+                    <td>{{ CATEGORY_NAMES[attempt.category] }}</td>
                     <td>
-                      {{ CATEGORY_NAMES[attempt.category] }} ({{
-                      SUBCATEGORY_NAMES[attempt.subcategory] }})
+                      {% set subcategory_name = SUBCATEGORY_NAMES[attempt.category][attempt.subcategory] %}
+                      {% if subcategory_name|length > 14 %}
+                        {{ subcategory_name[:14] }}...
+                      {% else %}
+                        {{ subcategory_name }}
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if attempt.difficulty == 'easy' %}
+                        初級
+                      {% elif attempt.difficulty == 'medium' %}
+                        中級
+                      {% elif attempt.difficulty == 'hard' %}
+                        上級
+                      {% else %}
+                        {{ attempt.difficulty }}
+                      {% endif %}
                     </td>
                     <td>{{ attempt.score }}/{{ attempt.total_questions }}</td>
                   </tr>

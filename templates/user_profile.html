@@ -23,26 +23,21 @@
 
           {% if not user.is_admin %}
           <div class="mb-4">
-            <h3 class="h6">利用可能な学年</h3>
+            <h3 class="h6">利用可能な学年と科目</h3>
             <ul class="list-unstyled">
               {% for grade in user.allowed_grades %}
-              <li>{{ grade }}年生</li>
+              <li>
+                <strong>{{ grade }}年生:</strong>
+                {% if 'japanese' in user.allowed_subjects or 'math' in user.allowed_subjects %}
+                  {% if 'japanese' in user.allowed_subjects %}国語{% endif %}
+                  {% if 'japanese' in user.allowed_subjects and 'math' in user.allowed_subjects %}、{% endif %}
+                  {% if 'math' in user.allowed_subjects %}算数{% endif %}
+                {% else %}
+                  設定された科目はありません
+                {% endif %}
+              </li>
               {% endfor %}
             </ul>
-          </div>
-
-          <div class="mb-4">
-            <h3 class="h6">利用可能な科目</h3>
-            {% for category, subcategories in user.allowed_subjects.items() %}
-            <div class="mb-3">
-              <h4 class="h6 mb-2">{{ CATEGORY_NAMES[category] }}</h4>
-              <ul class="list-unstyled">
-                {% for subcategory in subcategories %}
-                <li>{{ SUBCATEGORY_NAMES[subcategory] }}</li>
-                {% endfor %}
-              </ul>
-            </div>
-            {% endfor %}
           </div>
           {% endif %}
 
